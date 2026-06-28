@@ -29,6 +29,7 @@ import {
   BPM_MAX,
   BPM_MIN,
   COUNT_IN_OPTIONS,
+  DEFAULT_PRACTICE_CONFIG,
   DRILL_MAX,
   DRILL_MIN,
   POOL_MAX,
@@ -37,6 +38,7 @@ import {
   TIME_SIGNATURES,
   TRANSITION_MAX,
   TRANSITION_UNIT_OPTIONS,
+  type PracticeConfig,
   type TransitionUnit,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
@@ -113,11 +115,18 @@ export default function PracticeSetupPage() {
     [loadedDrillId, drillsLib.drills],
   );
   // Has the live config diverged from the saved drill's config? Drives
-  // the "Discard changes" affordance. JSON-equality is fine here —
-  // PracticeConfig is small, plain data, deterministic field order.
+  // the "Discard changes" affordance and the Save changes button state.
+  //
+  // Both sides are spread-from-defaults FIRST so:
+  //   (a) key order is deterministic across both objects (JSON.stringify
+  //       reflects insertion order in V8)
+  //   (b) a drill saved under an older PracticeConfig schema (missing
+  //       newer fields) doesn't read as "dirty" just because the live
+  //       config has been auto-filled with defaults during loadConfig.
   const isDirty = useMemo(() => {
     if (!editingDrill) return false;
-    const liveJson = JSON.stringify({
+    const live: PracticeConfig = {
+      ...DEFAULT_PRACTICE_CONFIG,
       chordPool: config.chordPool,
       orderingStrategy: config.orderingStrategy,
       measuresPerChord: config.measuresPerChord,
@@ -130,8 +139,14 @@ export default function PracticeSetupPage() {
       countInMeasures: config.countInMeasures,
       notationStyle: config.notationStyle,
       arpeggioPattern: config.arpeggioPattern,
-    });
-    return liveJson !== JSON.stringify(editingDrill.config);
+      transitionUnit: config.transitionUnit,
+      transitionCount: config.transitionCount,
+    };
+    const saved: PracticeConfig = {
+      ...DEFAULT_PRACTICE_CONFIG,
+      ...editingDrill.config,
+    };
+    return JSON.stringify(live) !== JSON.stringify(saved);
   }, [editingDrill, config]);
 
   // Quick-build wizard state. Sets aren't directly reactive in

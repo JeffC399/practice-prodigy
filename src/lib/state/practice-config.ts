@@ -121,7 +121,13 @@ export const REPS_MAX = 32;
 export const POOL_MAX = 144;
 export const TRANSITION_MAX = 16;
 
-const DEFAULT_CONFIG: PracticeConfig = {
+/**
+ * Exported default PracticeConfig — consumed by setup-page logic that
+ * needs to normalize older saved drill snapshots up to the current
+ * schema (so newly-added fields don't show as "dirty" just because
+ * an old drill doesn't carry them yet).
+ */
+export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   chordPool: [{ root: "A", quality: "min7" }],
   orderingStrategy: "custom",
   measuresPerChord: 1,
@@ -175,7 +181,7 @@ type PracticeConfigStore = PracticeConfig & {
 export const usePracticeConfig = create<PracticeConfigStore>()(
   persist(
     (set) => ({
-      ...DEFAULT_CONFIG,
+      ...DEFAULT_PRACTICE_CONFIG,
       loadedDrillId: null,
       setLoadedDrillId: (loadedDrillId) => set({ loadedDrillId }),
       addChord: (chord) =>
@@ -213,7 +219,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           const next =
             chords.length > 0
               ? chords.slice(0, POOL_MAX)
-              : DEFAULT_CONFIG.chordPool;
+              : DEFAULT_PRACTICE_CONFIG.chordPool;
           return { chordPool: next };
         }),
       appendChords: (chords) =>
@@ -258,8 +264,8 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
       loadConfig: (config) =>
         // Spread defaults first so a drill saved under an older schema
         // (missing fields added later) still loads with sensible values.
-        set(() => ({ ...DEFAULT_CONFIG, ...config })),
-      resetToDefaults: () => set(DEFAULT_CONFIG),
+        set(() => ({ ...DEFAULT_PRACTICE_CONFIG, ...config })),
+      resetToDefaults: () => set(DEFAULT_PRACTICE_CONFIG),
     }),
     {
       name: "practice-prodigy:practice-config:v1",
@@ -280,9 +286,9 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           delete next.chord;
           next.chordPool = oldChord
             ? [oldChord]
-            : DEFAULT_CONFIG.chordPool;
-          next.orderingStrategy = DEFAULT_CONFIG.orderingStrategy;
-          next.measuresPerChord = DEFAULT_CONFIG.measuresPerChord;
+            : DEFAULT_PRACTICE_CONFIG.chordPool;
+          next.orderingStrategy = DEFAULT_PRACTICE_CONFIG.orderingStrategy;
+          next.measuresPerChord = DEFAULT_PRACTICE_CONFIG.measuresPerChord;
         }
 
         // v2 → v3: `sessionMeasures` renamed to `drillMeasures` and the
@@ -291,17 +297,17 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         // setups behave identically.
         if (version <= 2) {
           const oldMeasures = (next.sessionMeasures as number | undefined) ??
-            DEFAULT_CONFIG.drillMeasures;
+            DEFAULT_PRACTICE_CONFIG.drillMeasures;
           delete next.sessionMeasures;
           next.drillMeasures = oldMeasures;
-          next.repetitions = DEFAULT_CONFIG.repetitions;
-          next.randomizeChords = DEFAULT_CONFIG.randomizeChords;
+          next.repetitions = DEFAULT_PRACTICE_CONFIG.repetitions;
+          next.randomizeChords = DEFAULT_PRACTICE_CONFIG.randomizeChords;
         }
 
         // v3 → v4: new `repeatIndefinitely` toggle; defaults to false
         // so existing setups behave identically.
         if (version <= 3) {
-          next.repeatIndefinitely = DEFAULT_CONFIG.repeatIndefinitely;
+          next.repeatIndefinitely = DEFAULT_PRACTICE_CONFIG.repeatIndefinitely;
         }
 
         // v4 → v5: new `loadedDrillId` UI tracking (null when not
@@ -314,8 +320,8 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         // `transitionCount`. Defaults turn it off so existing setups
         // behave identically.
         if (version <= 5) {
-          next.transitionUnit = DEFAULT_CONFIG.transitionUnit;
-          next.transitionCount = DEFAULT_CONFIG.transitionCount;
+          next.transitionUnit = DEFAULT_PRACTICE_CONFIG.transitionUnit;
+          next.transitionCount = DEFAULT_PRACTICE_CONFIG.transitionCount;
         }
 
         return next;

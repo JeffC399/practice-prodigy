@@ -100,6 +100,25 @@
 
 ---
 
+## Active Ideas — Future modules (Practice Prodigy as a music-education platform)
+
+> The 9-item long-term vision (locked 2026-06-28): Practice Prodigy as a unified music-education super-app rather than just an arpeggio drill tool. Several items are already scoped elsewhere — captured here as cross-references plus genuinely new modules below. Implementation tier sketched, not committed.
+
+| Date | Title | Status | Notes |
+|---|---|---|---|
+| 2026-06-28 | Standalone Metronome module | Scoped → v2 (already in §4) | Full-featured metronome (subdivisions, accents, polymetric, programmable sequences) usable independently of arpeggio drills. Already captured under v2 multi-instrument section. |
+| 2026-06-28 | Standalone Tuner module | Scoped → v2 (already in §4) | Chromatic tuner using microphone input. Already captured under v2 multi-instrument section. |
+| 2026-06-28 | Chord progression drill — other instruments (piano, guitar, voice, drums, future) | Scoped → v2 (already in §4) | Extend the current bass arpeggios drilling to additional instruments via shared substrate (per the scales-module sketch). Each instrument gets its own route under `/practice/<instrument>/...`. |
+| 2026-06-28 | Scale driller | Scoped → v2 (already noted) | Separate `/practice/scales` route with shared substrate. Already captured under scales-module idea above. |
+| 2026-06-28 | Theory course / drills | Under Consideration → v3+ educational | Curriculum-driven theory module: intervals, chord construction, scale relationships, modes, voice leading, basic counterpoint. Mix of *lesson content* (read/watch) and *drill content* (recognize this interval, name this chord quality, etc.). Different skillset from engineering — needs curriculum design. Could ship in small slices ("Intervals 101" → "Triads 101" → "7th chords") rather than a monolithic course. |
+| 2026-06-28 | Ear training course / drills | Under Consideration → v3+ educational | Audio-played-back-recognize-and-respond: intervals, chord qualities, scale degrees, chord progressions, melodic dictation, rhythmic dictation. Pairs naturally with the existing audio engine; needs a UI for response capture (note picker, interval picker, chord picker). Ear training is the highest-leverage musical skill — strong educational fit. |
+| 2026-06-28 | Lead sheet builder (simple + advanced) | Under Consideration → v2/v3 educational | Two tiers: **simple** = chords-only lead sheet (drag chords from a palette onto a 4-bars-per-line canvas, set time signature, add bar lines, save/print/share); **advanced** = chords + melody (basic notation) + lyrics. Print-ready PDF export. Share via URL or .json import. Distinct from a *lead sheet view* of an active drill (that's a display feature) — this is an authoring tool. Competes with MuseScore / Soundslice; needs differentiation around speed of input and simplicity. |
+| 2026-06-28 | Sight-reading course | Under Consideration → v3+ educational | Intelligent progression: app generates short notation snippets at the user's level, presents them, listens (via mic or just timing), advances difficulty when the user reads cleanly. Start with bass and guitar (single-line clef-aware notation) since those leverage the existing audio engine. Notation rendering is non-trivial (VexFlow or similar). Adaptive difficulty engine is a serious ML/heuristic project. |
+| 2026-06-28 | Teacher / student portal | Scoped → v1.5 (already in §9) | Already a named milestone — see PROJECT-DESIGN.md §9. The 9-item vision item maps directly to this. v1.5 is the dedicated design pass. |
+| 2026-06-28 | Honest scope flag for the 9-item vision | Decided | Each of the educational modules (theory, ear training, sight-reading, lead sheet builder) is its own 6–12 month project. The realistic v1 → v3 arc is: v1 ships current (bass arpeggios), v1.x adds polish + clouds + native wrappers, v1.5 adds teacher/student, v2 adds multi-instrument arpeggios + scales + standalone metronome/tuner, v3 adds audio analysis (already scoped), v4+ adds the educational modules (theory/ear/sight-reading) one at a time, lead sheet builder slotted somewhere in v2/v3 as an authoring tool. Curriculum content for the educational modules is the long pole — needs subject-matter design, not just engineering. |
+
+---
+
 ## Active Ideas — v3+ milestone candidates (Audio Analysis)
 
 | Date | Title | Status | Notes |
