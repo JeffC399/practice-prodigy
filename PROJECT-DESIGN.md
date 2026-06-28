@@ -84,7 +84,14 @@ The screen during practice shows:
 - Dominant 7b9, Dominant 7#9, Dominant 7alt
 - Dominant 7b5, Dominant 7#5
 
-**Symbol convention:** jazz-style (e.g., `A-7`, `Cmaj7`, `Cø7`, `C°7`, `C+`, `C7alt`).
+**Symbol convention — configurable.** Four notation styles ship in v1; user selects via the cascade (System default → User global → per-Custom-Pattern → per-session override):
+
+1. **Jazz-minus** (default) — `A−7`, `Cmaj7`, `Bø7`, `C°7`, `C+`, `C7alt`. Unicode minus / half-dim / diminished / augmented symbols. Classic jazz lead-sheet convention.
+2. **Lowercase-m jazz** — `Am7`, `Cmaj7`, `Bm7♭5`, `Cdim7`, `Caug`, `C7alt`. Berklee / contemporary-jazz convention.
+3. **Plain ASCII** — `Am7`, `CM7`, `Bm7b5`, `Cdim7`, `Caug`, `C7alt`. No special characters — safe for copy-paste, plain-text export, and accessibility tools.
+4. **Long form** — `A minor 7`, `C major 7`, `B half-diminished 7`, `C diminished 7`, `C augmented`, `C dominant 7 altered`. Verbose; valuable for beginners and theory-focused users.
+
+Rendering is a single pluggable `ChordRenderer` module — adding additional styles (e.g., Roman numeral / Nashville Number System — see IDEAS.md) is an additive change, never a refactor.
 
 **Chord-to-scale mapping:** sensible jazz-convention defaults baked in; per-quality override available in Advanced Settings (Maj7 → Lydian instead of Ionian, m7 → Aeolian instead of Dorian, etc.). Per-instance overrides deferred to post-v1.
 
@@ -327,3 +334,4 @@ Everything in Section 4 above. Web + PWA, deployed on Vercel.
 |---|---|
 | 2026-06-28 | Initial design doc created from design-interview session. Locked v1 scope. |
 | 2026-06-28 | Metronome engine + first-slice `/practice` route shipped (hardcoded A−7, 90 BPM, 4/4, 1-measure count-in, 8 measures). Distinct count-in click (filtered-noise stick tick) pulled forward into v1 from v1.1 after hands-on test. |
+| 2026-06-28 | v1 chord-vocabulary scope expanded: notation form is now **user-configurable** across four shipped styles (jazz-minus / lowercase-m / plain ASCII / long form) selected via the standard cascade. Replaces the previous single locked "jazz-style" convention. |
