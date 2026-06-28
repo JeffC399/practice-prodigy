@@ -163,7 +163,7 @@ Four patterns ship in v1:
 ### 4.7 Audio Engine
 
 **Hybrid strategy:**
-- **Metronome click** during practice — sample-accurate timing via Tone.js / Web Audio API.
+- **Metronome click** during practice — sample-accurate timing via Tone.js / Web Audio API. **Count-in beats** use a dry stick-click timbre (filtered noise) so the transition from preparation into playing is unmistakable; **playing beats** use a tonal sine click with a higher-pitched downbeat. Beat-1 emphasis is preserved within count-in too so the meter still reads.
 - **"Preview this pattern over this chord"** button on the setup screen — plays the arpeggio with a bass-like timbre so you can hear what you're about to drill.
 - **No play-along** during practice itself — drilling demands silence so you can hear yourself.
 
@@ -326,3 +326,4 @@ Everything in Section 4 above. Web + PWA, deployed on Vercel.
 | Date | Change |
 |---|---|
 | 2026-06-28 | Initial design doc created from design-interview session. Locked v1 scope. |
+| 2026-06-28 | Metronome engine + first-slice `/practice` route shipped (hardcoded A−7, 90 BPM, 4/4, 1-measure count-in, 8 measures). Distinct count-in click (filtered-noise stick tick) pulled forward into v1 from v1.1 after hands-on test. |

@@ -7,9 +7,11 @@ import * as Tone from "tone";
  * count-in phase from playing phase, and emits state on every beat so the UI
  * can stay perfectly in sync via Tone's Draw scheduler.
  *
- * v1-foundation slice: produces a click on each beat, with a higher pitch on
- * the downbeat (beat 1 of every measure). Future work plugs additional
- * audio (preview, reference) into the same Transport.
+ * v1-foundation slice: produces a click on each beat. Count-in beats use a
+ * dry stick-click timbre (filtered noise) so the transition into the playing
+ * portion is unmistakable; playing beats use a tonal sine click with a
+ * higher-pitched downbeat. Future work plugs additional audio (preview,
+ * reference) into the same Transport.
  */
 
 export type MetronomePhase = "idle" | "count-in" | "playing";
@@ -51,6 +53,9 @@ const IDLE_STATE: MetronomeState = {
 class MetronomeEngine {
   private downbeatSynth: Tone.Synth | null = null;
   private offbeatSynth: Tone.Synth | null = null;
+  private countInDownbeatSynth: Tone.NoiseSynth | null = null;
+  private countInOffbeatSynth: Tone.NoiseSynth | null = null;
+  private countInFilter: Tone.Filter | null = null;
   private scheduledId: number | null = null;
   private listeners = new Set<MetronomeListener>();
   private state: MetronomeState = IDLE_STATE;
@@ -92,6 +97,30 @@ class MetronomeEngine {
         envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.03 },
         volume: -10,
       }).toDestination();
+    }
+    if (!this.countInFilter) {
+      // High-pass filtered noise yields a dry, woody "stick-click" tick —
+      // distinctly un-musical compared to the tonal playing clicks. The
+      // count-in is preparation, not the song; the timbre should say so.
+      this.countInFilter = new Tone.Filter({
+        type: "highpass",
+        frequency: 3000,
+        Q: 1,
+      }).toDestination();
+    }
+    if (!this.countInDownbeatSynth) {
+      this.countInDownbeatSynth = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.015 },
+        volume: -6,
+      }).connect(this.countInFilter);
+    }
+    if (!this.countInOffbeatSynth) {
+      this.countInOffbeatSynth = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.02, sustain: 0, release: 0.012 },
+        volume: -12,
+      }).connect(this.countInFilter);
     }
   }
 
@@ -144,9 +173,17 @@ class MetronomeEngine {
       const isDownbeat = this.isDownbeatFor(counter);
 
       // Audio: trigger click at the exact sample-accurate time.
-      const synth = isDownbeat ? this.downbeatSynth : this.offbeatSynth;
-      const pitch = isDownbeat ? "C6" : "G5";
-      synth?.triggerAttackRelease(pitch, "32n", time);
+      // Count-in (counter < 0) → dry stick-click; playing → tonal sine click.
+      if (counter < 0) {
+        const synth = isDownbeat
+          ? this.countInDownbeatSynth
+          : this.countInOffbeatSynth;
+        synth?.triggerAttackRelease("32n", time);
+      } else {
+        const synth = isDownbeat ? this.downbeatSynth : this.offbeatSynth;
+        const pitch = isDownbeat ? "C6" : "G5";
+        synth?.triggerAttackRelease(pitch, "32n", time);
+      }
 
       // Visual: schedule UI update tied to the same sample-accurate time.
       Tone.getDraw().schedule(() => this.advanceUiState(counter), time);
@@ -204,6 +241,12 @@ class MetronomeEngine {
     this.downbeatSynth = null;
     this.offbeatSynth?.dispose();
     this.offbeatSynth = null;
+    this.countInDownbeatSynth?.dispose();
+    this.countInDownbeatSynth = null;
+    this.countInOffbeatSynth?.dispose();
+    this.countInOffbeatSynth = null;
+    this.countInFilter?.dispose();
+    this.countInFilter = null;
     this.listeners.clear();
   }
 }

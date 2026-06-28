@@ -38,7 +38,7 @@
 | 2026-06-28 | Skip / restart-current-chord / rewind-1-chord controls | Scoped → v1.1 | For when user flubs a chord and wants to drill it again without restarting the whole sequence. |
 | 2026-06-28 | "Resume session" recovery | Scoped → v1.1 | Browser crash or screen lock → on reopen, offer "resume from where metronome stopped." |
 | 2026-06-28 | Per-chord-instance scale override | Under Consideration | "This specific Cmaj7 in this sequence uses Phrygian" — currently overrides are per-quality only. Adds data-model complexity; defer until real demand emerges. |
-| 2026-06-28 | Distinct count-in click sound | Scoped → v1.1 | Currently count-in uses same click as metronome; differentiate audibly so user always knows whether they're in count-in or playing. |
+| 2026-06-28 | Click sound library + customization | Scoped → v1.1 | Let user pick from a set of preset metronome sounds (wood block, cowbell, electronic click, side-stick, etc.) and optionally customize per-sound pitch / volume / decay. Currently a single hardcoded high/low click pair is used. Promotes the "click sound choice" already noted in PROJECT-DESIGN.md §4.8 to a first-class Advanced setting in the cascade. |
 
 ---
 
@@ -111,6 +111,7 @@
 
 | Date | Title | Implemented In | Notes |
 |---|---|---|---|
+| 2026-06-28 | Distinct count-in click sound | v1 (pulled forward from v1.1) | Count-in beats now use a dry, high-pass-filtered noise tick (stick-click character); playing beats keep the existing tonal sine click with higher-pitched downbeat. Pulled into v1 after user hands-on test on the first-slice deploy — visual cue alone made the count-in → playing transition unclear aurally. See `src/lib/audio/metronome.ts` and PROJECT-DESIGN.md §4.7. |
 
 ---
 
