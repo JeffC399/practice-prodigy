@@ -13,6 +13,7 @@ import {
   PITCH_CLASSES,
   PITCH_CLASS_DISPLAY_NAMES,
   QUALITY_DISPLAY_NAMES,
+  type Chord,
   type ChordQuality,
   type PitchClass,
 } from "@/lib/music/chord";
@@ -34,7 +35,15 @@ import {
   TIME_SIGNATURES,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
-import { ArrowRight, Play, Plus, Square, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  ListChecks,
+  Play,
+  Plus,
+  Square,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -59,6 +68,8 @@ export default function PracticeSetupPage() {
     removeChordAt,
     setChordRootAt,
     setChordQualityAt,
+    replaceChordPool,
+    appendChords,
     setBpm,
     setTimeSignature,
     setCountInMeasures,
@@ -68,6 +79,43 @@ export default function PracticeSetupPage() {
     setNotationStyle,
     setArpeggioPattern,
   } = config;
+
+  // Quick-build wizard state. Sets aren't directly reactive in
+  // React, so each toggle creates a fresh Set.
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedRoots, setSelectedRoots] = useState<Set<PitchClass>>(
+    () => new Set(),
+  );
+  const [selectedQualities, setSelectedQualities] = useState<
+    Set<ChordQuality>
+  >(() => new Set());
+
+  const toggleRoot = (root: PitchClass) =>
+    setSelectedRoots((prev) => {
+      const next = new Set(prev);
+      if (next.has(root)) next.delete(root);
+      else next.add(root);
+      return next;
+    });
+  const toggleQuality = (quality: ChordQuality) =>
+    setSelectedQualities((prev) => {
+      const next = new Set(prev);
+      if (next.has(quality)) next.delete(quality);
+      else next.add(quality);
+      return next;
+    });
+
+  const wizardChords: Chord[] = useMemo(() => {
+    const chords: Chord[] = [];
+    for (const root of PITCH_CLASSES) {
+      if (!selectedRoots.has(root)) continue;
+      for (const quality of CHORD_QUALITIES) {
+        if (!selectedQualities.has(quality)) continue;
+        chords.push({ root, quality });
+      }
+    }
+    return chords;
+  }, [selectedRoots, selectedQualities]);
 
   // Gate render until after mount so persisted-store hydration doesn't
   // diff against SSR's default values. The setState-in-effect pattern is
@@ -217,7 +265,164 @@ export default function PracticeSetupPage() {
 
           {/* Chord pool builder */}
           <FormSection title="Chord pool">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              {/* Quick-build wizard — collapsible, closed by default */}
+              <div className="rounded-md border border-border bg-background/30">
+                <button
+                  type="button"
+                  onClick={() => setWizardOpen((o) => !o)}
+                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-foreground hover:bg-background/60 transition-colors"
+                  aria-expanded={wizardOpen}
+                  aria-controls="quick-build-panel"
+                >
+                  <span className="flex items-center gap-2">
+                    <ListChecks
+                      className="h-4 w-4 text-primary"
+                      aria-hidden="true"
+                    />
+                    Quick build — pick roots × qualities
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground transition-transform ${
+                      wizardOpen ? "rotate-180" : ""
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+                {wizardOpen && (
+                  <div
+                    id="quick-build-panel"
+                    className="flex flex-col gap-5 border-t border-border px-4 py-4"
+                  >
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {/* Roots column */}
+                      <WizardColumn
+                        title="Roots"
+                        presets={[
+                          {
+                            label: "All",
+                            onClick: () =>
+                              setSelectedRoots(new Set(PITCH_CLASSES)),
+                          },
+                          {
+                            label: "Naturals",
+                            onClick: () =>
+                              setSelectedRoots(
+                                new Set(WIZARD_ROOTS_NATURALS),
+                              ),
+                          },
+                          {
+                            label: "None",
+                            onClick: () => setSelectedRoots(new Set()),
+                          },
+                        ]}
+                      >
+                        <div className="grid grid-cols-2 gap-1">
+                          {PITCH_CLASSES.map((root) => (
+                            <WizardCheckbox
+                              key={root}
+                              label={PITCH_CLASS_DISPLAY_NAMES[root]}
+                              checked={selectedRoots.has(root)}
+                              onChange={() => toggleRoot(root)}
+                            />
+                          ))}
+                        </div>
+                      </WizardColumn>
+
+                      {/* Qualities column */}
+                      <WizardColumn
+                        title="Qualities"
+                        presets={[
+                          {
+                            label: "All",
+                            onClick: () =>
+                              setSelectedQualities(
+                                new Set(CHORD_QUALITIES),
+                              ),
+                          },
+                          {
+                            label: "Common 7ths",
+                            onClick: () =>
+                              setSelectedQualities(
+                                new Set(WIZARD_QUALITIES_COMMON),
+                              ),
+                          },
+                          {
+                            label: "Triads",
+                            onClick: () =>
+                              setSelectedQualities(
+                                new Set(WIZARD_QUALITIES_TRIADS),
+                              ),
+                          },
+                          {
+                            label: "None",
+                            onClick: () => setSelectedQualities(new Set()),
+                          },
+                        ]}
+                      >
+                        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          {CHORD_QUALITIES.map((q) => (
+                            <WizardCheckbox
+                              key={q}
+                              label={QUALITY_DISPLAY_NAMES[q]}
+                              checked={selectedQualities.has(q)}
+                              onChange={() => toggleQuality(q)}
+                            />
+                          ))}
+                        </div>
+                      </WizardColumn>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+                      <p className="text-xs text-muted-foreground">
+                        {wizardChords.length === 0 ? (
+                          <>Pick at least one root and one quality.</>
+                        ) : (
+                          <>
+                            Will produce{" "}
+                            <span className="font-mono text-foreground tabular-nums">
+                              {wizardChords.length}
+                            </span>{" "}
+                            chord
+                            {wizardChords.length === 1 ? "" : "s"} (
+                            {selectedRoots.size} root
+                            {selectedRoots.size === 1 ? "" : "s"} ×{" "}
+                            {selectedQualities.size} qualit
+                            {selectedQualities.size === 1 ? "y" : "ies"})
+                            {wizardChords.length > POOL_MAX &&
+                              ` — capped at ${POOL_MAX}.`}
+                          </>
+                        )}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            appendChords(wizardChords);
+                            setWizardOpen(false);
+                          }}
+                          disabled={wizardChords.length === 0}
+                          className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:border-primary/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Add to pool
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            replaceChordPool(wizardChords);
+                            setWizardOpen(false);
+                          }}
+                          disabled={wizardChords.length === 0}
+                          className="rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Replace pool
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {config.chordPool.map((chord, index) => (
                 <div
                   key={index}
@@ -553,6 +758,83 @@ function Select(
 
 /** Quick-pick tempo buttons that sit above the slider. */
 const TEMPO_PRESETS = [40, 60, 80, 100, 120, 140, 160, 200] as const;
+
+/** Preset selections for the quick-build wizard's column buttons. */
+const WIZARD_ROOTS_NATURALS: readonly PitchClass[] = [
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "A",
+  "B",
+];
+const WIZARD_QUALITIES_COMMON: readonly ChordQuality[] = [
+  "maj7",
+  "min7",
+  "dom7",
+  "dim7",
+];
+const WIZARD_QUALITIES_TRIADS: readonly ChordQuality[] = [
+  "maj",
+  "min",
+  "aug",
+];
+
+function WizardColumn({
+  title,
+  presets,
+  children,
+}: {
+  title: string;
+  presets: { label: string; onClick: () => void }[];
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          {title}
+        </span>
+        <div className="flex flex-wrap gap-1">
+          {presets.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={p.onClick}
+              className="rounded-md border border-border bg-background px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function WizardCheckbox({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer rounded px-1 py-0.5 hover:bg-background/60 transition-colors">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="h-3.5 w-3.5 rounded border-border bg-background accent-primary cursor-pointer"
+      />
+      <span className="text-sm text-foreground">{label}</span>
+    </label>
+  );
+}
 
 /**
  * Number input that lets the user type intermediate values (including

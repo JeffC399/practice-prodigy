@@ -89,7 +89,10 @@ export const DRILL_MIN = 1;
 export const DRILL_MAX = 64;
 export const REPS_MIN = 1;
 export const REPS_MAX = 32;
-export const POOL_MAX = 32;
+// Up to 12 roots × 12 qualities — comfortably handles the wizard's
+// largest reasonable cross-products (e.g. 12 roots × all common
+// 7ths = 48 chords) without artificial truncation.
+export const POOL_MAX = 144;
 
 const DEFAULT_CONFIG: PracticeConfig = {
   chordPool: [{ root: "A", quality: "min7" }],
@@ -110,6 +113,10 @@ type PracticeConfigStore = PracticeConfig & {
   removeChordAt: (index: number) => void;
   setChordRootAt: (index: number, root: PitchClass) => void;
   setChordQualityAt: (index: number, quality: ChordQuality) => void;
+  /** Replace the entire pool. Used by the quick-build wizard. */
+  replaceChordPool: (chords: Chord[]) => void;
+  /** Append chords to the pool. Used by the quick-build "Add" action. */
+  appendChords: (chords: Chord[]) => void;
   setOrderingStrategy: (strategy: OrderingStrategy) => void;
   setBpm: (bpm: number) => void;
   setTimeSignature: (timeSignature: TimeSignature) => void;
@@ -155,6 +162,23 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
             i === index ? { ...c, quality } : c,
           ),
         })),
+      replaceChordPool: (chords) =>
+        set(() => {
+          // Always keep at least one chord — the drill needs something.
+          const next =
+            chords.length > 0
+              ? chords.slice(0, POOL_MAX)
+              : DEFAULT_CONFIG.chordPool;
+          return { chordPool: next };
+        }),
+      appendChords: (chords) =>
+        set((state) => {
+          const room = POOL_MAX - state.chordPool.length;
+          if (room <= 0) return {};
+          return {
+            chordPool: [...state.chordPool, ...chords.slice(0, room)],
+          };
+        }),
       setOrderingStrategy: (orderingStrategy) => set({ orderingStrategy }),
       setBpm: (bpm) =>
         set({ bpm: clamp(Math.round(bpm), BPM_MIN, BPM_MAX) }),
