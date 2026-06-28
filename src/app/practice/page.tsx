@@ -229,15 +229,19 @@ export default function PracticeSetupPage() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const fromIndex = config.chordPool.findIndex(
-      (_, i) => `chord-${i}` === active.id,
-    );
-    const toIndex = config.chordPool.findIndex(
-      (_, i) => `chord-${i}` === over.id,
-    );
+    const fromIndex = config.chordPoolIds.indexOf(active.id as string);
+    const toIndex = config.chordPoolIds.indexOf(over.id as string);
     if (fromIndex < 0 || toIndex < 0) return;
     config.moveChord(fromIndex, toIndex);
   };
+
+  // Stable memoized items array for SortableContext — dnd-kit re-runs
+  // some internal setup when the reference changes; memoizing keeps
+  // the drop animation crisp.
+  const sortableItems = useMemo(
+    () => config.chordPoolIds,
+    [config.chordPoolIds],
+  );
 
   /** Snapshot of the live PracticeConfig (no loadedDrillId, no setters). */
   const snapshotConfig = (): PracticeConfig =>
@@ -773,30 +777,34 @@ export default function PracticeSetupPage() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={config.chordPool.map((_, i) => `chord-${i}`)}
+                  items={sortableItems}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="flex max-h-96 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
-                    {config.chordPool.map((chord, index) => (
-                      <SortableChordRow
-                        key={`chord-${index}`}
-                        id={`chord-${index}`}
-                        chord={chord}
-                        index={index}
-                        canDrag={config.orderingStrategy === "custom"}
-                        poolSize={poolSize}
-                        onRootChange={(root) =>
-                          setChordRootAt(index, root)
-                        }
-                        onQualityChange={(q) =>
-                          setChordQualityAt(index, q)
-                        }
-                        onRemove={() => removeChordAt(index)}
-                        rowRef={(el) => {
-                          poolRowRefs.current[index] = el;
-                        }}
-                      />
-                    ))}
+                    {config.chordPool.map((chord, index) => {
+                      const slotId =
+                        config.chordPoolIds[index] ?? `legacy-${index}`;
+                      return (
+                        <SortableChordRow
+                          key={slotId}
+                          id={slotId}
+                          chord={chord}
+                          index={index}
+                          canDrag={config.orderingStrategy === "custom"}
+                          poolSize={poolSize}
+                          onRootChange={(root) =>
+                            setChordRootAt(index, root)
+                          }
+                          onQualityChange={(q) =>
+                            setChordQualityAt(index, q)
+                          }
+                          onRemove={() => removeChordAt(index)}
+                          rowRef={(el) => {
+                            poolRowRefs.current[index] = el;
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 </SortableContext>
               </DndContext>
@@ -1517,6 +1525,9 @@ function extractPracticeConfig(
   return {
     ...DEFAULT_PRACTICE_CONFIG,
     ...(source.chordPool !== undefined && { chordPool: source.chordPool }),
+    ...(source.chordPoolIds !== undefined && {
+      chordPoolIds: source.chordPoolIds,
+    }),
     ...(source.orderingStrategy !== undefined && {
       orderingStrategy: source.orderingStrategy,
     }),

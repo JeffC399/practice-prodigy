@@ -85,6 +85,14 @@ export const RANDOM_ORDERING_STRATEGIES: ReadonlySet<OrderingStrategy> =
 
 export type PracticeConfig = {
   chordPool: Chord[];
+  /**
+   * Stable per-slot IDs for the chord pool — parallel to chordPool
+   * (same length, same ordering). Used as the sortable item id for
+   * drag-and-drop so dnd-kit can track an entry's identity across
+   * reorders. Without these, the drop animation stutters because
+   * index-based IDs change every time the pool reorders.
+   */
+  chordPoolIds: string[];
   orderingStrategy: OrderingStrategy;
   measuresPerChord: number;
   /**
@@ -142,8 +150,15 @@ export const TRANSITION_MAX = 16;
  * schema (so newly-added fields don't show as "dirty" just because
  * an old drill doesn't carry them yet).
  */
+function newChordSlotId(): string {
+  return `slot_${Date.now().toString(36)}_${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+}
+
 export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   chordPool: [{ root: "A", quality: "min7" }],
+  chordPoolIds: ["slot_default"],
   orderingStrategy: "custom",
   measuresPerChord: 1,
   drillMeasures: 8,
@@ -207,13 +222,17 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
             (state.chordPool.length > 0
               ? { ...state.chordPool[state.chordPool.length - 1] }
               : { root: "A", quality: "min7" });
-          return { chordPool: [...state.chordPool, newChord] };
+          return {
+            chordPool: [...state.chordPool, newChord],
+            chordPoolIds: [...state.chordPoolIds, newChordSlotId()],
+          };
         }),
       removeChordAt: (index) =>
         set((state) => {
           if (state.chordPool.length <= 1) return {};
           return {
             chordPool: state.chordPool.filter((_, i) => i !== index),
+            chordPoolIds: state.chordPoolIds.filter((_, i) => i !== index),
           };
         }),
       setChordRootAt: (index, root) =>
@@ -221,6 +240,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           chordPool: state.chordPool.map((c, i) =>
             i === index ? { ...c, root } : c,
           ),
+          // ids unchanged — slot identity preserved across value edits
         })),
       setChordQualityAt: (index, quality) =>
         set((state) => ({
@@ -230,19 +250,26 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         })),
       replaceChordPool: (chords) =>
         set(() => {
-          // Always keep at least one chord — the drill needs something.
           const next =
             chords.length > 0
               ? chords.slice(0, POOL_MAX)
               : DEFAULT_PRACTICE_CONFIG.chordPool;
-          return { chordPool: next };
+          return {
+            chordPool: next,
+            chordPoolIds: next.map(() => newChordSlotId()),
+          };
         }),
       appendChords: (chords) =>
         set((state) => {
           const room = POOL_MAX - state.chordPool.length;
           if (room <= 0) return {};
+          const adding = chords.slice(0, room);
           return {
-            chordPool: [...state.chordPool, ...chords.slice(0, room)],
+            chordPool: [...state.chordPool, ...adding],
+            chordPoolIds: [
+              ...state.chordPoolIds,
+              ...adding.map(() => newChordSlotId()),
+            ],
           };
         }),
       moveChord: (fromIndex, toIndex) =>
@@ -256,10 +283,13 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           ) {
             return {};
           }
-          const next = [...state.chordPool];
-          const [moved] = next.splice(fromIndex, 1);
-          next.splice(toIndex, 0, moved);
-          return { chordPool: next };
+          const nextPool = [...state.chordPool];
+          const [movedChord] = nextPool.splice(fromIndex, 1);
+          nextPool.splice(toIndex, 0, movedChord);
+          const nextIds = [...state.chordPoolIds];
+          const [movedId] = nextIds.splice(fromIndex, 1);
+          nextIds.splice(toIndex, 0, movedId);
+          return { chordPool: nextPool, chordPoolIds: nextIds };
         }),
       setOrderingStrategy: (orderingStrategy) => set({ orderingStrategy }),
       setBpm: (bpm) =>
@@ -294,13 +324,27 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
       loadConfig: (config) =>
         // Spread defaults first so a drill saved under an older schema
         // (missing fields added later) still loads with sensible values.
-        set(() => ({ ...DEFAULT_PRACTICE_CONFIG, ...config })),
+        // Then ensure chordPoolIds is in lockstep with chordPool — a
+        // drill saved before the parallel-id array existed will lack
+        // them; mismatched length means we regenerate fresh.
+        set(() => {
+          const merged: PracticeConfig = {
+            ...DEFAULT_PRACTICE_CONFIG,
+            ...config,
+          };
+          if (merged.chordPoolIds.length !== merged.chordPool.length) {
+            merged.chordPoolIds = merged.chordPool.map(() =>
+              newChordSlotId(),
+            );
+          }
+          return merged;
+        }),
       resetToDefaults: () => set(DEFAULT_PRACTICE_CONFIG),
     }),
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 7,
+      version: 8,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -355,16 +399,21 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         }
 
         // v6 → v7: replaced the boolean `randomizeChords` toggle with
-        // the full `orderingStrategy` enum (8 named strategies). When
-        // the old boolean was true, map to "randomShuffleEachPass" —
-        // that's the exact semantic the toggle had. When false, the
-        // orderingStrategy already-saved value (or default "custom")
-        // is preserved.
+        // the full `orderingStrategy` enum (8 named strategies).
         if (version <= 6) {
           if (next.randomizeChords === true) {
             next.orderingStrategy = "randomShuffleEachPass";
           }
           delete next.randomizeChords;
+        }
+
+        // v7 → v8: parallel `chordPoolIds` array for stable drag IDs.
+        // Generate one ID per existing chord so the lengths match.
+        if (version <= 7) {
+          const pool = Array.isArray(next.chordPool)
+            ? (next.chordPool as Chord[])
+            : DEFAULT_PRACTICE_CONFIG.chordPool;
+          next.chordPoolIds = pool.map(() => newChordSlotId());
         }
 
         return next;
