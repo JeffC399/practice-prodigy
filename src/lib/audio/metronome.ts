@@ -39,6 +39,14 @@ export type MetronomeConfig = {
    * have elapsed the engine stops. Omit to loop indefinitely until stop().
    */
   totalPlayingBeats?: number;
+  /**
+   * Optional per-beat style override for the playing portion. Index 0 = the
+   * first playing beat (counter=0). "transition" beats use the count-in
+   * stick-click synth so the user can audibly tell prep beats from play
+   * beats; "play" beats use the tonal playing click. Beats past the array
+   * default to "play".
+   */
+  beatStyles?: Array<"play" | "transition">;
 };
 
 export type MetronomeListener = (state: MetronomeState) => void;
@@ -189,8 +197,16 @@ class MetronomeEngine {
       const isDownbeat = this.isDownbeatFor(counter);
 
       // Audio: trigger click at the exact sample-accurate time.
-      // Count-in (counter < 0) → dry stick-click; playing → tonal sine click.
-      if (counter < 0) {
+      //   counter < 0                       → dry stick-click (initial count-in)
+      //   counter >= 0 + style "transition" → dry stick-click (inter-chord prep)
+      //   counter >= 0 + style "play"       → tonal sine click (playing)
+      // Inter-chord prep reuses the stick-click voice so the user can
+      // tell aurally whether they're supposed to be playing or just
+      // resting before the next chord.
+      const isPrep =
+        counter >= 0 &&
+        (config.beatStyles?.[counter] ?? "play") === "transition";
+      if (counter < 0 || isPrep) {
         const synth = isDownbeat
           ? this.countInDownbeatSynth
           : this.countInOffbeatSynth;

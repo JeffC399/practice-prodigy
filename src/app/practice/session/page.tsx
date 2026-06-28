@@ -90,20 +90,42 @@ export default function PracticeSessionPage() {
     isPlaying && state.measureInSession > 0
       ? (state.measureInSession - 1) * beatsPerMeasure + state.beatInMeasure
       : 1;
-  const currentEntry =
-    sequence[absoluteBeat - 1] ??
-    sequence[0] ??
-    ({ chord: config.chordPool[0], kind: "play" } as SequenceBeat);
-  const currentChord = currentEntry.chord;
+  const currentEntry = useMemo<SequenceBeat>(
+    () =>
+      sequence[absoluteBeat - 1] ??
+      sequence[0] ??
+      ({ chord: config.chordPool[0], kind: "play" } as SequenceBeat),
+    [sequence, absoluteBeat, config.chordPool],
+  );
   const isTransition = currentEntry.kind === "transition";
+
+  /**
+   * Big-display chord: the most recently PLAYED chord. During prep
+   * beats this means the big display stays anchored on the chord
+   * that was just played, rather than swapping in the upcoming
+   * chord. The NEXT preview below already shows what's coming, so
+   * the big display would just be redundant + jarring if it changed.
+   */
+  const bigDisplayChord = useMemo(() => {
+    if (currentEntry.kind === "play") return currentEntry.chord;
+    // Walk backward through the sequence to find the last play beat.
+    for (let i = absoluteBeat - 2; i >= 0; i--) {
+      if (sequence[i].kind === "play") return sequence[i].chord;
+    }
+    // No prior play beat (very first measure is a transition, which
+    // shouldn't happen since generation skips the first transition,
+    // but defensively): show whatever's at this position.
+    return currentEntry.chord;
+  }, [absoluteBeat, currentEntry, sequence]);
+
   const nextChord = useMemo(
     () => findNextDifferentChord(sequence, absoluteBeat - 1),
     [sequence, absoluteBeat],
   );
 
   const currentLabel = useMemo(
-    () => renderChord(currentChord, config.notationStyle),
-    [currentChord, config.notationStyle],
+    () => renderChord(bigDisplayChord, config.notationStyle),
+    [bigDisplayChord, config.notationStyle],
   );
   const nextLabel = useMemo(
     () =>
@@ -155,6 +177,9 @@ export default function PracticeSessionPage() {
         transitionCount: config.transitionCount,
       });
       setActiveSequence(fresh);
+      // Map each beat's kind so the engine can pick the right click
+      // synth (transition → stick-click; play → tonal click).
+      const beatStyles = fresh.map((b) => b.kind);
       void start({
         bpm: config.bpm,
         beatsPerMeasure,
@@ -163,6 +188,7 @@ export default function PracticeSessionPage() {
         totalPlayingBeats: config.repeatIndefinitely
           ? undefined
           : fresh.length,
+        beatStyles,
       });
     } else {
       stop();
@@ -278,22 +304,11 @@ export default function PracticeSessionPage() {
             totalMeasures={totalPlayMeasures}
           />
 
-          {/* During transition: GET READY label takes the slot. Otherwise
-              NEXT preview shows the upcoming different chord. */}
-          {!isIdle && isTransition ? (
-            <div className="flex items-center gap-3 font-mono text-sm">
-              <span className="uppercase tracking-wider text-xs text-primary">
-                Get ready
-              </span>
-              <span
-                className={`font-semibold text-primary ${
-                  isLongForm ? "text-lg" : "text-2xl"
-                } leading-none tracking-tight`}
-              >
-                Next chord
-              </span>
-            </div>
-          ) : nextLabel && !isIdle ? (
+          {/* NEXT preview always shows the upcoming different chord —
+              this is the only place the user reads what's coming. The
+              metronome's stick-click sound during prep beats does the
+              "don't play yet" signaling, not the visual. */}
+          {nextLabel && !isIdle ? (
             <div className="flex items-center gap-3 font-mono text-sm text-muted-foreground">
               <span className="uppercase tracking-wider text-xs">Next</span>
               <span
@@ -308,18 +323,13 @@ export default function PracticeSessionPage() {
             <div className="h-6" aria-hidden="true" />
           )}
 
-          {/* Current chord — slightly dimmed during transition to signal
-              "this is the upcoming chord, you're not playing yet." */}
+          {/* Big chord — anchored on the most-recently-PLAYED chord.
+              Stays put during prep beats so the visual stays calm; the
+              audio change (stick-click) is the prep signal. */}
           <div
-            className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center ${
+            className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center text-foreground ${
               isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
-            } ${
-              isIdle
-                ? "opacity-40 text-foreground"
-                : isTransition
-                  ? "opacity-60 text-primary"
-                  : "opacity-100 text-foreground"
-            }`}
+            } ${isIdle ? "opacity-40" : "opacity-100"}`}
             aria-live="polite"
           >
             {currentLabel}
