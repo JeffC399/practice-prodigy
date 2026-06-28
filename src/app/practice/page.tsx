@@ -379,19 +379,28 @@ export default function PracticeSetupPage() {
               details" was unnecessary noise). */}
           {editingDrill && (
             <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="font-mono text-xs uppercase tracking-wider text-primary">
                   Editing drill
                 </span>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex flex-wrap shrink-0 gap-2">
                   {isDirty && (
-                    <button
-                      type="button"
-                      onClick={handleDiscardChanges}
-                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-destructive/50 transition-colors"
-                    >
-                      Discard changes
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleSaveChanges}
+                        className="rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 transition-colors"
+                      >
+                        Save changes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDiscardChanges}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-destructive/50 transition-colors"
+                      >
+                        Discard changes
+                      </button>
+                    </>
                   )}
                   <button
                     type="button"
@@ -426,6 +435,14 @@ export default function PracticeSetupPage() {
                 rows={2}
                 className="resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none focus:text-foreground"
               />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Edit chords, pattern, tempo, and session in the sections
+                below — they all apply to this drill. Click{" "}
+                <span className="font-medium text-foreground">
+                  Save changes
+                </span>{" "}
+                to commit them.
+              </p>
             </div>
           )}
 
