@@ -10,6 +10,7 @@ import {
   BPM_MIN,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
+import { useDrillsLibrary } from "@/lib/state/drills-library";
 import { Minus, Play, Plus, Square, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -31,7 +32,14 @@ import type { Chord } from "@/lib/music/chord";
  */
 export default function PracticeSessionPage() {
   const config = usePracticeConfig();
+  const drillsLib = useDrillsLibrary();
   const { state, start, stop } = useMetronome();
+
+  // When the user launched this session from a Quick Start card, anchor
+  // their context by showing the drill's name in the header.
+  const currentDrill = config.loadedDrillId
+    ? drillsLib.drills.find((d) => d.id === config.loadedDrillId) ?? null
+    : null;
 
   const isIdle = state.phase === "idle";
   const isCountIn = state.phase === "count-in";
@@ -164,14 +172,24 @@ export default function PracticeSessionPage() {
   return (
     <main className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Link
-          href="/practice"
-          className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Back to setup"
-        >
-          <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>Setup</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/practice"
+            className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Back to setup"
+          >
+            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Setup</span>
+          </Link>
+          {currentDrill && (
+            <span className="hidden sm:flex items-center gap-2">
+              <span className="text-muted-foreground/40">|</span>
+              <span className="text-sm font-medium text-foreground truncate max-w-[18rem]">
+                {currentDrill.name}
+              </span>
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">
           <span className="text-foreground">
             {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}

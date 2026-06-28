@@ -20,13 +20,28 @@ export type Drill = {
   config: PracticeConfig;
   createdAt: number;
   updatedAt: number;
+  /** Free-text personal note shown as a third line on Quick Start cards. */
+  notes?: string;
+  /**
+   * Timestamp of the last Launch from Quick Start. Drives the
+   * recently-used sort on the Quick Start surface. Undefined means
+   * "never launched yet" — those drills sort to the bottom.
+   */
+  lastLoadedAt?: number;
 };
 
 type DrillsLibraryStore = {
   drills: Drill[];
-  saveDrill: (name: string, config: PracticeConfig) => string;
+  saveDrill: (name: string, config: PracticeConfig, notes?: string) => string;
   updateDrillConfig: (id: string, config: PracticeConfig) => void;
+  /** Update the name and/or notes of an existing drill. */
+  updateDrillMeta: (
+    id: string,
+    meta: { name?: string; notes?: string },
+  ) => void;
   renameDrill: (id: string, name: string) => void;
+  /** Stamp lastLoadedAt — call when the user launches a drill. */
+  markDrillLoaded: (id: string) => void;
   deleteDrill: (id: string) => void;
 };
 
@@ -40,7 +55,7 @@ export const useDrillsLibrary = create<DrillsLibraryStore>()(
   persist(
     (set) => ({
       drills: [],
-      saveDrill: (name, config) => {
+      saveDrill: (name, config, notes) => {
         const id = newDrillId();
         const now = Date.now();
         set((state) => ({
@@ -49,6 +64,7 @@ export const useDrillsLibrary = create<DrillsLibraryStore>()(
             {
               id,
               name: name.trim() || "Untitled drill",
+              notes: notes?.trim() || undefined,
               config,
               createdAt: now,
               updatedAt: now,
@@ -65,12 +81,33 @@ export const useDrillsLibrary = create<DrillsLibraryStore>()(
               : d,
           ),
         })),
+      updateDrillMeta: (id, meta) =>
+        set((state) => ({
+          drills: state.drills.map((d) => {
+            if (d.id !== id) return d;
+            const next: Drill = { ...d, updatedAt: Date.now() };
+            if (meta.name !== undefined) {
+              next.name = meta.name.trim() || d.name;
+            }
+            if (meta.notes !== undefined) {
+              const trimmed = meta.notes.trim();
+              next.notes = trimmed.length > 0 ? trimmed : undefined;
+            }
+            return next;
+          }),
+        })),
       renameDrill: (id, name) =>
         set((state) => ({
           drills: state.drills.map((d) =>
             d.id === id
               ? { ...d, name: name.trim() || d.name, updatedAt: Date.now() }
               : d,
+          ),
+        })),
+      markDrillLoaded: (id) =>
+        set((state) => ({
+          drills: state.drills.map((d) =>
+            d.id === id ? { ...d, lastLoadedAt: Date.now() } : d,
           ),
         })),
       deleteDrill: (id) =>

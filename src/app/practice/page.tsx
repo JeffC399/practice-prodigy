@@ -91,6 +91,15 @@ export default function PracticeSetupPage() {
     setLoadedDrillId,
   } = config;
   const drillsLib = useDrillsLibrary();
+  // Sort drills so most-recently-launched bubbles to the top of Quick Start.
+  // Drills that have never been launched fall to the bottom in save order.
+  const sortedDrills = useMemo(
+    () =>
+      [...drillsLib.drills].sort(
+        (a, b) => (b.lastLoadedAt ?? 0) - (a.lastLoadedAt ?? 0),
+      ),
+    [drillsLib.drills],
+  );
   const editingDrill = useMemo(
     () =>
       loadedDrillId
@@ -98,6 +107,27 @@ export default function PracticeSetupPage() {
         : null,
     [loadedDrillId, drillsLib.drills],
   );
+  // Has the live config diverged from the saved drill's config? Drives
+  // the "Discard changes" affordance. JSON-equality is fine here —
+  // PracticeConfig is small, plain data, deterministic field order.
+  const isDirty = useMemo(() => {
+    if (!editingDrill) return false;
+    const liveJson = JSON.stringify({
+      chordPool: config.chordPool,
+      orderingStrategy: config.orderingStrategy,
+      measuresPerChord: config.measuresPerChord,
+      drillMeasures: config.drillMeasures,
+      repetitions: config.repetitions,
+      repeatIndefinitely: config.repeatIndefinitely,
+      randomizeChords: config.randomizeChords,
+      bpm: config.bpm,
+      timeSignature: config.timeSignature,
+      countInMeasures: config.countInMeasures,
+      notationStyle: config.notationStyle,
+      arpeggioPattern: config.arpeggioPattern,
+    });
+    return liveJson !== JSON.stringify(editingDrill.config);
+  }, [editingDrill, config]);
 
   // Quick-build wizard state. Sets aren't directly reactive in
   // React, so each toggle creates a fresh Set.
@@ -157,6 +187,17 @@ export default function PracticeSetupPage() {
   // Save-as-drill inline form state.
   const [isSavingDrill, setIsSavingDrill] = useState(false);
   const [saveDrillName, setSaveDrillName] = useState("");
+  const [saveDrillNotes, setSaveDrillNotes] = useState("");
+
+  // Edit-details inline form state (used when a drill is loaded for edit).
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editDetailsName, setEditDetailsName] = useState("");
+  const [editDetailsNotes, setEditDetailsNotes] = useState("");
+
+  // Controlled-open state for the Chord pool section, so a click on a
+  // chip in the Sequence preview can force it open before scrolling.
+  const [chordPoolOpen, setChordPoolOpen] = useState(false);
+  const poolRowRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   /** Take a snapshot of the current PracticeConfig (data fields only). */
   const snapshotConfig = () => {
@@ -168,12 +209,40 @@ export default function PracticeSetupPage() {
   const handleSaveDrill = () => {
     const name = saveDrillName.trim();
     if (!name) return;
-    const id = drillsLib.saveDrill(name, snapshotConfig());
+    const id = drillsLib.saveDrill(
+      name,
+      snapshotConfig(),
+      saveDrillNotes,
+    );
     setSaveDrillName("");
+    setSaveDrillNotes("");
     setIsSavingDrill(false);
     // The new drill becomes the one being edited so subsequent Save
     // changes / Save as new chains work intuitively.
     setLoadedDrillId(id);
+  };
+
+  /** Open the inline Edit-details form, seeded with the current drill's metadata. */
+  const handleStartEditDetails = () => {
+    if (!editingDrill) return;
+    setEditDetailsName(editingDrill.name);
+    setEditDetailsNotes(editingDrill.notes ?? "");
+    setIsEditingDetails(true);
+  };
+
+  const handleSaveDetails = () => {
+    if (!editingDrill) return;
+    drillsLib.updateDrillMeta(editingDrill.id, {
+      name: editDetailsName,
+      notes: editDetailsNotes,
+    });
+    setIsEditingDetails(false);
+  };
+
+  /** Reset live config to the saved drill's state. */
+  const handleDiscardChanges = () => {
+    if (!editingDrill) return;
+    loadConfig(editingDrill.config);
   };
 
   /** Overwrite the currently-edited Drill with the current config. */
@@ -206,7 +275,23 @@ export default function PracticeSetupPage() {
     }
     loadConfig(drill.config);
     setLoadedDrillId(drill.id);
+    drillsLib.markDrillLoaded(drill.id);
     router.push("/practice/session?autostart=1");
+  };
+
+  /** Open Chord pool + scroll the chosen row into view + focus its root select. */
+  const handleSequenceChipClick = (index: number) => {
+    setChordPoolOpen(true);
+    // setTimeout lets the section finish expanding before we scroll
+    // (the row may have been display:none-equivalent inside the
+    // collapsed body when we issued the click).
+    setTimeout(() => {
+      const el = poolRowRefs.current[index];
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const select = el.querySelector("select");
+      if (select) (select as HTMLSelectElement).focus();
+    }, 60);
   };
 
   const firstChord = config.chordPool[0];
@@ -307,22 +392,104 @@ export default function PracticeSetupPage() {
 
           {/* Editing badge — visible only when a saved Drill is loaded for edit. */}
           {editingDrill && (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
-              <div className="flex flex-col">
-                <span className="font-mono text-xs uppercase tracking-wider text-primary">
-                  Editing drill
-                </span>
-                <span className="text-sm font-medium text-foreground">
-                  {editingDrill.name}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleDoneEditing}
-                className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-              >
-                Done editing
-              </button>
+            <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
+              {isEditingDetails ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label
+                      htmlFor="edit-drill-name"
+                      className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
+                    >
+                      Name
+                    </label>
+                    <input
+                      id="edit-drill-name"
+                      type="text"
+                      value={editDetailsName}
+                      onChange={(e) => setEditDetailsName(e.target.value)}
+                      className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label
+                      htmlFor="edit-drill-notes"
+                      className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
+                    >
+                      Notes (optional)
+                    </label>
+                    <textarea
+                      id="edit-drill-notes"
+                      value={editDetailsNotes}
+                      onChange={(e) =>
+                        setEditDetailsNotes(e.target.value.slice(0, 300))
+                      }
+                      placeholder="e.g. Slow at 60. Focus on left-hand timing."
+                      rows={2}
+                      className="resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingDetails(false)}
+                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveDetails}
+                      disabled={!editDetailsName.trim()}
+                      className="rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Save details
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-mono text-xs uppercase tracking-wider text-primary">
+                        Editing drill
+                      </span>
+                      <span className="text-sm font-medium text-foreground">
+                        {editingDrill.name}
+                      </span>
+                      {editingDrill.notes && (
+                        <span className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                          {editingDrill.notes}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      {isDirty && (
+                        <button
+                          type="button"
+                          onClick={handleDiscardChanges}
+                          className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-destructive/50 transition-colors"
+                        >
+                          Discard changes
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleStartEditDetails}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                      >
+                        Edit details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDoneEditing}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Done editing
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -338,7 +505,7 @@ export default function PracticeSetupPage() {
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {drillsLib.drills.map((drill) => (
+                {sortedDrills.map((drill) => (
                   <DrillCard
                     key={drill.id}
                     drill={drill}
@@ -376,12 +543,19 @@ export default function PracticeSetupPage() {
               {renderedChords.map((label, i) => (
                 <span
                   key={i}
-                  className={`inline-flex items-center gap-2 rounded-md border border-border/50 bg-background/40 py-1.5 pl-3 pr-1.5 font-mono font-semibold text-foreground leading-none tracking-tight ${chipTextClass(
+                  className={`inline-flex items-center gap-2 rounded-md border border-border/50 bg-background/40 py-1.5 pl-1.5 pr-1.5 font-mono font-semibold text-foreground leading-none tracking-tight ${chipTextClass(
                     poolSize,
                     isLongForm,
                   )}`}
                 >
-                  <span>{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSequenceChipClick(i)}
+                    aria-label={`Edit ${label} in chord pool`}
+                    className="rounded-sm px-1.5 hover:text-primary transition-colors"
+                  >
+                    {label}
+                  </button>
                   <button
                     type="button"
                     onClick={() => removeChordAt(i)}
@@ -419,7 +593,12 @@ export default function PracticeSetupPage() {
           </section>
 
           {/* Chord pool builder */}
-          <CollapsibleSection title="Chord pool" summary={chordPoolSummary}>
+          <CollapsibleSection
+            title="Chord pool"
+            summary={chordPoolSummary}
+            open={chordPoolOpen}
+            onOpenChange={setChordPoolOpen}
+          >
             <div className="flex flex-col gap-3">
               {/* Quick-build wizard — collapsible, closed by default */}
               <div className="rounded-md border border-border bg-background/30">
@@ -584,6 +763,9 @@ export default function PracticeSetupPage() {
                 {config.chordPool.map((chord, index) => (
                   <div
                     key={index}
+                    ref={(el) => {
+                      poolRowRefs.current[index] = el;
+                    }}
                     className="grid grid-cols-[7rem_1fr_auto] gap-2 items-center"
                   >
                     <Select
@@ -904,47 +1086,69 @@ export default function PracticeSetupPage() {
 
             {/* Save area — differs depending on whether a Drill is loaded for edit. */}
             {isSavingDrill ? (
-              <div className="flex flex-col gap-2 rounded-md border border-border bg-background/40 p-3">
-                <label
-                  htmlFor="drill-name"
-                  className="text-xs font-mono uppercase tracking-wider text-muted-foreground"
-                >
-                  Name this drill
-                </label>
-                <div className="flex gap-2">
+              <div className="flex flex-col gap-3 rounded-md border border-border bg-background/40 p-3">
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="drill-name"
+                    className="text-xs font-mono uppercase tracking-wider text-muted-foreground"
+                  >
+                    Name this drill
+                  </label>
                   <input
                     id="drill-name"
                     type="text"
                     value={saveDrillName}
                     onChange={(e) => setSaveDrillName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSaveDrill();
+                      if (e.key === "Enter" && !e.shiftKey) handleSaveDrill();
                       if (e.key === "Escape") {
                         setSaveDrillName("");
+                        setSaveDrillNotes("");
                         setIsSavingDrill(false);
                       }
                     }}
                     placeholder="e.g. Morning warm-up"
                     autoFocus
-                    className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                    className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
                   />
-                  <button
-                    type="button"
-                    onClick={handleSaveDrill}
-                    disabled={!saveDrillName.trim()}
-                    className="rounded-md border border-primary/40 bg-primary/15 px-4 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="drill-notes"
+                    className="text-xs font-mono uppercase tracking-wider text-muted-foreground"
                   >
-                    Save
-                  </button>
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    id="drill-notes"
+                    value={saveDrillNotes}
+                    onChange={(e) =>
+                      setSaveDrillNotes(e.target.value.slice(0, 300))
+                    }
+                    placeholder="e.g. Slow at 60. Focus on left-hand timing."
+                    rows={2}
+                    className="resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setSaveDrillName("");
+                      setSaveDrillNotes("");
                       setIsSavingDrill(false);
                     }}
-                    className="rounded-md border border-border bg-background px-4 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                    className="rounded-md border border-border bg-background px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveDrill}
+                    disabled={!saveDrillName.trim()}
+                    className="rounded-md border border-primary/40 bg-primary/15 px-4 py-1.5 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Save
                   </button>
                 </div>
               </div>
@@ -1043,6 +1247,11 @@ function DrillCard({
             </>
           )}
         </div>
+        {drill.notes && (
+          <div className="mt-1.5 line-clamp-2 text-xs italic text-muted-foreground/80">
+            {drill.notes}
+          </div>
+        )}
       </button>
       {/* Card actions. Two-click delete confirm prevents accidental loss. */}
       <div className="absolute right-2 top-2 flex items-center gap-1">
@@ -1121,18 +1330,29 @@ function CollapsibleSection({
   summary,
   children,
   defaultOpen = false,
+  open: openProp,
+  onOpenChange,
 }: {
   title: string;
   summary: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  /** When provided, the section becomes controlled by the parent. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   return (
     <section className="flex flex-col rounded-md border border-border bg-background/30">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-background/60 transition-colors"
       >
