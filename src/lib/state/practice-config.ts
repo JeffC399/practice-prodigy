@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { ArpeggioPattern } from "@/lib/music/arpeggio";
 import type { Chord, PitchClass, ChordQuality } from "@/lib/music/chord";
 import type { ChordNotationStyle } from "@/lib/music/render-chord";
 
@@ -45,6 +46,7 @@ export type PracticeConfig = {
   countInMeasures: number;
   sessionMeasures: number;
   notationStyle: ChordNotationStyle;
+  arpeggioPattern: ArpeggioPattern;
 };
 
 export const BPM_MIN = 30;
@@ -59,6 +61,7 @@ const DEFAULT_CONFIG: PracticeConfig = {
   countInMeasures: 1,
   sessionMeasures: 8,
   notationStyle: "jazz-minus",
+  arpeggioPattern: "arp-7ths",
 };
 
 type PracticeConfigStore = PracticeConfig & {
@@ -69,6 +72,7 @@ type PracticeConfigStore = PracticeConfig & {
   setCountInMeasures: (measures: number) => void;
   setSessionMeasures: (measures: number) => void;
   setNotationStyle: (style: ChordNotationStyle) => void;
+  setArpeggioPattern: (pattern: ArpeggioPattern) => void;
   resetToDefaults: () => void;
 };
 
@@ -93,6 +97,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           ),
         }),
       setNotationStyle: (notationStyle) => set({ notationStyle }),
+      setArpeggioPattern: (arpeggioPattern) => set({ arpeggioPattern }),
       resetToDefaults: () => set(DEFAULT_CONFIG),
     }),
     {

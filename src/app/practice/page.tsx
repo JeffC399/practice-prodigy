@@ -1,5 +1,13 @@
 "use client";
 
+import { previewPlayer } from "@/lib/audio/preview";
+import {
+  ARPEGGIO_PATTERNS,
+  ARPEGGIO_PATTERN_DESCRIPTIONS,
+  ARPEGGIO_PATTERN_DISPLAY_NAMES,
+  generateArpeggio,
+  type ArpeggioPattern,
+} from "@/lib/music/arpeggio";
 import {
   CHORD_QUALITIES,
   PITCH_CLASSES,
@@ -23,10 +31,10 @@ import {
   TIME_SIGNATURES,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Play, Square } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Practice setup screen. The user configures the drill here, then proceeds
@@ -47,6 +55,7 @@ export default function PracticeSetupPage() {
     setCountInMeasures,
     setSessionMeasures,
     setNotationStyle,
+    setArpeggioPattern,
   } = config;
 
   // Gate render until after mount so persisted-store hydration doesn't
@@ -58,6 +67,30 @@ export default function PracticeSetupPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
+
+  // Stop any in-flight preview when the user navigates away.
+  useEffect(() => {
+    return () => previewPlayer.cancel();
+  }, []);
+
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const previewIdRef = useRef(0);
+
+  const handlePreview = async () => {
+    if (isPreviewing) {
+      previewPlayer.cancel();
+      setIsPreviewing(false);
+      return;
+    }
+    const myId = ++previewIdRef.current;
+    setIsPreviewing(true);
+    const notes = generateArpeggio(config.chord, config.arpeggioPattern);
+    await previewPlayer.playArpeggio(notes, config.bpm);
+    const totalMs = (notes.length * (60 / config.bpm) + 0.4) * 1000;
+    setTimeout(() => {
+      if (previewIdRef.current === myId) setIsPreviewing(false);
+    }, totalMs);
+  };
 
   const chordPreview = useMemo(
     () => renderChord(config.chord, config.notationStyle),
@@ -184,6 +217,52 @@ export default function PracticeSetupPage() {
                   ))}
                 </Select>
               </FormField>
+            </div>
+          </FormSection>
+
+          {/* Arpeggio pattern */}
+          <FormSection title="Pattern">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-stretch gap-3">
+                <Select
+                  id="arpeggio-pattern"
+                  value={config.arpeggioPattern}
+                  onChange={(e) =>
+                    setArpeggioPattern(e.target.value as ArpeggioPattern)
+                  }
+                  className="flex-1"
+                  aria-label="Arpeggio pattern"
+                >
+                  {ARPEGGIO_PATTERNS.map((p) => (
+                    <option key={p} value={p}>
+                      {ARPEGGIO_PATTERN_DISPLAY_NAMES[p]}
+                    </option>
+                  ))}
+                </Select>
+                <button
+                  type="button"
+                  onClick={handlePreview}
+                  className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 text-sm font-medium text-primary hover:bg-primary/20 active:scale-[0.98] transition-all"
+                  aria-label={
+                    isPreviewing ? "Stop preview" : "Preview arpeggio"
+                  }
+                >
+                  {isPreviewing ? (
+                    <>
+                      <Square className="h-4 w-4" aria-hidden="true" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4" aria-hidden="true" />
+                      Preview
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {ARPEGGIO_PATTERN_DESCRIPTIONS[config.arpeggioPattern]}
+              </p>
             </div>
           </FormSection>
 
