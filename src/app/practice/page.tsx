@@ -48,6 +48,7 @@ import {
   Bookmark,
   Check,
   ChevronDown,
+  ChevronUp,
   ListChecks,
   Pencil,
   Play,
@@ -194,58 +195,6 @@ export default function PracticeSetupPage() {
   // chip in the Sequence preview can force it open before scrolling.
   const [chordPoolOpen, setChordPoolOpen] = useState(false);
   const poolRowRefs = useRef<Array<HTMLDivElement | null>>([]);
-
-  /**
-   * Pull a clean PracticeConfig out of any source (the live store or a
-   * saved drill's config). Listing fields explicitly is the only safe
-   * way to avoid UI-state fields like `loadedDrillId` leaking into a
-   * saved drill snapshot — JSON.stringify-the-whole-store dropped
-   * functions but didn't strip non-PracticeConfig data, which caused
-   * the Save changes button to read as dirty on fresh drill loads.
-   */
-  const extractPracticeConfig = (
-    source: Partial<PracticeConfig>,
-  ): PracticeConfig => ({
-    ...DEFAULT_PRACTICE_CONFIG,
-    ...(source.chordPool !== undefined && { chordPool: source.chordPool }),
-    ...(source.orderingStrategy !== undefined && {
-      orderingStrategy: source.orderingStrategy,
-    }),
-    ...(source.measuresPerChord !== undefined && {
-      measuresPerChord: source.measuresPerChord,
-    }),
-    ...(source.drillMeasures !== undefined && {
-      drillMeasures: source.drillMeasures,
-    }),
-    ...(source.repetitions !== undefined && {
-      repetitions: source.repetitions,
-    }),
-    ...(source.repeatIndefinitely !== undefined && {
-      repeatIndefinitely: source.repeatIndefinitely,
-    }),
-    ...(source.randomizeChords !== undefined && {
-      randomizeChords: source.randomizeChords,
-    }),
-    ...(source.bpm !== undefined && { bpm: source.bpm }),
-    ...(source.timeSignature !== undefined && {
-      timeSignature: source.timeSignature,
-    }),
-    ...(source.countInMeasures !== undefined && {
-      countInMeasures: source.countInMeasures,
-    }),
-    ...(source.notationStyle !== undefined && {
-      notationStyle: source.notationStyle,
-    }),
-    ...(source.arpeggioPattern !== undefined && {
-      arpeggioPattern: source.arpeggioPattern,
-    }),
-    ...(source.transitionUnit !== undefined && {
-      transitionUnit: source.transitionUnit,
-    }),
-    ...(source.transitionCount !== undefined && {
-      transitionCount: source.transitionCount,
-    }),
-  });
 
   /** Snapshot of the live PracticeConfig (no loadedDrillId, no setters). */
   const snapshotConfig = (): PracticeConfig =>
@@ -1515,6 +1464,63 @@ function Select(
   );
 }
 
+/**
+ * Pull a clean PracticeConfig out of any source (the live store or a
+ * saved drill's config). Listing fields explicitly is the only safe
+ * way to avoid UI-state fields (like loadedDrillId) leaking into a
+ * saved drill snapshot. Used by BOTH the save path and the isDirty
+ * comparison so they're structurally symmetric. Lives at module
+ * scope so it's available to every render of the setup component —
+ * defining it inside the function caused a temporal-dead-zone crash
+ * when the isDirty useMemo (declared earlier in the same scope) tried
+ * to call it.
+ */
+function extractPracticeConfig(
+  source: Partial<PracticeConfig>,
+): PracticeConfig {
+  return {
+    ...DEFAULT_PRACTICE_CONFIG,
+    ...(source.chordPool !== undefined && { chordPool: source.chordPool }),
+    ...(source.orderingStrategy !== undefined && {
+      orderingStrategy: source.orderingStrategy,
+    }),
+    ...(source.measuresPerChord !== undefined && {
+      measuresPerChord: source.measuresPerChord,
+    }),
+    ...(source.drillMeasures !== undefined && {
+      drillMeasures: source.drillMeasures,
+    }),
+    ...(source.repetitions !== undefined && {
+      repetitions: source.repetitions,
+    }),
+    ...(source.repeatIndefinitely !== undefined && {
+      repeatIndefinitely: source.repeatIndefinitely,
+    }),
+    ...(source.randomizeChords !== undefined && {
+      randomizeChords: source.randomizeChords,
+    }),
+    ...(source.bpm !== undefined && { bpm: source.bpm }),
+    ...(source.timeSignature !== undefined && {
+      timeSignature: source.timeSignature,
+    }),
+    ...(source.countInMeasures !== undefined && {
+      countInMeasures: source.countInMeasures,
+    }),
+    ...(source.notationStyle !== undefined && {
+      notationStyle: source.notationStyle,
+    }),
+    ...(source.arpeggioPattern !== undefined && {
+      arpeggioPattern: source.arpeggioPattern,
+    }),
+    ...(source.transitionUnit !== undefined && {
+      transitionUnit: source.transitionUnit,
+    }),
+    ...(source.transitionCount !== undefined && {
+      transitionCount: source.transitionCount,
+    }),
+  };
+}
+
 /** Quick-pick tempo buttons that sit above the slider. */
 const TEMPO_PRESETS = [40, 60, 80, 100, 120, 140, 160, 200] as const;
 
@@ -1604,6 +1610,9 @@ function WizardCheckbox({
  * store is only updated when the typed value is valid and in range;
  * on blur we commit + clamp. Pattern fixes the bug where typing "31"
  * was impossible because the leading "3" got clamped to the min.
+ *
+ * Includes ±1 stepper buttons (up/down chevrons) so users can nudge
+ * without typing. Buttons disable at the min/max boundaries.
  */
 function ClampedNumberInput({
   id,
@@ -1626,42 +1635,81 @@ function ClampedNumberInput({
   const [focused, setFocused] = useState(false);
   const display = focused && draft !== null ? draft : String(value);
 
+  const step = (delta: number) => {
+    const next = Math.max(min, Math.min(max, value + delta));
+    if (next !== value) onChange(next);
+  };
+
   return (
-    <input
-      id={id}
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      value={display}
-      aria-label={ariaLabel}
-      onFocus={() => {
-        setFocused(true);
-        setDraft(String(value));
-      }}
-      onChange={(e) => {
-        const v = e.target.value.replace(/[^0-9]/g, "");
-        setDraft(v);
-        const n = Number(v);
-        if (v !== "" && !isNaN(n) && n >= min && n <= max) {
-          onChange(n);
-        }
-      }}
-      onBlur={() => {
-        setFocused(false);
-        if (draft === null) return;
-        const n = Number(draft);
-        const clamped =
-          draft !== "" && !isNaN(n)
-            ? Math.max(min, Math.min(max, n))
-            : min;
-        onChange(clamped);
-        setDraft(null);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-      className={`rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none ${className ?? ""}`}
-    />
+    <div
+      className={`relative flex items-stretch rounded-md border border-border bg-background focus-within:border-primary transition-colors ${className ?? ""}`}
+    >
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={display}
+        aria-label={ariaLabel}
+        onFocus={() => {
+          setFocused(true);
+          setDraft(String(value));
+        }}
+        onChange={(e) => {
+          const v = e.target.value.replace(/[^0-9]/g, "");
+          setDraft(v);
+          const n = Number(v);
+          if (v !== "" && !isNaN(n) && n >= min && n <= max) {
+            onChange(n);
+          }
+        }}
+        onBlur={() => {
+          setFocused(false);
+          if (draft === null) return;
+          const n = Number(draft);
+          const clamped =
+            draft !== "" && !isNaN(n)
+              ? Math.max(min, Math.min(max, n))
+              : min;
+          onChange(clamped);
+          setDraft(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            step(1);
+          }
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            step(-1);
+          }
+        }}
+        className="flex-1 min-w-0 rounded-l-md bg-transparent px-3 py-2 font-mono text-sm tabular-nums focus:outline-none"
+      />
+      <div className="flex flex-col border-l border-border">
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => step(1)}
+          disabled={value >= max}
+          aria-label={`Increase ${ariaLabel ?? "value"} by 1`}
+          className="flex h-1/2 w-6 items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronUp className="h-3 w-3" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => step(-1)}
+          disabled={value <= min}
+          aria-label={`Decrease ${ariaLabel ?? "value"} by 1`}
+          className="flex h-1/2 w-6 items-center justify-center border-t border-border text-muted-foreground hover:text-foreground hover:bg-background/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronDown className="h-3 w-3" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   );
 }
 
