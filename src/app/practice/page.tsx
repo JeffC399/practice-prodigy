@@ -8,7 +8,12 @@ import {
   type ChordQuality,
   type PitchClass,
 } from "@/lib/music/chord";
-import { renderChord } from "@/lib/music/render-chord";
+import {
+  CHORD_NOTATION_STYLES,
+  NOTATION_STYLE_DISPLAY_NAMES,
+  renderChord,
+  type ChordNotationStyle,
+} from "@/lib/music/render-chord";
 import {
   BPM_MAX,
   BPM_MIN,
@@ -41,6 +46,7 @@ export default function PracticeSetupPage() {
     setTimeSignature,
     setCountInMeasures,
     setSessionMeasures,
+    setNotationStyle,
   } = config;
 
   // Gate render until after mount so persisted-store hydration doesn't
@@ -116,10 +122,34 @@ export default function PracticeSetupPage() {
               Chord
             </div>
             <div
-              className="font-mono font-semibold text-foreground text-7xl leading-none tracking-tight"
+              className={`font-mono font-semibold text-foreground leading-none tracking-tight text-center ${
+                config.notationStyle === "long-form" ? "text-4xl" : "text-7xl"
+              }`}
               aria-live="polite"
             >
               {chordPreview}
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <label
+                htmlFor="notation-style"
+                className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
+              >
+                Notation
+              </label>
+              <select
+                id="notation-style"
+                value={config.notationStyle}
+                onChange={(e) =>
+                  setNotationStyle(e.target.value as ChordNotationStyle)
+                }
+                className="rounded-md border border-border bg-background px-3 py-1 text-xs focus:border-primary focus:outline-none"
+              >
+                {CHORD_NOTATION_STYLES.map((style) => (
+                  <option key={style} value={style}>
+                    {NOTATION_STYLE_DISPLAY_NAMES[style]}
+                  </option>
+                ))}
+              </select>
             </div>
           </section>
 

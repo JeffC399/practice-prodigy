@@ -3,13 +3,10 @@ import type { Chord, ChordQuality, PitchClass } from "./chord";
 /**
  * Chord-symbol rendering for Practice Prodigy.
  *
- * v1 will ship four user-selectable notation styles (jazz-minus, lowercase-m
- * jazz, plain ASCII, long form) wired through the standard cascade. This
- * module is intentionally pluggable — adding a fifth style (e.g. Roman
- * numeral / Nashville) is a new function + a new entry in the dispatch map.
- *
- * Current slice (B1) ships ONLY jazz-minus. The other three styles are
- * stubbed to defer cleanly to jazz-minus until the renderer expansion slice.
+ * Four user-selectable notation styles ship in v1 (PROJECT-DESIGN.md §4.2),
+ * wired through the standard cascade. The rendering layer is intentionally
+ * pluggable — adding a fifth style (e.g. Roman numeral / Nashville) is a
+ * new suffix table + a new dispatch arm.
  */
 
 export const CHORD_NOTATION_STYLES = [
@@ -29,6 +26,7 @@ export const NOTATION_STYLE_DISPLAY_NAMES: Record<ChordNotationStyle, string> =
     "long-form": "Long form (A minor 7)",
   };
 
+/** Suffix tables — one row per quality, one column per style. */
 const JAZZ_MINUS_SUFFIX: Record<ChordQuality, string> = {
   maj: "",
   min: "−",
@@ -52,30 +50,96 @@ const JAZZ_MINUS_SUFFIX: Record<ChordQuality, string> = {
   dom7sharp5: "7♯5",
 };
 
-/** Display sharps with the Unicode sharp symbol for visual cleanliness. */
-function prettyRoot(root: PitchClass): string {
+const LOWERCASE_M_SUFFIX: Record<ChordQuality, string> = {
+  maj: "",
+  min: "m",
+  aug: "aug",
+  dom7: "7",
+  min7: "m7",
+  maj7: "maj7",
+  halfDim7: "m7♭5",
+  dim7: "dim7",
+  sus2: "sus2",
+  sus4: "sus4",
+  "7sus4": "7sus4",
+  maj9: "maj9",
+  min9: "m9",
+  dom9: "9",
+  dom13: "13",
+  dom7b9: "7♭9",
+  dom7sharp9: "7♯9",
+  dom7alt: "7alt",
+  dom7b5: "7♭5",
+  dom7sharp5: "7♯5",
+};
+
+const PLAIN_ASCII_SUFFIX: Record<ChordQuality, string> = {
+  maj: "",
+  min: "m",
+  aug: "aug",
+  dom7: "7",
+  min7: "m7",
+  maj7: "M7",
+  halfDim7: "m7b5",
+  dim7: "dim7",
+  sus2: "sus2",
+  sus4: "sus4",
+  "7sus4": "7sus4",
+  maj9: "M9",
+  min9: "m9",
+  dom9: "9",
+  dom13: "13",
+  dom7b9: "7b9",
+  dom7sharp9: "7#9",
+  dom7alt: "7alt",
+  dom7b5: "7b5",
+  dom7sharp5: "7#5",
+};
+
+/**
+ * Long-form: a leading space separates root from quality words (the root
+ * renders as "C", not "Cmajor"), but extension digits attach to the
+ * preceding word for jazz convention ("major 7", not "major7").
+ */
+const LONG_FORM_SUFFIX: Record<ChordQuality, string> = {
+  maj: " major",
+  min: " minor",
+  aug: " augmented",
+  dom7: " dominant 7",
+  min7: " minor 7",
+  maj7: " major 7",
+  halfDim7: " half-diminished 7",
+  dim7: " diminished 7",
+  sus2: " suspended 2",
+  sus4: " suspended 4",
+  "7sus4": " dominant 7 suspended 4",
+  maj9: " major 9",
+  min9: " minor 9",
+  dom9: " dominant 9",
+  dom13: " dominant 13",
+  dom7b9: " dominant 7♭9",
+  dom7sharp9: " dominant 7♯9",
+  dom7alt: " dominant 7 altered",
+  dom7b5: " dominant 7♭5",
+  dom7sharp5: " dominant 7♯5",
+};
+
+/** Plain ASCII keeps the raw `#`; all other styles prefer the Unicode `♯`. */
+function renderRoot(root: PitchClass, style: ChordNotationStyle): string {
+  if (style === "plain-ascii") return root;
   return root.replace("#", "♯");
 }
 
-export function renderJazzMinus(chord: Chord): string {
-  return `${prettyRoot(chord.root)}${JAZZ_MINUS_SUFFIX[chord.quality]}`;
-}
-
-/**
- * Pluggable dispatch. Styles other than jazz-minus currently route through
- * `renderJazzMinus` — the B2 slice will implement them properly. Doing it
- * this way means the rest of the app (setup form, drill screen, future
- * sequence views) can already call `renderChord(chord, style)` against the
- * stable API; only this file changes when the additional styles land.
- */
 export function renderChord(chord: Chord, style: ChordNotationStyle): string {
+  const root = renderRoot(chord.root, style);
   switch (style) {
     case "jazz-minus":
-      return renderJazzMinus(chord);
+      return `${root}${JAZZ_MINUS_SUFFIX[chord.quality]}`;
     case "lowercase-m":
+      return `${root}${LOWERCASE_M_SUFFIX[chord.quality]}`;
     case "plain-ascii":
+      return `${root}${PLAIN_ASCII_SUFFIX[chord.quality]}`;
     case "long-form":
-      // TODO(slice B2): implement these three styles.
-      return renderJazzMinus(chord);
+      return `${root}${LONG_FORM_SUFFIX[chord.quality]}`;
   }
 }

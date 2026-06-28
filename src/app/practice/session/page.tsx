@@ -78,9 +78,11 @@ export default function PracticeSessionPage() {
           />
 
           <div
-            className={`font-mono font-semibold text-foreground text-[12rem] leading-none tracking-tight transition-opacity duration-200 ${
-              isIdle ? "opacity-40" : "opacity-100"
-            }`}
+            className={`font-mono font-semibold text-foreground leading-none tracking-tight transition-opacity duration-200 text-center ${
+              config.notationStyle === "long-form"
+                ? "text-6xl sm:text-7xl"
+                : "text-[12rem]"
+            } ${isIdle ? "opacity-40" : "opacity-100"}`}
             aria-live="polite"
           >
             {chordLabel}

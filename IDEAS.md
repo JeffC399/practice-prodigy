@@ -16,12 +16,6 @@
 
 ---
 
-## Active Ideas — v1 expanded scope
-
-| Date | Title | Status | Notes |
-|---|---|---|---|
-| 2026-06-28 | Configurable chord notation form | Scoped → v1 (expanded) | User-selectable rendering style for chord symbols. Candidate styles: **jazz-minus** (`A−7`, `Cmaj7`, `Bø7`) — current default; **lowercase-m jazz** (`Am7`, `Cmaj7`, `Bm7♭5`); **plain ASCII** (`Am7`, `CM7`, `Bm7b5`) — no special characters; **long form** (`A minor 7`, `C major 7`, `B half-diminished 7`); future: **Roman numeral / Nashville** (see separate entry). Cascade applies: System default → User global → per-Custom-Pattern (persists with saved patterns) → per-session override. Implementation: pluggable `ChordRenderer` module branching on style enum — single rendering-layer change, doesn't touch chord data model. PROJECT-DESIGN.md §4.2 needs updating (currently locks "jazz-style" as the only convention). |
-
 ## Active Ideas — v1.1 milestone candidates (Polish + Cloud)
 
 | Date | Title | Status | Notes |
@@ -119,6 +113,7 @@
 | Date | Title | Implemented In | Notes |
 |---|---|---|---|
 | 2026-06-28 | Distinct count-in click sound | v1 (pulled forward from v1.1) | Count-in beats now use a dry, high-pass-filtered noise tick (stick-click character); playing beats keep the existing tonal sine click with higher-pitched downbeat. Pulled into v1 after user hands-on test on the first-slice deploy — visual cue alone made the count-in → playing transition unclear aurally. See `src/lib/audio/metronome.ts` and PROJECT-DESIGN.md §4.7. |
+| 2026-06-28 | Configurable chord notation form | v1 | All four styles (jazz-minus, lowercase-m, plain-ASCII, long-form) shipped as a pluggable `ChordRenderer` module. Notation-style picker on the setup screen with live chord preview; selection persists per-user via the cascade. Long-form display uses smaller text on setup + drill screens so verbose strings still fit cleanly. See `src/lib/music/render-chord.ts` and PROJECT-DESIGN.md §4.2. |
 
 ---
 
