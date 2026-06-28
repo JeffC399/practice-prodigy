@@ -223,10 +223,16 @@ export default function PracticeSetupPage() {
     loadConfig(editingDrill.config);
   };
 
+  // Brief "Saved" confirmation that survives the dirty→clean transition
+  // so the user gets feedback that the click actually did something.
+  const [justSavedAt, setJustSavedAt] = useState<number | null>(null);
+
   /** Overwrite the currently-edited Drill with the current config. */
   const handleSaveChanges = () => {
     if (!editingDrill) return;
     drillsLib.updateDrillConfig(editingDrill.id, snapshotConfig());
+    setJustSavedAt(Date.now());
+    setTimeout(() => setJustSavedAt(null), 1500);
   };
 
   const handleEditDrill = (drill: Drill) => {
@@ -1110,10 +1116,24 @@ export default function PracticeSetupPage() {
                 <button
                   type="button"
                   onClick={handleSaveChanges}
-                  className="flex items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/15 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/25 transition-colors"
+                  disabled={!isDirty}
+                  aria-label={
+                    isDirty
+                      ? `Save changes to ${editingDrill.name}`
+                      : "No changes to save"
+                  }
+                  className={`flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                    isDirty
+                      ? "border-primary/40 bg-primary/15 text-primary hover:bg-primary/25"
+                      : justSavedAt !== null
+                        ? "border-primary/40 bg-primary/15 text-primary cursor-default"
+                        : "border-dashed border-border bg-background/40 text-muted-foreground cursor-not-allowed"
+                  }`}
                 >
                   <Check className="h-4 w-4" aria-hidden="true" />
-                  Save changes to &ldquo;{editingDrill.name}&rdquo;
+                  {justSavedAt !== null && !isDirty
+                    ? "Saved"
+                    : `Save changes to "${editingDrill.name}"`}
                 </button>
                 <button
                   type="button"
