@@ -1,4 +1,5 @@
-import { Music } from "lucide-react";
+import { Music, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -29,20 +30,33 @@ export default function Home() {
         {/* Status badge */}
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/40 p-5">
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+            <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
             <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               Status
             </span>
           </div>
           <p className="text-sm leading-relaxed">
             <span className="font-medium text-foreground">
-              v0.1 — Bass Arpeggios module, scaffold ready.
+              v1 build in progress — first slice live.
             </span>{" "}
             <span className="text-muted-foreground">
-              Design locked. Build begins next session.
+              Hardcoded A−7 chord, 90 BPM, 4/4, 1-measure count-in,
+              8-measure session. Dialing in the metronome feel.
             </span>
           </p>
         </div>
+
+        {/* Practice CTA */}
+        <Link
+          href="/practice"
+          className="group flex items-center justify-between gap-3 rounded-lg bg-primary px-6 py-4 text-base font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <span>Open practice screen</span>
+          <ArrowRight
+            className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </Link>
 
         {/* Footer links */}
         <div className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs text-muted-foreground">
