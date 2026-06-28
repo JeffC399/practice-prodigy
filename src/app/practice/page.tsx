@@ -43,6 +43,7 @@ import {
   Plus,
   Square,
   Trash2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -230,12 +231,21 @@ export default function PracticeSetupPage() {
               {renderedChords.map((label, i) => (
                 <span
                   key={i}
-                  className={`rounded-md border border-border/50 bg-background/40 px-3 py-1.5 font-mono font-semibold text-foreground leading-none tracking-tight ${chipTextClass(
+                  className={`inline-flex items-center gap-2 rounded-md border border-border/50 bg-background/40 py-1.5 pl-3 pr-1.5 font-mono font-semibold text-foreground leading-none tracking-tight ${chipTextClass(
                     poolSize,
                     isLongForm,
                   )}`}
                 >
-                  {label}
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeChordAt(i)}
+                    disabled={poolSize <= 1}
+                    aria-label={`Remove ${label} from pool`}
+                    className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/60 hover:bg-border/60 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
                 </span>
               ))}
             </div>
@@ -472,15 +482,27 @@ export default function PracticeSetupPage() {
                   </div>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => addChord()}
-                disabled={poolSize >= POOL_MAX}
-                className="mt-1 flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Add chord
-              </button>
+              <div className="mt-1 grid grid-cols-[1fr_auto] gap-2">
+                <button
+                  type="button"
+                  onClick={() => addChord()}
+                  disabled={poolSize >= POOL_MAX}
+                  className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add chord
+                </button>
+                <button
+                  type="button"
+                  onClick={() => replaceChordPool([])}
+                  disabled={poolSize <= 1}
+                  aria-label="Clear pool (reset to one default chord)"
+                  className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-destructive/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Clear pool
+                </button>
+              </div>
               <label className="flex items-start gap-3 pt-3 cursor-pointer group">
                 <input
                   type="checkbox"
