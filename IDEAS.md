@@ -16,6 +16,12 @@
 
 ---
 
+## Active Ideas — v1 expanded scope
+
+| Date | Title | Status | Notes |
+|---|---|---|---|
+| 2026-06-28 | Configurable chord notation form | Scoped → v1 (expanded) | User-selectable rendering style for chord symbols. Candidate styles: **jazz-minus** (`A−7`, `Cmaj7`, `Bø7`) — current default; **lowercase-m jazz** (`Am7`, `Cmaj7`, `Bm7♭5`); **plain ASCII** (`Am7`, `CM7`, `Bm7b5`) — no special characters; **long form** (`A minor 7`, `C major 7`, `B half-diminished 7`); future: **Roman numeral / Nashville** (see separate entry). Cascade applies: System default → User global → per-Custom-Pattern (persists with saved patterns) → per-session override. Implementation: pluggable `ChordRenderer` module branching on style enum — single rendering-layer change, doesn't touch chord data model. PROJECT-DESIGN.md §4.2 needs updating (currently locks "jazz-style" as the only convention). |
+
 ## Active Ideas — v1.1 milestone candidates (Polish + Cloud)
 
 | Date | Title | Status | Notes |
@@ -38,6 +44,7 @@
 | 2026-06-28 | Skip / restart-current-chord / rewind-1-chord controls | Scoped → v1.1 | For when user flubs a chord and wants to drill it again without restarting the whole sequence. |
 | 2026-06-28 | "Resume session" recovery | Scoped → v1.1 | Browser crash or screen lock → on reopen, offer "resume from where metronome stopped." |
 | 2026-06-28 | Per-chord-instance scale override | Under Consideration | "This specific Cmaj7 in this sequence uses Phrygian" — currently overrides are per-quality only. Adds data-model complexity; defer until real demand emerges. |
+| 2026-06-28 | Scale-degree / Roman-numeral chord display | Under Consideration → v1.1 or v2 | Show chords by their **functional role** (i, ii−, IV, V7, etc.) instead of letter names (A, B, C). Pedagogically excellent — teaches functional harmony, which is what jazz/popular musicians actually use day-to-day. Subtle design problem: requires a **key context**. Drills WITH a declared key (ii-V-I in Bb, blues in F) are trivial. Drills WITHOUT a single key (cycle-of-5ths through dominant 7s, random chords from all 12 keys) need a design call — declare the key globally? compute per-chord implied key on the fly? disable Roman numerals in keyless modes? Convention: lowercase = minor (`i`, `ii`, `iii`), uppercase = major (`I`, `IV`, `V`), with quality decorations appended (`V7`, `iiø7`). Optional alternate: Nashville Number System (`1`, `2`, `♭3`, `4`, `5`, `6`, `♭7`) used by country / session players. Sits in the same `ChordRenderer` plugin slot as the notation-form work above. |
 | 2026-06-28 | Click sound library + customization | Scoped → v1.1 | Let user pick from a set of preset metronome sounds (wood block, cowbell, electronic click, side-stick, etc.) and optionally customize per-sound pitch / volume / decay. Currently a single hardcoded high/low click pair is used. Promotes the "click sound choice" already noted in PROJECT-DESIGN.md §4.8 to a first-class Advanced setting in the cascade. |
 
 ---

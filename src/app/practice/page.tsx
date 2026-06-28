@@ -1,49 +1,90 @@
 "use client";
 
-import { useMetronome } from "@/lib/audio/use-metronome";
-import { Play, Square } from "lucide-react";
+import {
+  CHORD_QUALITIES,
+  PITCH_CLASSES,
+  PITCH_CLASS_DISPLAY_NAMES,
+  QUALITY_DISPLAY_NAMES,
+  type ChordQuality,
+  type PitchClass,
+} from "@/lib/music/chord";
+import { renderChord } from "@/lib/music/render-chord";
+import {
+  BPM_MAX,
+  BPM_MIN,
+  COUNT_IN_OPTIONS,
+  SESSION_MAX,
+  SESSION_MIN,
+  TIME_SIGNATURES,
+  usePracticeConfig,
+} from "@/lib/state/practice-config";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 /**
- * v1 first-slice practice screen.
+ * Practice setup screen. The user configures the drill here, then proceeds
+ * to /practice/session to actually play. Configuration is persisted to
+ * localStorage so revisits land with the user's last setup ready to go.
  *
- * Hardcoded so we can dial in the audio timing in isolation:
- *   - Chord: A-7
- *   - Tempo: 90 BPM
- *   - Time signature: 4/4
- *   - Count-in: 1 measure (4 beats)
- *   - Playing: 8 measures (32 beats)
- *
- * Everything here will become configurable in the next slice. The single goal
- * of this slice is: does the click feel solid against a real bass?
+ * Currently single-chord drills only — the sequence builder (multi-chord
+ * pools + ordering strategies) lands in a later slice per PROJECT-DESIGN.md §4.4.
  */
-const HARDCODED_CONFIG = {
-  bpm: 90,
-  beatsPerMeasure: 4,
-  beatUnit: 4 as const,
-  countInBeats: 4,
-  totalPlayingBeats: 32,
-} as const;
+export default function PracticeSetupPage() {
+  const router = useRouter();
+  const config = usePracticeConfig();
+  const {
+    setRoot,
+    setQuality,
+    setBpm,
+    setTimeSignature,
+    setCountInMeasures,
+    setSessionMeasures,
+  } = config;
 
-const CHORD_LABEL = "A−7";
+  // Gate render until after mount so persisted-store hydration doesn't
+  // diff against SSR's default values. The setState-in-effect pattern is
+  // canonical for this case; the alternative (useSyncExternalStore against
+  // persist middleware) adds complexity without changing behavior.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
-export default function PracticePage() {
-  const { state, start, stop } = useMetronome();
-  const isIdle = state.phase === "idle";
-  const isCountIn = state.phase === "count-in";
-  const isPlaying = state.phase === "playing";
+  const chordPreview = useMemo(
+    () => renderChord(config.chord, config.notationStyle),
+    [config.chord, config.notationStyle],
+  );
 
-  const handleToggle = () => {
-    if (isIdle) {
-      void start(HARDCODED_CONFIG);
-    } else {
-      stop();
-    }
+  const timeSignatureValue = `${config.timeSignature.beatsPerMeasure}/${config.timeSignature.beatUnit}`;
+
+  const handleTimeSignatureChange = (value: string) => {
+    const [beatsPerMeasure, beatUnit] = value.split("/").map(Number);
+    const match = TIME_SIGNATURES.find(
+      (ts) =>
+        ts.beatsPerMeasure === beatsPerMeasure && ts.beatUnit === beatUnit,
+    );
+    if (match) setTimeSignature(match);
   };
+
+  const handleStart = () => {
+    router.push("/practice/session");
+  };
+
+  if (!mounted) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+        <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          Loading setup…
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex flex-1 flex-col">
-      {/* Top bar */}
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <Link
           href="/"
@@ -51,65 +92,169 @@ export default function PracticePage() {
         >
           ← Practice Prodigy
         </Link>
-        <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          <span>{HARDCODED_CONFIG.bpm} BPM</span>
-          <span>
-            {HARDCODED_CONFIG.beatsPerMeasure}/{HARDCODED_CONFIG.beatUnit}
-          </span>
-          <span>v1 slice · hardcoded</span>
+        <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          Setup
         </div>
       </header>
 
-      {/* Practice surface */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
-        <div className="flex w-full max-w-3xl flex-col items-center gap-12">
-          {/* Phase indicator */}
-          <PhaseBadge
-            isIdle={isIdle}
-            isCountIn={isCountIn}
-            isPlaying={isPlaying}
-            countInRemaining={state.countInBeatsRemaining}
-            measure={state.measureInSession}
-            totalMeasures={
-              HARDCODED_CONFIG.totalPlayingBeats /
-              HARDCODED_CONFIG.beatsPerMeasure
-            }
-          />
-
-          {/* The chord — the entire point of the screen */}
-          <div
-            className={`font-mono font-semibold text-foreground text-[12rem] leading-none tracking-tight transition-opacity duration-200 ${
-              isIdle ? "opacity-40" : "opacity-100"
-            }`}
-            aria-live="polite"
-          >
-            {CHORD_LABEL}
+      <div className="flex flex-1 flex-col items-center px-6 py-12">
+        <div className="flex w-full max-w-2xl flex-col gap-10">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Configure your drill
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Pick a chord, tempo, and meter. Settings are remembered so the
+              next time you open this screen, you can start drilling
+              immediately.
+            </p>
           </div>
 
-          {/* Beat dots */}
-          <BeatDots
-            beatsPerMeasure={HARDCODED_CONFIG.beatsPerMeasure}
-            activeBeat={isIdle ? 0 : state.beatInMeasure}
-          />
+          {/* Chord preview */}
+          <section className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-10">
+            <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Chord
+            </div>
+            <div
+              className="font-mono font-semibold text-foreground text-7xl leading-none tracking-tight"
+              aria-live="polite"
+            >
+              {chordPreview}
+            </div>
+          </section>
 
-          {/* Transport */}
+          {/* Chord picker */}
+          <FormSection title="Chord">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="Root" htmlFor="root">
+                <Select
+                  id="root"
+                  value={config.chord.root}
+                  onChange={(e) => setRoot(e.target.value as PitchClass)}
+                >
+                  {PITCH_CLASSES.map((pc) => (
+                    <option key={pc} value={pc}>
+                      {PITCH_CLASS_DISPLAY_NAMES[pc]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Quality" htmlFor="quality">
+                <Select
+                  id="quality"
+                  value={config.chord.quality}
+                  onChange={(e) => setQuality(e.target.value as ChordQuality)}
+                >
+                  {CHORD_QUALITIES.map((q) => (
+                    <option key={q} value={q}>
+                      {QUALITY_DISPLAY_NAMES[q]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+          </FormSection>
+
+          {/* Tempo & meter */}
+          <FormSection title="Tempo & meter">
+            <div className="flex flex-col gap-6">
+              <FormField
+                label={
+                  <div className="flex items-center justify-between">
+                    <span>Tempo</span>
+                    <span className="font-mono text-base font-medium text-foreground tabular-nums">
+                      ♩ = {config.bpm}
+                    </span>
+                  </div>
+                }
+                htmlFor="bpm"
+              >
+                <div className="flex items-center gap-4">
+                  <input
+                    id="bpm"
+                    type="range"
+                    min={BPM_MIN}
+                    max={BPM_MAX}
+                    value={config.bpm}
+                    onChange={(e) => setBpm(Number(e.target.value))}
+                    className="flex-1 accent-primary"
+                  />
+                  <input
+                    type="number"
+                    min={BPM_MIN}
+                    max={BPM_MAX}
+                    value={config.bpm}
+                    onChange={(e) => setBpm(Number(e.target.value) || BPM_MIN)}
+                    className="w-20 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none"
+                    aria-label="BPM (numeric)"
+                  />
+                </div>
+              </FormField>
+
+              <FormField label="Time signature" htmlFor="time-signature">
+                <Select
+                  id="time-signature"
+                  value={timeSignatureValue}
+                  onChange={(e) => handleTimeSignatureChange(e.target.value)}
+                >
+                  {TIME_SIGNATURES.map((ts) => {
+                    const v = `${ts.beatsPerMeasure}/${ts.beatUnit}`;
+                    return (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    );
+                  })}
+                </Select>
+              </FormField>
+            </div>
+          </FormSection>
+
+          {/* Session shape */}
+          <FormSection title="Session">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="Count-in" htmlFor="count-in">
+                <Select
+                  id="count-in"
+                  value={config.countInMeasures}
+                  onChange={(e) =>
+                    setCountInMeasures(Number(e.target.value))
+                  }
+                >
+                  {COUNT_IN_OPTIONS.map((opt) => (
+                    <option key={opt.measures} value={opt.measures}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Length (measures)" htmlFor="session-measures">
+                <input
+                  id="session-measures"
+                  type="number"
+                  min={SESSION_MIN}
+                  max={SESSION_MAX}
+                  value={config.sessionMeasures}
+                  onChange={(e) =>
+                    setSessionMeasures(Number(e.target.value) || SESSION_MIN)
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none"
+                />
+              </FormField>
+            </div>
+          </FormSection>
+
+          {/* Start button */}
           <button
             type="button"
-            onClick={handleToggle}
-            className="flex items-center gap-3 rounded-full bg-primary px-8 py-4 text-base font-medium text-primary-foreground shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
-            aria-label={isIdle ? "Start practice" : "Stop practice"}
+            onClick={handleStart}
+            className="group flex items-center justify-between gap-3 rounded-lg bg-primary px-6 py-4 text-base font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
           >
-            {isIdle ? (
-              <>
-                <Play className="h-5 w-5" aria-hidden="true" />
-                Start
-              </>
-            ) : (
-              <>
-                <Square className="h-5 w-5" aria-hidden="true" />
-                Stop
-              </>
-            )}
+            <span>Start practice</span>
+            <ArrowRight
+              className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
           </button>
         </div>
       </div>
@@ -117,74 +262,57 @@ export default function PracticePage() {
   );
 }
 
-function PhaseBadge({
-  isIdle,
-  isCountIn,
-  isPlaying,
-  countInRemaining,
-  measure,
-  totalMeasures,
+function FormSection({
+  title,
+  children,
 }: {
-  isIdle: boolean;
-  isCountIn: boolean;
-  isPlaying: boolean;
-  countInRemaining: number;
-  measure: number;
-  totalMeasures: number;
+  title: string;
+  children: React.ReactNode;
 }) {
-  let label: string;
-  if (isIdle) {
-    label = "Ready";
-  } else if (isCountIn) {
-    label = `Count-in · ${countInRemaining}`;
-  } else if (isPlaying) {
-    label = `Measure ${measure} of ${totalMeasures}`;
-  } else {
-    label = "";
-  }
-
   return (
-    <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-      <span
-        className={`inline-block h-2 w-2 rounded-full transition-colors ${
-          isPlaying
-            ? "bg-primary"
-            : isCountIn
-              ? "bg-primary/60"
-              : "bg-muted-foreground/40"
-        }`}
-      />
-      <span>{label}</span>
+    <section className="flex flex-col gap-4">
+      <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function FormField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: React.ReactNode;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label
+        htmlFor={htmlFor}
+        className="text-sm font-medium text-foreground"
+      >
+        {label}
+      </label>
+      {children}
     </div>
   );
 }
 
-function BeatDots({
-  beatsPerMeasure,
-  activeBeat,
-}: {
-  beatsPerMeasure: number;
-  activeBeat: number;
-}) {
+function Select(
+  props: React.SelectHTMLAttributes<HTMLSelectElement> & {
+    children: React.ReactNode;
+  },
+) {
+  const { className, children, ...rest } = props;
   return (
-    <div className="flex items-center gap-3" aria-hidden="true">
-      {Array.from({ length: beatsPerMeasure }, (_, i) => {
-        const beatNumber = i + 1;
-        const isActive = beatNumber === activeBeat;
-        const isDownbeat = beatNumber === 1;
-        return (
-          <div
-            key={beatNumber}
-            className={`h-3 w-3 rounded-full transition-all duration-100 ${
-              isActive
-                ? isDownbeat
-                  ? "bg-primary scale-150"
-                  : "bg-primary/80 scale-125"
-                : "bg-muted-foreground/30 scale-100"
-            }`}
-          />
-        );
-      })}
-    </div>
+    <select
+      {...rest}
+      className={`w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none ${className ?? ""}`}
+    >
+      {children}
+    </select>
   );
 }

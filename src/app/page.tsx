@@ -37,11 +37,12 @@ export default function Home() {
           </div>
           <p className="text-sm leading-relaxed">
             <span className="font-medium text-foreground">
-              v1 build in progress — first slice live.
+              v1 build in progress — single-chord drills are live.
             </span>{" "}
             <span className="text-muted-foreground">
-              Hardcoded A−7 chord, 90 BPM, 4/4, 1-measure count-in,
-              8-measure session. Dialing in the metronome feel.
+              Configurable chord (all 20 qualities), tempo (30–300 BPM), time
+              signature (all 10), count-in, and session length. Sequences,
+              arpeggio patterns, and additional notation styles next.
             </span>
           </p>
         </div>
@@ -51,7 +52,7 @@ export default function Home() {
           href="/practice"
           className="group flex items-center justify-between gap-3 rounded-lg bg-primary px-6 py-4 text-base font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
         >
-          <span>Open practice screen</span>
+          <span>Set up a drill</span>
           <ArrowRight
             className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
             aria-hidden="true"
