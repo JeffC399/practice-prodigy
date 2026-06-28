@@ -1,6 +1,7 @@
 "use client";
 
 import { useMetronome } from "@/lib/audio/use-metronome";
+import { ARPEGGIO_PATTERN_SHORT_NAMES } from "@/lib/music/arpeggio";
 import { renderChord } from "@/lib/music/render-chord";
 import { chordAtMeasure } from "@/lib/music/sequence";
 import { usePracticeConfig } from "@/lib/state/practice-config";
@@ -113,6 +114,9 @@ export default function PracticeSessionPage() {
           <span>Setup</span>
         </Link>
         <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          <span className="text-foreground">
+            {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+          </span>
           <span>{config.bpm} BPM</span>
           <span>
             {config.timeSignature.beatsPerMeasure}/

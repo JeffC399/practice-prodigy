@@ -32,6 +32,14 @@ export const ARPEGGIO_PATTERN_DISPLAY_NAMES: Record<ArpeggioPattern, string> =
     descending: "Descending (8–7–5–3)",
   };
 
+/** Short labels for compact UI surfaces like the drill-screen header. */
+export const ARPEGGIO_PATTERN_SHORT_NAMES: Record<ArpeggioPattern, string> = {
+  "scale-tones": "Scale Tones",
+  "arp-7ths": "Arp 7ths",
+  "triads-with-lt": "Triads + LT",
+  descending: "Descending",
+};
+
 export const ARPEGGIO_PATTERN_DESCRIPTIONS: Record<ArpeggioPattern, string> = {
   "scale-tones":
     "Eight notes ascending one octave through the chord's scale.",
