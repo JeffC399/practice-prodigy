@@ -35,6 +35,9 @@ import {
   REPS_MAX,
   REPS_MIN,
   TIME_SIGNATURES,
+  TRANSITION_MAX,
+  TRANSITION_UNIT_OPTIONS,
+  type TransitionUnit,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
@@ -84,6 +87,8 @@ export default function PracticeSetupPage() {
     setRepetitions,
     setRepeatIndefinitely,
     setRandomizeChords,
+    setTransitionUnit,
+    setTransitionCount,
     setNotationStyle,
     setArpeggioPattern,
     loadConfig,
@@ -345,11 +350,15 @@ export default function PracticeSetupPage() {
   const patternSummary =
     ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern];
   const tempoMeterSummary = `♩ = ${config.bpm} · ${config.timeSignature.beatsPerMeasure}/${config.timeSignature.beatUnit}`;
+  const prepSummary =
+    config.transitionCount > 0
+      ? ` · prep ${config.transitionCount} ${config.transitionUnit === "measures" ? (config.transitionCount === 1 ? "measure" : "measures") : config.transitionCount === 1 ? "beat" : "beats"}`
+      : "";
   const sessionSummary = config.repeatIndefinitely
-    ? `${config.drillMeasures} measures / rep · Loop ∞`
+    ? `${config.drillMeasures} measures / rep · Loop ∞${prepSummary}`
     : `${config.drillMeasures} × ${config.repetitions} = ${
         config.drillMeasures * config.repetitions
-      } measures`;
+      } measures${prepSummary}`;
 
   return (
     <main className="flex flex-1 flex-col">
@@ -1000,6 +1009,76 @@ export default function PracticeSetupPage() {
                 </span>
               </div>
             </label>
+
+            {/* Prep between chords — inter-chord count-in for beginners
+                who need time to find the next root before playing. */}
+            <div className="flex flex-col gap-2 rounded-md border border-border bg-background/30 p-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-foreground">
+                  Prep between chords
+                </span>
+                <span className="text-xs text-muted-foreground leading-relaxed">
+                  Inserts {config.transitionUnit} of &ldquo;GET
+                  READY&rdquo; prep before each chord change so you have
+                  time to find the new root before playing.
+                </span>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-2 items-center">
+                <ClampedNumberInput
+                  id="transition-count"
+                  value={config.transitionCount}
+                  min={0}
+                  max={TRANSITION_MAX}
+                  onChange={setTransitionCount}
+                  className="w-20"
+                  ariaLabel="Prep count"
+                />
+                <Select
+                  aria-label="Prep unit"
+                  value={config.transitionUnit}
+                  onChange={(e) =>
+                    setTransitionUnit(e.target.value as TransitionUnit)
+                  }
+                  disabled={config.transitionCount === 0}
+                  className={
+                    config.transitionCount === 0
+                      ? "opacity-40 cursor-not-allowed"
+                      : ""
+                  }
+                >
+                  {TRANSITION_UNIT_OPTIONS.map((u) => (
+                    <option key={u} value={u}>
+                      {u === "measures" ? "Measures" : "Beats"}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {config.transitionCount === 0 ? (
+                  "Off — chords change immediately, no prep."
+                ) : (
+                  <>
+                    Each chord change gets{" "}
+                    <span className="font-mono text-foreground tabular-nums">
+                      {config.transitionCount}
+                    </span>{" "}
+                    {config.transitionUnit === "measures"
+                      ? config.transitionCount === 1
+                        ? "measure"
+                        : "measures"
+                      : config.transitionCount === 1
+                        ? "beat"
+                        : "beats"}{" "}
+                    of prep time. The upcoming chord shows on screen with
+                    a{" "}
+                    <span className="font-medium text-primary">
+                      GET READY
+                    </span>{" "}
+                    label.
+                  </>
+                )}
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground">
               {config.repeatIndefinitely ? (
                 <>

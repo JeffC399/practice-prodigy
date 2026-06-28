@@ -4,7 +4,11 @@ import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { ARPEGGIO_PATTERN_SHORT_NAMES } from "@/lib/music/arpeggio";
 import { renderChord } from "@/lib/music/render-chord";
-import { generateSequence } from "@/lib/music/sequence";
+import {
+  findNextDifferentChord,
+  generateSequence,
+  type SequenceBeat,
+} from "@/lib/music/sequence";
 import {
   BPM_MAX,
   BPM_MIN,
@@ -14,17 +18,16 @@ import { useDrillsLibrary } from "@/lib/state/drills-library";
 import { Minus, Play, Plus, Square, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Chord } from "@/lib/music/chord";
 
 /**
  * Active drill screen. Reads the active practice configuration from the
- * persisted store, generates a fresh chord sequence on Start, and runs
- * the metronome through it.
+ * persisted store, generates a fresh beat-by-beat sequence on Start,
+ * and runs the metronome through it.
  *
- * Sequence drilling: the per-measure chord assignments are pre-computed
- * once per Start (via `generateSequence`) and looked up by measure
- * number. For randomized drills this means every Start re-samples,
- * exactly matching the "fresh sample per rep" semantic the user chose.
+ * Sequence drilling: the sequence is now BEAT-level (SequenceBeat[]) so
+ * inter-chord prep transitions can land mid-measure when the user picks
+ * "beats" unit. The metronome ticks beats; the drill page maps current
+ * (measure, beatInMeasure) → absoluteBeat → sequence[absoluteBeat-1].
  *
  * NEXT chord preview is rendered above the current chord
  * (PROJECT-DESIGN.md §4.1 Always-Visible mode); Late-Reveal lands in
@@ -45,21 +48,12 @@ export default function PracticeSessionPage() {
   const isCountIn = state.phase === "count-in";
   const isPlaying = state.phase === "playing";
 
-  const totalMeasures = config.repeatIndefinitely
-    ? null
-    : config.drillMeasures * config.repetitions;
-  const totalPlayingBeats =
-    totalMeasures !== null
-      ? totalMeasures * config.timeSignature.beatsPerMeasure
-      : undefined;
-  const countInBeats =
-    config.countInMeasures * config.timeSignature.beatsPerMeasure;
+  const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
+  const countInBeats = config.countInMeasures * beatsPerMeasure;
 
-  // Idle preview: always shows the deterministic order so the user can
-  // see what the drill looks like before pressing Start. The actual
-  // randomized sequence is sampled fresh in handleToggle so randomized
-  // drills get a new pull each time the user starts. Idle preview is
-  // never indefinite — only the active play uses the large buffer.
+  // Idle preview: deterministic order with NO transitions so the user
+  // sees the canonical pool walk. Active sequence (sampled fresh on
+  // each Start) uses the real settings including transitions.
   const idlePreviewSequence = useMemo(
     () =>
       generateSequence({
@@ -69,25 +63,43 @@ export default function PracticeSessionPage() {
         repetitions: config.repetitions,
         repeatIndefinitely: false,
         randomizeChords: false,
+        timeSignature: config.timeSignature,
+        transitionUnit: config.transitionUnit,
+        transitionCount: 0,
       }),
     [
       config.chordPool,
       config.orderingStrategy,
       config.drillMeasures,
       config.repetitions,
+      config.timeSignature,
+      config.transitionUnit,
     ],
   );
 
-  const [activeSequence, setActiveSequence] = useState<Chord[] | null>(null);
+  const [activeSequence, setActiveSequence] = useState<
+    SequenceBeat[] | null
+  >(null);
   const sequence = isIdle
     ? idlePreviewSequence
     : (activeSequence ?? idlePreviewSequence);
 
-  const activeMeasure =
-    isPlaying && state.measureInSession > 0 ? state.measureInSession : 1;
-  const currentChord = sequence[activeMeasure - 1] ?? sequence[0];
-  const nextChord =
-    activeMeasure < sequence.length ? sequence[activeMeasure] : null;
+  // The metronome reports (measure, beatInMeasure). Convert to a 1-indexed
+  // absolute beat counter so we can index into the beat-level sequence.
+  const absoluteBeat =
+    isPlaying && state.measureInSession > 0
+      ? (state.measureInSession - 1) * beatsPerMeasure + state.beatInMeasure
+      : 1;
+  const currentEntry =
+    sequence[absoluteBeat - 1] ??
+    sequence[0] ??
+    ({ chord: config.chordPool[0], kind: "play" } as SequenceBeat);
+  const currentChord = currentEntry.chord;
+  const isTransition = currentEntry.kind === "transition";
+  const nextChord = useMemo(
+    () => findNextDifferentChord(sequence, absoluteBeat - 1),
+    [sequence, absoluteBeat],
+  );
 
   const currentLabel = useMemo(
     () => renderChord(currentChord, config.notationStyle),
@@ -98,6 +110,14 @@ export default function PracticeSessionPage() {
       nextChord ? renderChord(nextChord, config.notationStyle) : null,
     [nextChord, config.notationStyle],
   );
+
+  // For the header "8 × 4 = 32 measures" summary we report the PLAY
+  // length only (transitions don't count as drill measures). The
+  // metronome stop length comes from the active sequence (which already
+  // includes transition beats) — see handleToggle.
+  const totalPlayMeasures = config.repeatIndefinitely
+    ? null
+    : config.drillMeasures * config.repetitions;
 
   // Quick Start auto-launch — if we arrived with ?autostart=1 (set by a
   // Quick Start card click on /practice), start the drill once we mount.
@@ -123,22 +143,26 @@ export default function PracticeSessionPage() {
       // Fresh sequence at every Start. For randomizeChords this
       // re-samples (the "fresh sample per rep" semantic the user picked);
       // for deterministic it's a harmless rebuild.
-      setActiveSequence(
-        generateSequence({
-          pool: config.chordPool,
-          orderingStrategy: config.orderingStrategy,
-          drillMeasures: config.drillMeasures,
-          repetitions: config.repetitions,
-          repeatIndefinitely: config.repeatIndefinitely,
-          randomizeChords: config.randomizeChords,
-        }),
-      );
+      const fresh = generateSequence({
+        pool: config.chordPool,
+        orderingStrategy: config.orderingStrategy,
+        drillMeasures: config.drillMeasures,
+        repetitions: config.repetitions,
+        repeatIndefinitely: config.repeatIndefinitely,
+        randomizeChords: config.randomizeChords,
+        timeSignature: config.timeSignature,
+        transitionUnit: config.transitionUnit,
+        transitionCount: config.transitionCount,
+      });
+      setActiveSequence(fresh);
       void start({
         bpm: config.bpm,
-        beatsPerMeasure: config.timeSignature.beatsPerMeasure,
+        beatsPerMeasure,
         beatUnit: config.timeSignature.beatUnit,
         countInBeats,
-        totalPlayingBeats,
+        totalPlayingBeats: config.repeatIndefinitely
+          ? undefined
+          : fresh.length,
       });
     } else {
       stop();
@@ -200,6 +224,12 @@ export default function PracticeSessionPage() {
           {config.repeatIndefinitely && (
             <span className="text-primary">Loop ∞</span>
           )}
+          {config.transitionCount > 0 && (
+            <span className="text-primary">
+              Prep {config.transitionCount}
+              {config.transitionUnit === "measures" ? "m" : "b"}
+            </span>
+          )}
           {/* Live tempo nudge — adjusts the metronome and the persisted
               config in one click; works mid-drill. */}
           <span className="flex items-center gap-1">
@@ -232,7 +262,7 @@ export default function PracticeSessionPage() {
           <span>
             {config.repeatIndefinitely
               ? `${config.drillMeasures} measures / rep`
-              : `${config.drillMeasures} × ${config.repetitions} = ${totalMeasures} measures`}
+              : `${config.drillMeasures} × ${config.repetitions} = ${totalPlayMeasures} measures`}
           </span>
         </div>
       </header>
@@ -245,11 +275,25 @@ export default function PracticeSessionPage() {
             isPlaying={isPlaying}
             countInRemaining={state.countInBeatsRemaining}
             measure={state.measureInSession}
-            totalMeasures={totalMeasures}
+            totalMeasures={totalPlayMeasures}
           />
 
-          {/* NEXT preview */}
-          {nextLabel && !isIdle ? (
+          {/* During transition: GET READY label takes the slot. Otherwise
+              NEXT preview shows the upcoming different chord. */}
+          {!isIdle && isTransition ? (
+            <div className="flex items-center gap-3 font-mono text-sm">
+              <span className="uppercase tracking-wider text-xs text-primary">
+                Get ready
+              </span>
+              <span
+                className={`font-semibold text-primary ${
+                  isLongForm ? "text-lg" : "text-2xl"
+                } leading-none tracking-tight`}
+              >
+                Next chord
+              </span>
+            </div>
+          ) : nextLabel && !isIdle ? (
             <div className="flex items-center gap-3 font-mono text-sm text-muted-foreground">
               <span className="uppercase tracking-wider text-xs">Next</span>
               <span
@@ -264,19 +308,27 @@ export default function PracticeSessionPage() {
             <div className="h-6" aria-hidden="true" />
           )}
 
-          {/* Current chord */}
+          {/* Current chord — slightly dimmed during transition to signal
+              "this is the upcoming chord, you're not playing yet." */}
           <div
-            className={`font-mono font-semibold text-foreground leading-none tracking-tight transition-opacity duration-200 text-center ${
+            className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center ${
               isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
-            } ${isIdle ? "opacity-40" : "opacity-100"}`}
+            } ${
+              isIdle
+                ? "opacity-40 text-foreground"
+                : isTransition
+                  ? "opacity-60 text-primary"
+                  : "opacity-100 text-foreground"
+            }`}
             aria-live="polite"
           >
             {currentLabel}
           </div>
 
           <BeatDots
-            beatsPerMeasure={config.timeSignature.beatsPerMeasure}
+            beatsPerMeasure={beatsPerMeasure}
             activeBeat={isIdle ? 0 : state.beatInMeasure}
+            isTransition={!isIdle && isTransition}
           />
 
           <button
@@ -352,9 +404,11 @@ function PhaseBadge({
 function BeatDots({
   beatsPerMeasure,
   activeBeat,
+  isTransition,
 }: {
   beatsPerMeasure: number;
   activeBeat: number;
+  isTransition: boolean;
 }) {
   return (
     <div className="flex items-center gap-3" aria-hidden="true">
@@ -362,14 +416,17 @@ function BeatDots({
         const beatNumber = i + 1;
         const isActive = beatNumber === activeBeat;
         const isDownbeat = beatNumber === 1;
+        const baseColor = isTransition
+          ? "bg-primary/40"
+          : "bg-primary";
         return (
           <div
             key={beatNumber}
             className={`h-3 w-3 rounded-full transition-all duration-100 ${
               isActive
                 ? isDownbeat
-                  ? "bg-primary scale-150"
-                  : "bg-primary/80 scale-125"
+                  ? `${baseColor} scale-150`
+                  : `${isTransition ? "bg-primary/30" : "bg-primary/80"} scale-125`
                 : "bg-muted-foreground/30 scale-100"
             }`}
           />

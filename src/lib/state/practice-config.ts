@@ -39,6 +39,9 @@ export const COUNT_IN_OPTIONS = [
   { measures: 2, label: "2 measures" },
 ] as const;
 
+export const TRANSITION_UNIT_OPTIONS = ["measures", "beats"] as const;
+export type TransitionUnit = (typeof TRANSITION_UNIT_OPTIONS)[number];
+
 /**
  * Ordering strategies per PROJECT-DESIGN.md §4.4. v1 ships all 8; this
  * slice implements "custom" (deterministic) and "randomSamplePerRep"
@@ -83,6 +86,22 @@ export type PracticeConfig = {
    * pool in `orderingStrategy` order, looping as needed.
    */
   randomizeChords: boolean;
+  /**
+   * Unit for the inter-chord prep window (see transitionCount). The
+   * measures option locks transitions to bar boundaries (intuitive
+   * for beginners); beats lets advanced users dial in sub-measure
+   * prep at the cost of mid-measure chord changes on screen.
+   */
+  transitionUnit: TransitionUnit;
+  /**
+   * Beats (or measures, per transitionUnit) of "GET READY" prep
+   * inserted between chord changes during play. 0 disables. Sub-
+   * sequent chord positions in the play sequence get this many beats
+   * of pre-display before the actual play beats begin — gives the
+   * user time to find the new root before they have to start the
+   * arpeggio.
+   */
+  transitionCount: number;
   bpm: number;
   timeSignature: TimeSignature;
   countInMeasures: number;
@@ -100,6 +119,7 @@ export const REPS_MAX = 32;
 // largest reasonable cross-products (e.g. 12 roots × all common
 // 7ths = 48 chords) without artificial truncation.
 export const POOL_MAX = 144;
+export const TRANSITION_MAX = 16;
 
 const DEFAULT_CONFIG: PracticeConfig = {
   chordPool: [{ root: "A", quality: "min7" }],
@@ -109,6 +129,8 @@ const DEFAULT_CONFIG: PracticeConfig = {
   repetitions: 1,
   repeatIndefinitely: false,
   randomizeChords: false,
+  transitionUnit: "measures",
+  transitionCount: 0,
   bpm: 90,
   timeSignature: { beatsPerMeasure: 4, beatUnit: 4 },
   countInMeasures: 1,
@@ -141,6 +163,8 @@ type PracticeConfigStore = PracticeConfig & {
   setRepetitions: (reps: number) => void;
   setRepeatIndefinitely: (repeat: boolean) => void;
   setRandomizeChords: (randomize: boolean) => void;
+  setTransitionUnit: (unit: TransitionUnit) => void;
+  setTransitionCount: (count: number) => void;
   setNotationStyle: (style: ChordNotationStyle) => void;
   setArpeggioPattern: (pattern: ArpeggioPattern) => void;
   /** Replace every config field with values from a loaded Drill. */
@@ -220,6 +244,15 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
       setRepeatIndefinitely: (repeatIndefinitely) =>
         set({ repeatIndefinitely }),
       setRandomizeChords: (randomizeChords) => set({ randomizeChords }),
+      setTransitionUnit: (transitionUnit) => set({ transitionUnit }),
+      setTransitionCount: (transitionCount) =>
+        set({
+          transitionCount: clamp(
+            Math.round(transitionCount),
+            0,
+            TRANSITION_MAX,
+          ),
+        }),
       setNotationStyle: (notationStyle) => set({ notationStyle }),
       setArpeggioPattern: (arpeggioPattern) => set({ arpeggioPattern }),
       loadConfig: (config) =>
@@ -231,7 +264,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 5,
+      version: 6,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -275,6 +308,14 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         // editing a saved Drill).
         if (version <= 4) {
           next.loadedDrillId = null;
+        }
+
+        // v5 → v6: inter-chord prep window — `transitionUnit` and
+        // `transitionCount`. Defaults turn it off so existing setups
+        // behave identically.
+        if (version <= 5) {
+          next.transitionUnit = DEFAULT_CONFIG.transitionUnit;
+          next.transitionCount = DEFAULT_CONFIG.transitionCount;
         }
 
         return next;
