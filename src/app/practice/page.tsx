@@ -423,51 +423,55 @@ export default function PracticeSetupPage() {
                 )}
               </div>
 
-              {config.chordPool.map((chord, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-[7rem_1fr_auto] gap-2 items-center"
-                >
-                  <Select
-                    aria-label={`Chord ${index + 1} root`}
-                    value={chord.root}
-                    onChange={(e) =>
-                      setChordRootAt(index, e.target.value as PitchClass)
-                    }
+              {/* Scrollable pool list — keeps a 48-chord wizard pool from
+                  pushing Pattern / Tempo / Session off the screen. */}
+              <div className="flex max-h-96 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
+                {config.chordPool.map((chord, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-[7rem_1fr_auto] gap-2 items-center"
                   >
-                    {PITCH_CLASSES.map((pc) => (
-                      <option key={pc} value={pc}>
-                        {PITCH_CLASS_DISPLAY_NAMES[pc]}
-                      </option>
-                    ))}
-                  </Select>
-                  <Select
-                    aria-label={`Chord ${index + 1} quality`}
-                    value={chord.quality}
-                    onChange={(e) =>
-                      setChordQualityAt(
-                        index,
-                        e.target.value as ChordQuality,
-                      )
-                    }
-                  >
-                    {CHORD_QUALITIES.map((q) => (
-                      <option key={q} value={q}>
-                        {QUALITY_DISPLAY_NAMES[q]}
-                      </option>
-                    ))}
-                  </Select>
-                  <button
-                    type="button"
-                    onClick={() => removeChordAt(index)}
-                    disabled={poolSize <= 1}
-                    aria-label={`Remove chord ${index + 1}`}
-                    className="flex items-center justify-center rounded-md border border-border bg-background h-9 w-9 text-muted-foreground hover:text-foreground hover:border-destructive/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
+                    <Select
+                      aria-label={`Chord ${index + 1} root`}
+                      value={chord.root}
+                      onChange={(e) =>
+                        setChordRootAt(index, e.target.value as PitchClass)
+                      }
+                    >
+                      {PITCH_CLASSES.map((pc) => (
+                        <option key={pc} value={pc}>
+                          {PITCH_CLASS_DISPLAY_NAMES[pc]}
+                        </option>
+                      ))}
+                    </Select>
+                    <Select
+                      aria-label={`Chord ${index + 1} quality`}
+                      value={chord.quality}
+                      onChange={(e) =>
+                        setChordQualityAt(
+                          index,
+                          e.target.value as ChordQuality,
+                        )
+                      }
+                    >
+                      {CHORD_QUALITIES.map((q) => (
+                        <option key={q} value={q}>
+                          {QUALITY_DISPLAY_NAMES[q]}
+                        </option>
+                      ))}
+                    </Select>
+                    <button
+                      type="button"
+                      onClick={() => removeChordAt(index)}
+                      disabled={poolSize <= 1}
+                      aria-label={`Remove chord ${index + 1}`}
+                      className="flex items-center justify-center rounded-md border border-border bg-background h-9 w-9 text-muted-foreground hover:text-foreground hover:border-destructive/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
               <button
                 type="button"
                 onClick={() => addChord()}
@@ -792,7 +796,10 @@ function WizardColumn({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+      {/* Header + presets stack vertically so each row gets the full
+          column width — keeps preset buttons on a single line and lets
+          both columns' checkbox grids align at the top. */}
+      <div className="flex flex-col gap-2">
         <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           {title}
         </span>
