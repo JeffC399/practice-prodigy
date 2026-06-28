@@ -48,6 +48,10 @@ import {
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
 import {
+  isShippedDrill,
+  SHIPPED_DRILLS,
+} from "@/lib/data/shipped-drills";
+import {
   ArrowRight,
   Bookmark,
   Check,
@@ -55,6 +59,7 @@ import {
   ChevronUp,
   GripVertical,
   ListChecks,
+  Lock,
   Pencil,
   Play,
   Plus,
@@ -120,22 +125,31 @@ export default function PracticeSetupPage() {
     setLoadedDrillId,
   } = config;
   const drillsLib = useDrillsLibrary();
-  // Sort drills so most-recently-launched bubbles to the top of Quick Start.
-  // Drills that have never been launched fall to the bottom in save order.
+  // Quick Start surfaces both lists: the user's own drills first (sorted by
+  // most-recently-launched), then the shipped built-ins in seed order. The
+  // user's own drills always take precedence at the top — anything they
+  // saved is more relevant than the canned library.
   const sortedDrills = useMemo(
-    () =>
-      [...drillsLib.drills].sort(
+    () => [
+      ...[...drillsLib.drills].sort(
         (a, b) => (b.lastLoadedAt ?? 0) - (a.lastLoadedAt ?? 0),
       ),
+      ...SHIPPED_DRILLS,
+    ],
     [drillsLib.drills],
   );
-  const editingDrill = useMemo(
-    () =>
-      loadedDrillId
-        ? drillsLib.drills.find((d) => d.id === loadedDrillId) ?? null
-        : null,
-    [loadedDrillId, drillsLib.drills],
-  );
+  // Editing lookup considers both lists — a shipped drill can be opened
+  // for edit (the pencil), but its Save changes is locked; only Save as
+  // new is offered. See the editing badge below.
+  const editingDrill = useMemo(() => {
+    if (!loadedDrillId) return null;
+    return (
+      drillsLib.drills.find((d) => d.id === loadedDrillId) ??
+      SHIPPED_DRILLS.find((d) => d.id === loadedDrillId) ??
+      null
+    );
+  }, [loadedDrillId, drillsLib.drills]);
+  const isEditingShipped = !!editingDrill && isShippedDrill(editingDrill.id);
   // Has the live config diverged from the saved drill's config? Drives
   // the "Discard changes" affordance and the Save changes button state.
   //
@@ -309,7 +323,12 @@ export default function PracticeSetupPage() {
     // drill would reopen the editing badge on return to setup, which
     // surprises the user. Edit mode is only entered via the explicit
     // pencil on the card.
-    drillsLib.markDrillLoaded(drill.id);
+    //
+    // Built-in drills aren't in the library store, so markDrillLoaded
+    // would be a no-op — skip the unnecessary set call.
+    if (!isShippedDrill(drill.id)) {
+      drillsLib.markDrillLoaded(drill.id);
+    }
     router.push("/practice/session?autostart=1");
   };
 
@@ -428,12 +447,14 @@ export default function PracticeSetupPage() {
             </p>
           </div>
 
-          {/* Editing badge — name and notes are always-editable inline.
-              `key`d to the drill id so switching drills mid-edit cleanly
-              resets the uncontrolled inputs. Saves on blur (and blur
-              fires when the user clicks Done editing, so explicit "save
-              details" was unnecessary noise). */}
-          {editingDrill && (
+          {/* Editing badge — two flavors:
+                User drill: name and notes are always-editable inline,
+                  saved on blur. `key`d to the drill id so switching
+                  drills mid-edit cleanly resets the uncontrolled inputs.
+                Shipped drill: name and notes are read-only (you can't
+                  modify the built-in). Save changes is unavailable;
+                  Save as new drill is the only commit path. */}
+          {editingDrill && !isEditingShipped && (
             <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="font-mono text-xs uppercase tracking-wider text-primary">
@@ -501,30 +522,67 @@ export default function PracticeSetupPage() {
               </p>
             </div>
           )}
+          {editingDrill && isEditingShipped && (
+            <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-primary">
+                  <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                  Editing built-in drill
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDoneEditing}
+                  className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Done editing
+                </button>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-foreground">
+                  {editingDrill.name}
+                </span>
+                {editingDrill.notes && (
+                  <span className="text-xs italic text-muted-foreground leading-relaxed">
+                    {editingDrill.notes}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Built-in drills can&rsquo;t be modified directly. Tweak
+                anything in the sections below, then use{" "}
+                <span className="font-medium text-foreground">
+                  Save as new drill
+                </span>{" "}
+                to keep your customized copy.
+              </p>
+            </div>
+          )}
 
-          {/* Quick Start — saved drills launch with one click. */}
+          {/* Quick Start — one-click launch for both the user's saved
+              drills and the shipped built-in library. */}
           <FormSection title="Quick start">
-            {drillsLib.drills.length === 0 ? (
-              <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground">
-                No saved drills yet. Configure one below and click{" "}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {sortedDrills.map((drill) => (
+                <DrillCard
+                  key={drill.id}
+                  drill={drill}
+                  isEditing={drill.id === loadedDrillId}
+                  isShipped={isShippedDrill(drill.id)}
+                  onLaunch={handleLoadDrill}
+                  onEdit={handleEditDrill}
+                  onDelete={drillsLib.deleteDrill}
+                />
+              ))}
+            </div>
+            {drillsLib.drills.length === 0 && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                These are the built-in drills that ship with Practice
+                Prodigy. Configure your own setup below and click{" "}
                 <span className="font-medium text-foreground">
                   Save as drill
                 </span>{" "}
-                to add it here for one-click launch.
+                to add your own to this list.
               </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {sortedDrills.map((drill) => (
-                  <DrillCard
-                    key={drill.id}
-                    drill={drill}
-                    isEditing={drill.id === loadedDrillId}
-                    onLaunch={handleLoadDrill}
-                    onEdit={handleEditDrill}
-                    onDelete={drillsLib.deleteDrill}
-                  />
-                ))}
-              </div>
             )}
           </FormSection>
 
@@ -1223,6 +1281,15 @@ export default function PracticeSetupPage() {
                   </button>
                 </div>
               </div>
+            ) : editingDrill && isEditingShipped ? (
+              <button
+                type="button"
+                onClick={() => setIsSavingDrill(true)}
+                className="flex items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/15 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/25 transition-colors"
+              >
+                <Bookmark className="h-4 w-4" aria-hidden="true" />
+                Save as new drill
+              </button>
             ) : editingDrill ? (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
@@ -1277,12 +1344,15 @@ export default function PracticeSetupPage() {
 function DrillCard({
   drill,
   isEditing,
+  isShipped,
   onLaunch,
   onEdit,
   onDelete,
 }: {
   drill: Drill;
   isEditing: boolean;
+  /** Shipped drills get a Built-in badge and hide the delete affordance. */
+  isShipped: boolean;
   onLaunch: (drill: Drill) => void;
   onEdit: (drill: Drill) => void;
   onDelete: (id: string) => void;
@@ -1314,7 +1384,7 @@ function DrillCard({
         onClick={() => onLaunch(drill)}
         className="group block w-full p-3 text-left"
       >
-        <div className="flex items-center gap-2 pr-20">
+        <div className={`flex items-center gap-2 ${isShipped ? "pr-28" : "pr-20"}`}>
           <Play
             className="h-4 w-4 shrink-0 text-primary"
             aria-hidden="true"
@@ -1343,9 +1413,20 @@ function DrillCard({
           </div>
         )}
       </button>
-      {/* Card actions. Two-click delete confirm prevents accidental loss. */}
+      {/* Card actions. Shipped drills only show edit (delete hidden — they
+          can't be removed, they're built in). User drills get the
+          two-click delete confirm to prevent accidental loss. */}
       <div className="absolute right-2 top-2 flex items-center gap-1">
-        {confirmingDelete ? (
+        {isShipped && (
+          <span
+            className="flex items-center gap-1 rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+            title="Built-in drill — ships with Practice Prodigy"
+          >
+            <Lock className="h-2.5 w-2.5" aria-hidden="true" />
+            Built-in
+          </span>
+        )}
+        {!isShipped && confirmingDelete ? (
           <>
             <button
               type="button"
@@ -1375,14 +1456,16 @@ function DrillCard({
             >
               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-              aria-label={`Delete drill ${drill.name}`}
-              className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-border/60 hover:text-foreground transition-colors"
-            >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
+            {!isShipped && (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                aria-label={`Delete drill ${drill.name}`}
+                className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-border/60 hover:text-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </>
         )}
       </div>
