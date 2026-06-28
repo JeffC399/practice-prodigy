@@ -98,26 +98,19 @@ export default function PracticeSessionPage() {
       ({ chord: config.chordPool[0], kind: "play" } as SequenceBeat),
     [sequence, absoluteBeat, config.chordPool],
   );
-  const isTransition = currentEntry.kind === "transition";
 
   /**
-   * Big-display chord: the most recently PLAYED chord. During prep
-   * beats this means the big display stays anchored on the chord
-   * that was just played, rather than swapping in the upcoming
-   * chord. The NEXT preview below already shows what's coming, so
-   * the big display would just be redundant + jarring if it changed.
+   * Big-display chord: whatever the current sequence entry references.
+   * Crucially this means during PREP beats the upcoming chord appears
+   * in the big display immediately when the prep starts — so the user
+   * has the full prep window to read the new chord and find the root,
+   * not just from the moment play resumes. The earlier jarring
+   * treatment (primary color + dimmed opacity) is gone; the chord
+   * renders normally regardless of prep vs play. The stick-click
+   * audio carries the "don't play yet" signal during prep.
    */
-  const bigDisplayChord = useMemo(() => {
-    if (currentEntry.kind === "play") return currentEntry.chord;
-    // Walk backward through the sequence to find the last play beat.
-    for (let i = absoluteBeat - 2; i >= 0; i--) {
-      if (sequence[i].kind === "play") return sequence[i].chord;
-    }
-    // No prior play beat (very first measure is a transition, which
-    // shouldn't happen since generation skips the first transition,
-    // but defensively): show whatever's at this position.
-    return currentEntry.chord;
-  }, [absoluteBeat, currentEntry, sequence]);
+  const bigDisplayChord = currentEntry.chord;
+  const isTransition = currentEntry.kind === "transition";
 
   const nextChord = useMemo(
     () => findNextDifferentChord(sequence, absoluteBeat - 1),
