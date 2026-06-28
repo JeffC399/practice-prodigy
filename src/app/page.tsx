@@ -37,12 +37,14 @@ export default function Home() {
           </div>
           <p className="text-sm leading-relaxed">
             <span className="font-medium text-foreground">
-              v1 build in progress — single-chord drills are live.
+              v1 build in progress — multi-chord sequence drilling is live.
             </span>{" "}
             <span className="text-muted-foreground">
-              Configurable chord (all 20 qualities), tempo (30–300 BPM), time
-              signature (all 10), count-in, and session length. Sequences,
-              arpeggio patterns, and additional notation styles next.
+              Build a chord pool, pick a pattern, and drill. Cycles chords
+              measure by measure with a NEXT preview, all four notation
+              styles, four arpeggio patterns, and audible Preview before
+              you start. Ordering strategies, presets, and pattern library
+              next.
             </span>
           </p>
         </div>

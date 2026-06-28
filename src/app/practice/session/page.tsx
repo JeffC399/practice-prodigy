@@ -2,6 +2,7 @@
 
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { renderChord } from "@/lib/music/render-chord";
+import { chordAtMeasure } from "@/lib/music/sequence";
 import { usePracticeConfig } from "@/lib/state/practice-config";
 import { Play, Square, Settings2 } from "lucide-react";
 import Link from "next/link";
@@ -12,6 +13,11 @@ import { useMemo } from "react";
  * persisted store and runs the metronome accordingly. The setup screen
  * (/practice) is the entry point; this route is where the actual drilling
  * happens.
+ *
+ * Sequence drilling: chord advances on measure boundaries via
+ * `chordAtMeasure`. A small NEXT badge above the current chord previews
+ * what's coming (PROJECT-DESIGN.md §4.1 Always-Visible mode); Late-Reveal
+ * mode lands in a polish slice.
  */
 export default function PracticeSessionPage() {
   const config = usePracticeConfig();
@@ -26,10 +32,58 @@ export default function PracticeSessionPage() {
   const countInBeats =
     config.countInMeasures * config.timeSignature.beatsPerMeasure;
 
-  const chordLabel = useMemo(
-    () => renderChord(config.chord, config.notationStyle),
-    [config.chord, config.notationStyle],
+  // During count-in / idle we show the FIRST chord of the sequence so
+  // the user has a moment to set up. During playing the chord advances
+  // by measure.
+  const activeMeasure =
+    isPlaying && state.measureInSession > 0 ? state.measureInSession : 1;
+  const nextMeasure = activeMeasure + 1;
+  const hasNext =
+    config.chordPool.length > 1 ||
+    nextMeasure <=
+      Math.ceil(
+        config.sessionMeasures / Math.max(1, config.measuresPerChord),
+      ) *
+        config.measuresPerChord;
+
+  const currentChord = useMemo(
+    () =>
+      chordAtMeasure(
+        config.chordPool,
+        config.orderingStrategy,
+        activeMeasure,
+        config.measuresPerChord,
+      ),
+    [
+      config.chordPool,
+      config.orderingStrategy,
+      activeMeasure,
+      config.measuresPerChord,
+    ],
   );
+  const nextChord = useMemo(
+    () =>
+      hasNext
+        ? chordAtMeasure(
+            config.chordPool,
+            config.orderingStrategy,
+            nextMeasure,
+            config.measuresPerChord,
+          )
+        : null,
+    [
+      hasNext,
+      config.chordPool,
+      config.orderingStrategy,
+      nextMeasure,
+      config.measuresPerChord,
+    ],
+  );
+
+  const currentLabel = renderChord(currentChord, config.notationStyle);
+  const nextLabel = nextChord
+    ? renderChord(nextChord, config.notationStyle)
+    : null;
 
   const handleToggle = () => {
     if (isIdle) {
@@ -44,6 +98,8 @@ export default function PracticeSessionPage() {
       stop();
     }
   };
+
+  const isLongForm = config.notationStyle === "long-form";
 
   return (
     <main className="flex flex-1 flex-col">
@@ -62,12 +118,16 @@ export default function PracticeSessionPage() {
             {config.timeSignature.beatsPerMeasure}/
             {config.timeSignature.beatUnit}
           </span>
-          <span>{config.sessionMeasures} measures</span>
+          <span>
+            {config.chordPool.length} chord
+            {config.chordPool.length === 1 ? "" : "s"} ·{" "}
+            {config.sessionMeasures} measures
+          </span>
         </div>
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
-        <div className="flex w-full max-w-3xl flex-col items-center gap-12">
+        <div className="flex w-full max-w-3xl flex-col items-center gap-10">
           <PhaseBadge
             isIdle={isIdle}
             isCountIn={isCountIn}
@@ -77,15 +137,30 @@ export default function PracticeSessionPage() {
             totalMeasures={config.sessionMeasures}
           />
 
+          {/* NEXT preview */}
+          {nextLabel && !isIdle ? (
+            <div className="flex items-center gap-3 font-mono text-sm text-muted-foreground">
+              <span className="uppercase tracking-wider text-xs">Next</span>
+              <span
+                className={`font-semibold text-foreground/80 ${
+                  isLongForm ? "text-lg" : "text-2xl"
+                } leading-none tracking-tight`}
+              >
+                {nextLabel}
+              </span>
+            </div>
+          ) : (
+            <div className="h-6" aria-hidden="true" />
+          )}
+
+          {/* Current chord */}
           <div
             className={`font-mono font-semibold text-foreground leading-none tracking-tight transition-opacity duration-200 text-center ${
-              config.notationStyle === "long-form"
-                ? "text-6xl sm:text-7xl"
-                : "text-[12rem]"
+              isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
             } ${isIdle ? "opacity-40" : "opacity-100"}`}
             aria-live="polite"
           >
-            {chordLabel}
+            {currentLabel}
           </div>
 
           <BeatDots

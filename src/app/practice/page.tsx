@@ -26,12 +26,13 @@ import {
   BPM_MAX,
   BPM_MIN,
   COUNT_IN_OPTIONS,
+  POOL_MAX,
   SESSION_MAX,
   SESSION_MIN,
   TIME_SIGNATURES,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
-import { ArrowRight, Play, Square } from "lucide-react";
+import { ArrowRight, Play, Plus, Square, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -41,15 +42,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
  * to /practice/session to actually play. Configuration is persisted to
  * localStorage so revisits land with the user's last setup ready to go.
  *
- * Currently single-chord drills only — the sequence builder (multi-chord
- * pools + ordering strategies) lands in a later slice per PROJECT-DESIGN.md §4.4.
+ * Multi-chord sequence drilling: the user builds a chord pool, picks an
+ * arpeggio pattern that applies to every chord, and the drill cycles
+ * through the pool measure by measure. v1 ships "Custom Order" (the
+ * order the user arranged the pool); the other 7 strategies from
+ * PROJECT-DESIGN.md §4.4 land in the next slice without changing the
+ * setup-page shape.
  */
 export default function PracticeSetupPage() {
   const router = useRouter();
   const config = usePracticeConfig();
   const {
-    setRoot,
-    setQuality,
+    addChord,
+    removeChordAt,
+    setChordRootAt,
+    setChordQualityAt,
     setBpm,
     setTimeSignature,
     setCountInMeasures,
@@ -76,15 +83,18 @@ export default function PracticeSetupPage() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const previewIdRef = useRef(0);
 
+  const firstChord = config.chordPool[0];
+
   const handlePreview = async () => {
     if (isPreviewing) {
       previewPlayer.cancel();
       setIsPreviewing(false);
       return;
     }
+    if (!firstChord) return;
     const myId = ++previewIdRef.current;
     setIsPreviewing(true);
-    const notes = generateArpeggio(config.chord, config.arpeggioPattern);
+    const notes = generateArpeggio(firstChord, config.arpeggioPattern);
     await previewPlayer.playArpeggio(notes, config.bpm);
     const totalMs = (notes.length * (60 / config.bpm) + 0.4) * 1000;
     setTimeout(() => {
@@ -92,9 +102,12 @@ export default function PracticeSetupPage() {
     }, totalMs);
   };
 
-  const chordPreview = useMemo(
-    () => renderChord(config.chord, config.notationStyle),
-    [config.chord, config.notationStyle],
+  const renderedChords = useMemo(
+    () =>
+      config.chordPool.map((chord) =>
+        renderChord(chord, config.notationStyle),
+      ),
+    [config.chordPool, config.notationStyle],
   );
 
   const timeSignatureValue = `${config.timeSignature.beatsPerMeasure}/${config.timeSignature.beatUnit}`;
@@ -122,6 +135,9 @@ export default function PracticeSetupPage() {
     );
   }
 
+  const poolSize = config.chordPool.length;
+  const isLongForm = config.notationStyle === "long-form";
+
   return (
     <main className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -143,26 +159,29 @@ export default function PracticeSetupPage() {
               Configure your drill
             </h1>
             <p className="text-sm text-muted-foreground">
-              Pick a chord, tempo, and meter. Settings are remembered so the
-              next time you open this screen, you can start drilling
-              immediately.
+              Build a chord pool, pick a pattern, set tempo and meter. The
+              drill cycles through the pool one chord per measure. Settings
+              are remembered.
             </p>
           </div>
 
-          {/* Chord preview. min-h locks the card height to the tallest
-              natural size so changing notation style doesn't reflow the
-              page — long-form just centers inside the same frame. */}
+          {/* Sequence preview. Min-height keeps the card stable across
+              notation styles even when the pool has just one chord. */}
           <section className="flex min-h-72 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-10">
             <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              Chord
+              Sequence · {poolSize} chord{poolSize === 1 ? "" : "s"}
             </div>
             <div
-              className={`font-mono font-semibold text-foreground leading-none tracking-tight text-center ${
-                config.notationStyle === "long-form" ? "text-4xl" : "text-7xl"
+              className={`flex flex-wrap items-center justify-center text-center font-mono font-semibold text-foreground leading-tight tracking-tight ${
+                isLongForm
+                  ? "gap-x-5 gap-y-2 text-2xl"
+                  : "gap-x-6 gap-y-2 text-5xl"
               }`}
               aria-live="polite"
             >
-              {chordPreview}
+              {renderedChords.map((label, i) => (
+                <span key={i}>{label}</span>
+              ))}
             </div>
             <div className="flex items-center gap-2 pt-2">
               <label
@@ -188,35 +207,67 @@ export default function PracticeSetupPage() {
             </div>
           </section>
 
-          {/* Chord picker */}
-          <FormSection title="Chord">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField label="Root" htmlFor="root">
-                <Select
-                  id="root"
-                  value={config.chord.root}
-                  onChange={(e) => setRoot(e.target.value as PitchClass)}
+          {/* Chord pool builder */}
+          <FormSection title="Chord pool">
+            <div className="flex flex-col gap-2">
+              {config.chordPool.map((chord, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-[7rem_1fr_auto] gap-2 items-center"
                 >
-                  {PITCH_CLASSES.map((pc) => (
-                    <option key={pc} value={pc}>
-                      {PITCH_CLASS_DISPLAY_NAMES[pc]}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField label="Quality" htmlFor="quality">
-                <Select
-                  id="quality"
-                  value={config.chord.quality}
-                  onChange={(e) => setQuality(e.target.value as ChordQuality)}
-                >
-                  {CHORD_QUALITIES.map((q) => (
-                    <option key={q} value={q}>
-                      {QUALITY_DISPLAY_NAMES[q]}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
+                  <Select
+                    aria-label={`Chord ${index + 1} root`}
+                    value={chord.root}
+                    onChange={(e) =>
+                      setChordRootAt(index, e.target.value as PitchClass)
+                    }
+                  >
+                    {PITCH_CLASSES.map((pc) => (
+                      <option key={pc} value={pc}>
+                        {PITCH_CLASS_DISPLAY_NAMES[pc]}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    aria-label={`Chord ${index + 1} quality`}
+                    value={chord.quality}
+                    onChange={(e) =>
+                      setChordQualityAt(
+                        index,
+                        e.target.value as ChordQuality,
+                      )
+                    }
+                  >
+                    {CHORD_QUALITIES.map((q) => (
+                      <option key={q} value={q}>
+                        {QUALITY_DISPLAY_NAMES[q]}
+                      </option>
+                    ))}
+                  </Select>
+                  <button
+                    type="button"
+                    onClick={() => removeChordAt(index)}
+                    disabled={poolSize <= 1}
+                    aria-label={`Remove chord ${index + 1}`}
+                    className="flex items-center justify-center rounded-md border border-border bg-background h-9 w-9 text-muted-foreground hover:text-foreground hover:border-destructive/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => addChord()}
+                disabled={poolSize >= POOL_MAX}
+                className="mt-1 flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add chord
+              </button>
+              <p className="pt-1 text-xs text-muted-foreground">
+                Custom order — the drill plays chords in the order shown
+                above, looping until the session length is reached.
+              </p>
             </div>
           </FormSection>
 
@@ -262,6 +313,13 @@ export default function PracticeSetupPage() {
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 {ARPEGGIO_PATTERN_DESCRIPTIONS[config.arpeggioPattern]}
+                {poolSize > 1 && (
+                  <>
+                    {" "}
+                    Preview auditions the pattern over the first chord in
+                    the pool.
+                  </>
+                )}
               </p>
             </div>
           </FormSection>
