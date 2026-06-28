@@ -1,4 +1,5 @@
-import type { Chord } from "./chord";
+import type { Chord, PitchClass } from "./chord";
+import { PITCH_CLASS_TO_SEMITONE } from "./intervals";
 import type {
   OrderingStrategy,
   TimeSignature,
@@ -14,19 +15,12 @@ import type {
  *   - "play"       — the user is expected to play the arpeggio
  *   - "transition" — inter-chord prep, the chord shown is the UPCOMING
  *                    chord, the user uses these beats to find the new
- *                    root before they have to play. (Configured via
- *                    transitionUnit + transitionCount in PracticeConfig.)
+ *                    root before they have to play.
  *
- * Drilling is structured as repetitions × drill-length (measures);
- * each play measure expands to beatsPerMeasure play beats. Between
- * consecutive different chords, transitionBeats of "transition" kind
- * are inserted so the user has prep time.
- *
- * For deterministic strategies the pool cycles in order. For
- * randomizeChords=true we sample fresh on every repetition (the user
- * explicitly chose that semantic over "sample once and replay"). The
- * other 6 ordering strategies are stubbed to defer to "custom"; only
- * this module changes when they're implemented.
+ * The chord-per-measure assignments come from the ordering strategy
+ * (one of 8 per PROJECT-DESIGN.md §4.4). Random strategies re-roll
+ * each call, so the drill screen regenerates the sequence on every
+ * Start for fresh sampling.
  */
 
 export type SequenceBeat = {
@@ -40,7 +34,6 @@ export type SequenceConfig = {
   drillMeasures: number;
   repetitions: number;
   repeatIndefinitely: boolean;
-  randomizeChords: boolean;
   /** Used to expand each play measure into beatsPerMeasure beats. */
   timeSignature: TimeSignature;
   transitionUnit: TransitionUnit;
@@ -50,15 +43,13 @@ export type SequenceConfig = {
 /**
  * Cap on the number of MEASURES we pre-generate when the user selects
  * "Loop until stopped." Functionally infinite for any normal session
- * (multi-hours at typical tempos / meters). Note this is a MEASURE
- * cap — the beat count of the generated sequence will be larger.
+ * (multi-hours at typical tempos / meters).
  */
 export const INDEFINITE_MEASURE_BUFFER = 4096;
 
 /**
- * Produce the full beat-per-tick sequence for a drill. The drill
- * screen regenerates this on every Start so randomized drills get
- * fresh sampling each session.
+ * Produce the full beat-per-tick sequence for a drill. Drill screen
+ * regenerates this on every Start so random strategies re-roll cleanly.
  */
 export function generateSequence(config: SequenceConfig): SequenceBeat[] {
   if (config.pool.length === 0) {
@@ -77,10 +68,6 @@ export function generateSequence(config: SequenceConfig): SequenceBeat[] {
   const result: SequenceBeat[] = [];
   let prevChord: Chord | null = null;
   for (const chord of playChords) {
-    // Insert transition BEFORE this chord — only on actual chord
-    // changes (skips when the same chord repeats), and never before
-    // the very first chord (the engine-level count-in covers that
-    // initial prep window).
     if (
       transitionBeats > 0 &&
       prevChord !== null &&
@@ -90,7 +77,6 @@ export function generateSequence(config: SequenceConfig): SequenceBeat[] {
         result.push({ chord, kind: "transition" });
       }
     }
-    // Each play measure expands to beatsPerMeasure play beats.
     for (let b = 0; b < beatsPerMeasure; b++) {
       result.push({ chord, kind: "play" });
     }
@@ -100,26 +86,73 @@ export function generateSequence(config: SequenceConfig): SequenceBeat[] {
 }
 
 /**
- * Build the per-measure play assignments (one Chord per measure of
- * actual playing). Length = drillMeasures × effective-reps. Doesn't
- * know about transitions — that's the caller's job to interleave.
+ * Build the per-measure play assignments (one Chord per play measure)
+ * according to the ordering strategy. Length = drillMeasures ×
+ * effective-reps. Doesn't know about transitions — that's the caller's
+ * job to interleave.
  */
 function buildPlayChords(config: SequenceConfig): Chord[] {
   const effectiveReps = config.repeatIndefinitely
     ? Math.max(1, Math.ceil(INDEFINITE_MEASURE_BUFFER / config.drillMeasures))
     : config.repetitions;
+
+  // Some strategies need a one-shot computation reused across reps.
+  let shuffledOnce: Chord[] | null = null;
+  if (config.orderingStrategy === "randomShuffleOnce") {
+    shuffledOnce = shuffle(config.pool);
+  }
+
   const result: Chord[] = [];
   for (let r = 0; r < effectiveReps; r++) {
-    if (config.randomizeChords) {
-      result.push(...sampleForRep(config.pool, config.drillMeasures));
-    } else {
-      // Deterministic — cycle through the pool in order.
-      for (let m = 0; m < config.drillMeasures; m++) {
-        result.push(config.pool[m % config.pool.length]);
-      }
-    }
+    const repChords = chordsForRep(config, shuffledOnce);
+    result.push(...repChords);
   }
   return result;
+}
+
+/**
+ * Produce the play-chord assignments for ONE repetition (length =
+ * drillMeasures), applying the ordering strategy.
+ */
+function chordsForRep(
+  config: SequenceConfig,
+  shuffledOnce: Chord[] | null,
+): Chord[] {
+  const { pool, orderingStrategy, drillMeasures } = config;
+  switch (orderingStrategy) {
+    case "custom":
+      return cycleThrough(pool, drillMeasures);
+    case "chromaticAsc":
+      return cycleThrough(sortChromatic(pool, "asc"), drillMeasures);
+    case "chromaticDesc":
+      return cycleThrough(sortChromatic(pool, "desc"), drillMeasures);
+    case "cycleOf5ths":
+      // Cycle of 5ths descending (= cycle of 4ths ascending) —
+      // the canonical jazz drill direction (C → F → Bb → ...).
+      return cycleThrough(
+        sortByCycleOfFifths(pool, "descending"),
+        drillMeasures,
+      );
+    case "cycleOf4ths":
+      // Other direction (C → G → D → ...).
+      return cycleThrough(
+        sortByCycleOfFifths(pool, "ascending"),
+        drillMeasures,
+      );
+    case "randomReplace": {
+      const out: Chord[] = [];
+      for (let m = 0; m < drillMeasures; m++) {
+        out.push(pool[Math.floor(Math.random() * pool.length)]);
+      }
+      return out;
+    }
+    case "randomShuffleOnce":
+      // shuffledOnce is set once per session in buildPlayChords; every
+      // rep here re-uses that same shuffle.
+      return cycleThrough(shuffledOnce ?? pool, drillMeasures);
+    case "randomShuffleEachPass":
+      return sampleForRep(pool, drillMeasures);
+  }
 }
 
 /**
@@ -140,15 +173,114 @@ export function findNextDifferentChord(
   return null;
 }
 
+// --------------------------------------------------------------------
+// Strategy helpers
+// --------------------------------------------------------------------
+
 function chordsEqual(a: Chord, b: Chord): boolean {
   return a.root === b.root && a.quality === b.quality;
 }
 
+/** Take `count` chords from an ordered pool, wrapping around at pool end. */
+function cycleThrough(pool: Chord[], count: number): Chord[] {
+  if (pool.length === 0) return [];
+  const out: Chord[] = [];
+  for (let i = 0; i < count; i++) out.push(pool[i % pool.length]);
+  return out;
+}
+
 /**
- * One rep's worth of chords: shuffle the pool, take up to
- * drillMeasures of them. If the pool is smaller than the drill length,
- * loop the shuffled order to fill — better than padding with the same
- * chord, since the user gets a more varied (if repeated) sequence.
+ * Re-sort the pool chromatically, anchored to the FIRST pool chord —
+ * so the user's first chord stays first and the rest follow in
+ * chromatic order from there. Wraps around at the octave.
+ */
+function sortChromatic(
+  pool: Chord[],
+  direction: "asc" | "desc",
+): Chord[] {
+  if (pool.length === 0) return [];
+  const anchor = PITCH_CLASS_TO_SEMITONE[pool[0].root];
+  return [...pool].sort((a, b) => {
+    const da = cyclicDistance(
+      PITCH_CLASS_TO_SEMITONE[a.root],
+      anchor,
+      direction,
+    );
+    const db = cyclicDistance(
+      PITCH_CLASS_TO_SEMITONE[b.root],
+      anchor,
+      direction,
+    );
+    return da - db;
+  });
+}
+
+/**
+ * Cycle-of-5ths position table — descending fifths order (the
+ * canonical jazz drill direction): C, F, Bb, Eb, Ab, Db, Gb, B, E, A,
+ * D, G. "Descending" cycle = step DOWN a perfect 5th each time
+ * (equivalently, UP a perfect 4th).
+ */
+const CYCLE_OF_FIFTHS_DESC_POSITION: Record<PitchClass, number> = {
+  C: 0,
+  F: 1,
+  "A#": 2,
+  "D#": 3,
+  "G#": 4,
+  "C#": 5,
+  "F#": 6,
+  B: 7,
+  E: 8,
+  A: 9,
+  D: 10,
+  G: 11,
+};
+
+/**
+ * Re-sort the pool by cycle-of-fifths position, anchored to the first
+ * pool chord. "descending" walks the canonical jazz cycle (ii-V-I
+ * friendly: Dm7 G7 Cmaj7 stays in that order); "ascending" walks the
+ * opposite direction (C → G → D → A).
+ */
+function sortByCycleOfFifths(
+  pool: Chord[],
+  direction: "ascending" | "descending",
+): Chord[] {
+  if (pool.length === 0) return [];
+  const anchor = CYCLE_OF_FIFTHS_DESC_POSITION[pool[0].root];
+  return [...pool].sort((a, b) => {
+    const da = cyclicDistance(
+      CYCLE_OF_FIFTHS_DESC_POSITION[a.root],
+      anchor,
+      direction === "descending" ? "asc" : "desc",
+    );
+    const db = cyclicDistance(
+      CYCLE_OF_FIFTHS_DESC_POSITION[b.root],
+      anchor,
+      direction === "descending" ? "asc" : "desc",
+    );
+    return da - db;
+  });
+}
+
+/** Cyclic distance from anchor to position, 0..11. */
+function cyclicDistance(
+  position: number,
+  anchor: number,
+  direction: "asc" | "desc",
+): number {
+  return direction === "asc"
+    ? mod(position - anchor, 12)
+    : mod(anchor - position, 12);
+}
+
+function mod(n: number, m: number): number {
+  return ((n % m) + m) % m;
+}
+
+/**
+ * One rep's worth of chords: shuffle the pool, take up to drillMeasures.
+ * Pool smaller than drill length → shuffled order loops to fill.
  */
 function sampleForRep(pool: Chord[], drillMeasures: number): Chord[] {
   const shuffled = shuffle(pool);

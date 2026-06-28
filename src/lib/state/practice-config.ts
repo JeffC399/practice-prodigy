@@ -61,6 +61,28 @@ export const ORDERING_STRATEGIES = [
 
 export type OrderingStrategy = (typeof ORDERING_STRATEGIES)[number];
 
+export const ORDERING_STRATEGY_DISPLAY_NAMES: Record<
+  OrderingStrategy,
+  string
+> = {
+  custom: "Custom (drag to reorder)",
+  chromaticAsc: "Chromatic ascending",
+  chromaticDesc: "Chromatic descending",
+  cycleOf5ths: "Cycle of 5ths (C → F → B♭ ...)",
+  cycleOf4ths: "Cycle of 4ths (C → G → D ...)",
+  randomReplace: "Random with replacement",
+  randomShuffleOnce: "Random shuffled (once)",
+  randomShuffleEachPass: "Random shuffled (each rep)",
+};
+
+/** Strategies whose generation involves randomness (drives Random badge). */
+export const RANDOM_ORDERING_STRATEGIES: ReadonlySet<OrderingStrategy> =
+  new Set([
+    "randomReplace",
+    "randomShuffleOnce",
+    "randomShuffleEachPass",
+  ]);
+
 export type PracticeConfig = {
   chordPool: Chord[];
   orderingStrategy: OrderingStrategy;
@@ -79,13 +101,6 @@ export type PracticeConfig = {
    * practice session.
    */
   repeatIndefinitely: boolean;
-  /**
-   * When true, each repetition draws a fresh random sample from the
-   * chord pool (without replacement, up to pool size; pool shuffled
-   * and looped if drillMeasures > pool size). When false, plays the
-   * pool in `orderingStrategy` order, looping as needed.
-   */
-  randomizeChords: boolean;
   /**
    * Unit for the inter-chord prep window (see transitionCount). The
    * measures option locks transitions to bar boundaries (intuitive
@@ -134,7 +149,6 @@ export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   drillMeasures: 8,
   repetitions: 1,
   repeatIndefinitely: false,
-  randomizeChords: false,
   transitionUnit: "measures",
   transitionCount: 0,
   bpm: 90,
@@ -161,6 +175,8 @@ type PracticeConfigStore = PracticeConfig & {
   replaceChordPool: (chords: Chord[]) => void;
   /** Append chords to the pool. Used by the quick-build "Add" action. */
   appendChords: (chords: Chord[]) => void;
+  /** Move a chord from one position to another. Used by drag-to-reorder. */
+  moveChord: (fromIndex: number, toIndex: number) => void;
   setOrderingStrategy: (strategy: OrderingStrategy) => void;
   setBpm: (bpm: number) => void;
   setTimeSignature: (timeSignature: TimeSignature) => void;
@@ -168,7 +184,6 @@ type PracticeConfigStore = PracticeConfig & {
   setDrillMeasures: (measures: number) => void;
   setRepetitions: (reps: number) => void;
   setRepeatIndefinitely: (repeat: boolean) => void;
-  setRandomizeChords: (randomize: boolean) => void;
   setTransitionUnit: (unit: TransitionUnit) => void;
   setTransitionCount: (count: number) => void;
   setNotationStyle: (style: ChordNotationStyle) => void;
@@ -230,6 +245,22 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
             chordPool: [...state.chordPool, ...chords.slice(0, room)],
           };
         }),
+      moveChord: (fromIndex, toIndex) =>
+        set((state) => {
+          if (
+            fromIndex === toIndex ||
+            fromIndex < 0 ||
+            toIndex < 0 ||
+            fromIndex >= state.chordPool.length ||
+            toIndex >= state.chordPool.length
+          ) {
+            return {};
+          }
+          const next = [...state.chordPool];
+          const [moved] = next.splice(fromIndex, 1);
+          next.splice(toIndex, 0, moved);
+          return { chordPool: next };
+        }),
       setOrderingStrategy: (orderingStrategy) => set({ orderingStrategy }),
       setBpm: (bpm) =>
         set({ bpm: clamp(Math.round(bpm), BPM_MIN, BPM_MAX) }),
@@ -249,7 +280,6 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         }),
       setRepeatIndefinitely: (repeatIndefinitely) =>
         set({ repeatIndefinitely }),
-      setRandomizeChords: (randomizeChords) => set({ randomizeChords }),
       setTransitionUnit: (transitionUnit) => set({ transitionUnit }),
       setTransitionCount: (transitionCount) =>
         set({
@@ -270,7 +300,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 6,
+      version: 7,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -293,15 +323,15 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
 
         // v2 → v3: `sessionMeasures` renamed to `drillMeasures` and the
         // drill grew a `repetitions` × `drillMeasures` total-length
-        // model. New `randomizeChords` toggle defaults off so existing
-        // setups behave identically.
+        // model. The v3 `randomizeChords` toggle is later removed in
+        // v7 in favor of the full orderingStrategy enum — that
+        // migration converts the boolean to the matching strategy.
         if (version <= 2) {
           const oldMeasures = (next.sessionMeasures as number | undefined) ??
             DEFAULT_PRACTICE_CONFIG.drillMeasures;
           delete next.sessionMeasures;
           next.drillMeasures = oldMeasures;
           next.repetitions = DEFAULT_PRACTICE_CONFIG.repetitions;
-          next.randomizeChords = DEFAULT_PRACTICE_CONFIG.randomizeChords;
         }
 
         // v3 → v4: new `repeatIndefinitely` toggle; defaults to false
@@ -322,6 +352,19 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         if (version <= 5) {
           next.transitionUnit = DEFAULT_PRACTICE_CONFIG.transitionUnit;
           next.transitionCount = DEFAULT_PRACTICE_CONFIG.transitionCount;
+        }
+
+        // v6 → v7: replaced the boolean `randomizeChords` toggle with
+        // the full `orderingStrategy` enum (8 named strategies). When
+        // the old boolean was true, map to "randomShuffleEachPass" —
+        // that's the exact semantic the toggle had. When false, the
+        // orderingStrategy already-saved value (or default "custom")
+        // is preserved.
+        if (version <= 6) {
+          if (next.randomizeChords === true) {
+            next.orderingStrategy = "randomShuffleEachPass";
+          }
+          delete next.randomizeChords;
         }
 
         return next;

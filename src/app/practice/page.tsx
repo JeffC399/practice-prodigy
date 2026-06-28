@@ -32,12 +32,16 @@ import {
   DEFAULT_PRACTICE_CONFIG,
   DRILL_MAX,
   DRILL_MIN,
+  ORDERING_STRATEGIES,
+  ORDERING_STRATEGY_DISPLAY_NAMES,
   POOL_MAX,
+  RANDOM_ORDERING_STRATEGIES,
   REPS_MAX,
   REPS_MIN,
   TIME_SIGNATURES,
   TRANSITION_MAX,
   TRANSITION_UNIT_OPTIONS,
+  type OrderingStrategy,
   type PracticeConfig,
   type TransitionUnit,
   usePracticeConfig,
@@ -49,6 +53,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  GripVertical,
   ListChecks,
   Pencil,
   Play,
@@ -57,6 +62,22 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -89,7 +110,7 @@ export default function PracticeSetupPage() {
     setDrillMeasures,
     setRepetitions,
     setRepeatIndefinitely,
-    setRandomizeChords,
+    setOrderingStrategy,
     setTransitionUnit,
     setTransitionCount,
     setNotationStyle,
@@ -195,6 +216,28 @@ export default function PracticeSetupPage() {
   // chip in the Sequence preview can force it open before scrolling.
   const [chordPoolOpen, setChordPoolOpen] = useState(false);
   const poolRowRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  // Drag-to-reorder (chord pool, Custom order only). PointerSensor for
+  // mouse/touch; KeyboardSensor for Space-to-pick-up + Arrow-to-move
+  // accessibility.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIndex = config.chordPool.findIndex(
+      (_, i) => `chord-${i}` === active.id,
+    );
+    const toIndex = config.chordPool.findIndex(
+      (_, i) => `chord-${i}` === over.id,
+    );
+    if (fromIndex < 0 || toIndex < 0) return;
+    config.moveChord(fromIndex, toIndex);
+  };
 
   /** Snapshot of the live PracticeConfig (no loadedDrillId, no setters). */
   const snapshotConfig = (): PracticeConfig =>
@@ -338,8 +381,8 @@ export default function PracticeSetupPage() {
 
   // One-line summaries surfaced in the collapsed section headers so the
   // user always sees the current value without expanding.
-  const chordPoolSummary = `${poolSize} chord${poolSize === 1 ? "" : "s"}${
-    config.randomizeChords ? " · Random" : ""
+  const chordPoolSummary = `${poolSize} chord${poolSize === 1 ? "" : "s"} · ${
+    ORDERING_STRATEGY_DISPLAY_NAMES[config.orderingStrategy]
   }`;
   const patternSummary =
     ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern];
@@ -720,57 +763,43 @@ export default function PracticeSetupPage() {
               </div>
 
               {/* Scrollable pool list — keeps a 48-chord wizard pool from
-                  pushing Pattern / Tempo / Session off the screen. */}
-              <div className="flex max-h-96 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
-                {config.chordPool.map((chord, index) => (
-                  <div
-                    key={index}
-                    ref={(el) => {
-                      poolRowRefs.current[index] = el;
-                    }}
-                    className="grid grid-cols-[7rem_1fr_auto] gap-2 items-center"
-                  >
-                    <Select
-                      aria-label={`Chord ${index + 1} root`}
-                      value={chord.root}
-                      onChange={(e) =>
-                        setChordRootAt(index, e.target.value as PitchClass)
-                      }
-                    >
-                      {PITCH_CLASSES.map((pc) => (
-                        <option key={pc} value={pc}>
-                          {PITCH_CLASS_DISPLAY_NAMES[pc]}
-                        </option>
-                      ))}
-                    </Select>
-                    <Select
-                      aria-label={`Chord ${index + 1} quality`}
-                      value={chord.quality}
-                      onChange={(e) =>
-                        setChordQualityAt(
-                          index,
-                          e.target.value as ChordQuality,
-                        )
-                      }
-                    >
-                      {CHORD_QUALITIES.map((q) => (
-                        <option key={q} value={q}>
-                          {QUALITY_DISPLAY_NAMES[q]}
-                        </option>
-                      ))}
-                    </Select>
-                    <button
-                      type="button"
-                      onClick={() => removeChordAt(index)}
-                      disabled={poolSize <= 1}
-                      aria-label={`Remove chord ${index + 1}`}
-                      className="flex items-center justify-center rounded-md border border-border bg-background h-9 w-9 text-muted-foreground hover:text-foreground hover:border-destructive/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
+                  pushing Pattern / Tempo / Session off the screen. The
+                  drag handle column only does anything when ordering is
+                  Custom (other strategies derive play order from the
+                  pool — manual reordering is meaningless). */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={config.chordPool.map((_, i) => `chord-${i}`)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="flex max-h-96 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
+                    {config.chordPool.map((chord, index) => (
+                      <SortableChordRow
+                        key={`chord-${index}`}
+                        id={`chord-${index}`}
+                        chord={chord}
+                        index={index}
+                        canDrag={config.orderingStrategy === "custom"}
+                        poolSize={poolSize}
+                        onRootChange={(root) =>
+                          setChordRootAt(index, root)
+                        }
+                        onQualityChange={(q) =>
+                          setChordQualityAt(index, q)
+                        }
+                        onRemove={() => removeChordAt(index)}
+                        rowRef={(el) => {
+                          poolRowRefs.current[index] = el;
+                        }}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
               <div className="mt-1 grid grid-cols-[1fr_auto] gap-2">
                 <button
                   type="button"
@@ -792,28 +821,30 @@ export default function PracticeSetupPage() {
                   Clear pool
                 </button>
               </div>
-              <label className="flex items-start gap-3 pt-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={config.randomizeChords}
-                  onChange={(e) => setRandomizeChords(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-border bg-background accent-primary cursor-pointer"
-                />
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                    Randomize chord order
-                  </span>
-                  <span className="text-xs text-muted-foreground leading-relaxed">
-                    {config.randomizeChords
-                      ? `Each repetition samples ${Math.min(config.drillMeasures, poolSize)} chord${
-                          Math.min(config.drillMeasures, poolSize) === 1
-                            ? ""
-                            : "s"
-                        } at random from your pool of ${poolSize}. Fresh sample every rep.`
-                      : "Custom order — drill plays the pool top-to-bottom, looping if it's shorter than the drill length."}
-                  </span>
-                </div>
-              </label>
+              <div className="flex flex-col gap-2 rounded-md border border-border bg-background/30 p-3">
+                <label
+                  htmlFor="ordering-strategy"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Order
+                </label>
+                <Select
+                  id="ordering-strategy"
+                  value={config.orderingStrategy}
+                  onChange={(e) =>
+                    setOrderingStrategy(e.target.value as OrderingStrategy)
+                  }
+                >
+                  {ORDERING_STRATEGIES.map((s) => (
+                    <option key={s} value={s}>
+                      {ORDERING_STRATEGY_DISPLAY_NAMES[s]}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {orderingDescription(config.orderingStrategy, poolSize, config.drillMeasures)}
+                </p>
+              </div>
             </div>
           </CollapsibleSection>
 
@@ -1251,7 +1282,12 @@ function DrillCard({
   const c = drill.config;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const flags: string[] = [];
-  if (c.randomizeChords) flags.push("Random");
+  if (
+    c.orderingStrategy &&
+    RANDOM_ORDERING_STRATEGIES.has(c.orderingStrategy)
+  ) {
+    flags.push("Random");
+  }
   if (c.repeatIndefinitely) flags.push("Loop ∞");
   const lengthLabel = c.repeatIndefinitely
     ? `${c.drillMeasures} measures / rep`
@@ -1496,9 +1532,6 @@ function extractPracticeConfig(
     ...(source.repeatIndefinitely !== undefined && {
       repeatIndefinitely: source.repeatIndefinitely,
     }),
-    ...(source.randomizeChords !== undefined && {
-      randomizeChords: source.randomizeChords,
-    }),
     ...(source.bpm !== undefined && { bpm: source.bpm }),
     ...(source.timeSignature !== undefined && {
       timeSignature: source.timeSignature,
@@ -1523,6 +1556,142 @@ function extractPracticeConfig(
 
 /** Quick-pick tempo buttons that sit above the slider. */
 const TEMPO_PRESETS = [40, 60, 80, 100, 120, 140, 160, 200] as const;
+
+/** Per-strategy explanatory text under the Order dropdown. */
+function orderingDescription(
+  strategy: OrderingStrategy,
+  poolSize: number,
+  drillMeasures: number,
+): string {
+  switch (strategy) {
+    case "custom":
+      return "Drill plays the pool top-to-bottom, looping if it's shorter than the drill length. Drag the handle on the left of each row to reorder.";
+    case "chromaticAsc":
+      return "Pool sorted chromatically up from the first chord. C → C♯ → D ...";
+    case "chromaticDesc":
+      return "Pool sorted chromatically down from the first chord. C → B → B♭ ...";
+    case "cycleOf5ths":
+      return "Pool sorted in the canonical jazz direction (descending 5ths / ascending 4ths). Cmaj7 ii-V-I sequences stay in order.";
+    case "cycleOf4ths":
+      return "Pool sorted ascending 5ths / descending 4ths. C → G → D → A ...";
+    case "randomReplace": {
+      const slots = Math.min(drillMeasures, poolSize);
+      return `Each measure independently picks a random chord from your pool of ${poolSize}. Chords can repeat within a rep. ${slots} slots per drill.`;
+    }
+    case "randomShuffleOnce":
+      return "Shuffled once at the start of the session — same order plays for every rep.";
+    case "randomShuffleEachPass":
+      return `Each rep samples ${Math.min(drillMeasures, poolSize)} chord${
+        Math.min(drillMeasures, poolSize) === 1 ? "" : "s"
+      } at random from your pool of ${poolSize}. Fresh sample every rep.`;
+  }
+}
+
+/**
+ * A draggable chord-pool row. useSortable wires the row's transform +
+ * transition for the drag animation; the grip-icon button receives the
+ * drag listeners. When canDrag is false (any non-Custom ordering), the
+ * grip is muted and the row is non-draggable.
+ */
+function SortableChordRow({
+  id,
+  chord,
+  index,
+  canDrag,
+  poolSize,
+  onRootChange,
+  onQualityChange,
+  onRemove,
+  rowRef,
+}: {
+  id: string;
+  chord: Chord;
+  index: number;
+  canDrag: boolean;
+  poolSize: number;
+  onRootChange: (root: PitchClass) => void;
+  onQualityChange: (quality: ChordQuality) => void;
+  onRemove: () => void;
+  rowRef: (el: HTMLDivElement | null) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: !canDrag });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={(el) => {
+        setNodeRef(el);
+        rowRef(el);
+      }}
+      style={style}
+      className="grid grid-cols-[auto_7rem_1fr_auto] gap-2 items-center"
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        disabled={!canDrag}
+        aria-label={
+          canDrag
+            ? `Reorder chord ${index + 1}`
+            : "Reorder available with Custom order"
+        }
+        className={`flex h-9 w-7 items-center justify-center rounded-md text-muted-foreground/50 transition-colors ${
+          canDrag
+            ? "cursor-grab hover:text-foreground hover:bg-background/60 active:cursor-grabbing"
+            : "cursor-not-allowed opacity-30"
+        }`}
+      >
+        <GripVertical className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <select
+        aria-label={`Chord ${index + 1} root`}
+        value={chord.root}
+        onChange={(e) => onRootChange(e.target.value as PitchClass)}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+      >
+        {PITCH_CLASSES.map((pc) => (
+          <option key={pc} value={pc}>
+            {PITCH_CLASS_DISPLAY_NAMES[pc]}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label={`Chord ${index + 1} quality`}
+        value={chord.quality}
+        onChange={(e) => onQualityChange(e.target.value as ChordQuality)}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+      >
+        {CHORD_QUALITIES.map((q) => (
+          <option key={q} value={q}>
+            {QUALITY_DISPLAY_NAMES[q]}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={poolSize <= 1}
+        aria-label={`Remove chord ${index + 1}`}
+        className="flex items-center justify-center rounded-md border border-border bg-background h-9 w-9 text-muted-foreground hover:text-foreground hover:border-destructive/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        <Trash2 className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
 
 /** Preset selections for the quick-build wizard's column buttons. */
 const WIZARD_ROOTS_NATURALS: readonly PitchClass[] = [

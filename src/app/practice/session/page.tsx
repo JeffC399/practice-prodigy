@@ -12,6 +12,7 @@ import {
 import {
   BPM_MAX,
   BPM_MIN,
+  RANDOM_ORDERING_STRATEGIES,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary } from "@/lib/state/drills-library";
@@ -51,25 +52,31 @@ export default function PracticeSessionPage() {
   const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
   const countInBeats = config.countInMeasures * beatsPerMeasure;
 
-  // Idle preview: deterministic order with NO transitions so the user
-  // sees the canonical pool walk. Active sequence (sampled fresh on
-  // each Start) uses the real settings including transitions.
+  // Idle preview: deterministic walk through the pool. For random
+  // strategies we fall back to "custom" so the preview shows the
+  // user's pool in the order they added it — no point pre-randomizing
+  // a preview the user is going to re-randomize at Start anyway.
+  // Transitions are also off here for a cleaner preview.
+  const previewStrategy = RANDOM_ORDERING_STRATEGIES.has(
+    config.orderingStrategy,
+  )
+    ? ("custom" as const)
+    : config.orderingStrategy;
   const idlePreviewSequence = useMemo(
     () =>
       generateSequence({
         pool: config.chordPool,
-        orderingStrategy: config.orderingStrategy,
+        orderingStrategy: previewStrategy,
         drillMeasures: config.drillMeasures,
         repetitions: config.repetitions,
         repeatIndefinitely: false,
-        randomizeChords: false,
         timeSignature: config.timeSignature,
         transitionUnit: config.transitionUnit,
         transitionCount: 0,
       }),
     [
       config.chordPool,
-      config.orderingStrategy,
+      previewStrategy,
       config.drillMeasures,
       config.repetitions,
       config.timeSignature,
@@ -156,16 +163,14 @@ export default function PracticeSessionPage() {
 
   const handleToggle = () => {
     if (isIdle) {
-      // Fresh sequence at every Start. For randomizeChords this
-      // re-samples (the "fresh sample per rep" semantic the user picked);
-      // for deterministic it's a harmless rebuild.
+      // Fresh sequence at every Start. Random strategies re-roll;
+      // deterministic strategies are a harmless rebuild.
       const fresh = generateSequence({
         pool: config.chordPool,
         orderingStrategy: config.orderingStrategy,
         drillMeasures: config.drillMeasures,
         repetitions: config.repetitions,
         repeatIndefinitely: config.repeatIndefinitely,
-        randomizeChords: config.randomizeChords,
         timeSignature: config.timeSignature,
         transitionUnit: config.transitionUnit,
         transitionCount: config.transitionCount,
@@ -238,7 +243,7 @@ export default function PracticeSessionPage() {
           <span className="text-foreground">
             {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
           </span>
-          {config.randomizeChords && (
+          {RANDOM_ORDERING_STRATEGIES.has(config.orderingStrategy) && (
             <span className="text-primary">Random</span>
           )}
           {config.repeatIndefinitely && (
