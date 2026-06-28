@@ -41,8 +41,10 @@ import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
 import {
   ArrowRight,
   Bookmark,
+  Check,
   ChevronDown,
   ListChecks,
+  Pencil,
   Play,
   Plus,
   Square,
@@ -85,8 +87,17 @@ export default function PracticeSetupPage() {
     setNotationStyle,
     setArpeggioPattern,
     loadConfig,
+    loadedDrillId,
+    setLoadedDrillId,
   } = config;
   const drillsLib = useDrillsLibrary();
+  const editingDrill = useMemo(
+    () =>
+      loadedDrillId
+        ? drillsLib.drills.find((d) => d.id === loadedDrillId) ?? null
+        : null,
+    [loadedDrillId, drillsLib.drills],
+  );
 
   // Quick-build wizard state. Sets aren't directly reactive in
   // React, so each toggle creates a fresh Set.
@@ -147,17 +158,40 @@ export default function PracticeSetupPage() {
   const [isSavingDrill, setIsSavingDrill] = useState(false);
   const [saveDrillName, setSaveDrillName] = useState("");
 
+  /** Take a snapshot of the current PracticeConfig (data fields only). */
+  const snapshotConfig = () => {
+    return JSON.parse(
+      JSON.stringify(config),
+    ) as import("@/lib/state/practice-config").PracticeConfig;
+  };
+
   const handleSaveDrill = () => {
     const name = saveDrillName.trim();
     if (!name) return;
-    // Strip the store's setter functions; PracticeConfig only has data fields.
-    const snapshot = JSON.parse(
-      JSON.stringify(config),
-    ) as import("@/lib/state/practice-config").PracticeConfig;
-    drillsLib.saveDrill(name, snapshot);
+    const id = drillsLib.saveDrill(name, snapshotConfig());
     setSaveDrillName("");
     setIsSavingDrill(false);
+    // The new drill becomes the one being edited so subsequent Save
+    // changes / Save as new chains work intuitively.
+    setLoadedDrillId(id);
   };
+
+  /** Overwrite the currently-edited Drill with the current config. */
+  const handleSaveChanges = () => {
+    if (!editingDrill) return;
+    drillsLib.updateDrillConfig(editingDrill.id, snapshotConfig());
+  };
+
+  const handleEditDrill = (drill: Drill) => {
+    loadConfig(drill.config);
+    setLoadedDrillId(drill.id);
+    // Scroll to top so the user sees the editing badge.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleDoneEditing = () => setLoadedDrillId(null);
 
   const handleLoadDrill = async (drill: Drill) => {
     // Unlock audio context while still inside the click gesture so the
@@ -171,6 +205,7 @@ export default function PracticeSetupPage() {
       // Silent — if the unlock fails, the user just has to hit Start manually.
     }
     loadConfig(drill.config);
+    setLoadedDrillId(drill.id);
     router.push("/practice/session?autostart=1");
   };
 
@@ -256,6 +291,27 @@ export default function PracticeSetupPage() {
             </p>
           </div>
 
+          {/* Editing badge — visible only when a saved Drill is loaded for edit. */}
+          {editingDrill && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
+              <div className="flex flex-col">
+                <span className="font-mono text-xs uppercase tracking-wider text-primary">
+                  Editing drill
+                </span>
+                <span className="text-sm font-medium text-foreground">
+                  {editingDrill.name}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDoneEditing}
+                className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              >
+                Done editing
+              </button>
+            </div>
+          )}
+
           {/* Quick Start — saved drills launch with one click. */}
           <FormSection title="Quick start">
             {drillsLib.drills.length === 0 ? (
@@ -272,7 +328,9 @@ export default function PracticeSetupPage() {
                   <DrillCard
                     key={drill.id}
                     drill={drill}
-                    onLoad={handleLoadDrill}
+                    isEditing={drill.id === loadedDrillId}
+                    onLaunch={handleLoadDrill}
+                    onEdit={handleEditDrill}
                     onDelete={drillsLib.deleteDrill}
                   />
                 ))}
@@ -283,8 +341,19 @@ export default function PracticeSetupPage() {
           {/* Sequence preview. Min-height keeps the card stable across
               notation styles even when the pool has just one chord. */}
           <section className="flex min-h-72 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-10">
-            <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              Sequence · {poolSize} chord{poolSize === 1 ? "" : "s"}
+            <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              <span>
+                Sequence · {poolSize} chord{poolSize === 1 ? "" : "s"}
+              </span>
+              {poolSize > 1 && (
+                <button
+                  type="button"
+                  onClick={() => replaceChordPool([])}
+                  className="rounded-sm border border-border bg-background px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-destructive/50 transition-colors"
+                >
+                  Clear pool
+                </button>
+              )}
             </div>
             <div
               className="flex flex-wrap items-center justify-center gap-2"
@@ -819,7 +888,7 @@ export default function PracticeSetupPage() {
               />
             </button>
 
-            {/* Save current setup as a Drill */}
+            {/* Save area — differs depending on whether a Drill is loaded for edit. */}
             {isSavingDrill ? (
               <div className="flex flex-col gap-2 rounded-md border border-border bg-background/40 p-3">
                 <label
@@ -865,6 +934,25 @@ export default function PracticeSetupPage() {
                   </button>
                 </div>
               </div>
+            ) : editingDrill ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleSaveChanges}
+                  className="flex items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/15 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/25 transition-colors"
+                >
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                  Save changes to &ldquo;{editingDrill.name}&rdquo;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSavingDrill(true)}
+                  className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                >
+                  <Bookmark className="h-4 w-4" aria-hidden="true" />
+                  Save as new drill
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -885,14 +973,19 @@ export default function PracticeSetupPage() {
 /** A saved drill rendered as a tile in the Quick Start section. */
 function DrillCard({
   drill,
-  onLoad,
+  isEditing,
+  onLaunch,
+  onEdit,
   onDelete,
 }: {
   drill: Drill;
-  onLoad: (drill: Drill) => void;
+  isEditing: boolean;
+  onLaunch: (drill: Drill) => void;
+  onEdit: (drill: Drill) => void;
   onDelete: (id: string) => void;
 }) {
   const c = drill.config;
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const flags: string[] = [];
   if (c.randomizeChords) flags.push("Random");
   if (c.repeatIndefinitely) flags.push("Loop ∞");
@@ -901,13 +994,19 @@ function DrillCard({
     : `${c.drillMeasures} × ${c.repetitions} = ${c.drillMeasures * c.repetitions} measures`;
 
   return (
-    <div className="relative">
+    <div
+      className={`relative rounded-lg border bg-background/40 transition-colors ${
+        isEditing
+          ? "border-primary/60 bg-primary/5"
+          : "border-border hover:border-primary/60 hover:bg-primary/5"
+      }`}
+    >
       <button
         type="button"
-        onClick={() => onLoad(drill)}
-        className="group block w-full rounded-lg border border-border bg-background/40 p-3 text-left transition-colors hover:border-primary/60 hover:bg-primary/5"
+        onClick={() => onLaunch(drill)}
+        className="group block w-full p-3 text-left"
       >
-        <div className="flex items-center gap-2 pr-7">
+        <div className="flex items-center gap-2 pr-20">
           <Play
             className="h-4 w-4 shrink-0 text-primary"
             aria-hidden="true"
@@ -931,14 +1030,49 @@ function DrillCard({
           )}
         </div>
       </button>
-      <button
-        type="button"
-        onClick={() => onDelete(drill.id)}
-        aria-label={`Delete drill ${drill.name}`}
-        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-border/60 hover:text-foreground transition-colors"
-      >
-        <X className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
+      {/* Card actions. Two-click delete confirm prevents accidental loss. */}
+      <div className="absolute right-2 top-2 flex items-center gap-1">
+        {confirmingDelete ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(false)}
+              className="rounded-sm border border-border bg-background px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDelete(drill.id);
+                setConfirmingDelete(false);
+              }}
+              className="rounded-sm border border-destructive/60 bg-destructive/15 px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-destructive hover:bg-destructive/25 transition-colors"
+            >
+              Delete
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => onEdit(drill)}
+              aria-label={`Edit drill ${drill.name}`}
+              className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-border/60 hover:text-foreground transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              aria-label={`Delete drill ${drill.name}`}
+              className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-border/60 hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

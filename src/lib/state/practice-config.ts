@@ -117,6 +117,14 @@ const DEFAULT_CONFIG: PracticeConfig = {
 };
 
 type PracticeConfigStore = PracticeConfig & {
+  /**
+   * ID of the Drill currently being edited, or null when the user is
+   * working on an ad-hoc setup. UI state — sits in the store so it
+   * survives navigation between setup and session. Set on Edit-card
+   * click; cleared on Done-editing / Save-as-new.
+   */
+  loadedDrillId: string | null;
+  setLoadedDrillId: (id: string | null) => void;
   addChord: (chord?: Chord) => void;
   removeChordAt: (index: number) => void;
   setChordRootAt: (index: number, root: PitchClass) => void;
@@ -144,6 +152,8 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
   persist(
     (set) => ({
       ...DEFAULT_CONFIG,
+      loadedDrillId: null,
+      setLoadedDrillId: (loadedDrillId) => set({ loadedDrillId }),
       addChord: (chord) =>
         set((state) => {
           if (state.chordPool.length >= POOL_MAX) return {};
@@ -221,7 +231,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -259,6 +269,12 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         // so existing setups behave identically.
         if (version <= 3) {
           next.repeatIndefinitely = DEFAULT_CONFIG.repeatIndefinitely;
+        }
+
+        // v4 → v5: new `loadedDrillId` UI tracking (null when not
+        // editing a saved Drill).
+        if (version <= 4) {
+          next.loadedDrillId = null;
         }
 
         return next;
