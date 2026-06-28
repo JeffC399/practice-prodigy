@@ -189,11 +189,6 @@ export default function PracticeSetupPage() {
   const [saveDrillName, setSaveDrillName] = useState("");
   const [saveDrillNotes, setSaveDrillNotes] = useState("");
 
-  // Edit-details inline form state (used when a drill is loaded for edit).
-  const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [editDetailsName, setEditDetailsName] = useState("");
-  const [editDetailsNotes, setEditDetailsNotes] = useState("");
-
   // Controlled-open state for the Chord pool section, so a click on a
   // chip in the Sequence preview can force it open before scrolling.
   const [chordPoolOpen, setChordPoolOpen] = useState(false);
@@ -222,24 +217,7 @@ export default function PracticeSetupPage() {
     setLoadedDrillId(id);
   };
 
-  /** Open the inline Edit-details form, seeded with the current drill's metadata. */
-  const handleStartEditDetails = () => {
-    if (!editingDrill) return;
-    setEditDetailsName(editingDrill.name);
-    setEditDetailsNotes(editingDrill.notes ?? "");
-    setIsEditingDetails(true);
-  };
-
-  const handleSaveDetails = () => {
-    if (!editingDrill) return;
-    drillsLib.updateDrillMeta(editingDrill.id, {
-      name: editDetailsName,
-      notes: editDetailsNotes,
-    });
-    setIsEditingDetails(false);
-  };
-
-  /** Reset live config to the saved drill's state. */
+  /** Reset live config to the saved drill's state (does not touch name/notes). */
   const handleDiscardChanges = () => {
     if (!editingDrill) return;
     loadConfig(editingDrill.config);
@@ -274,7 +252,11 @@ export default function PracticeSetupPage() {
       // Silent — if the unlock fails, the user just has to hit Start manually.
     }
     loadConfig(drill.config);
-    setLoadedDrillId(drill.id);
+    // Launching is launching — it deliberately does NOT enter edit
+    // mode. Otherwise pressing Done editing then launching the same
+    // drill would reopen the editing badge on return to setup, which
+    // surprises the user. Edit mode is only entered via the explicit
+    // pencil on the card.
     drillsLib.markDrillLoaded(drill.id);
     router.push("/practice/session?autostart=1");
   };
@@ -390,106 +372,60 @@ export default function PracticeSetupPage() {
             </p>
           </div>
 
-          {/* Editing badge — visible only when a saved Drill is loaded for edit. */}
+          {/* Editing badge — name and notes are always-editable inline.
+              `key`d to the drill id so switching drills mid-edit cleanly
+              resets the uncontrolled inputs. Saves on blur (and blur
+              fires when the user clicks Done editing, so explicit "save
+              details" was unnecessary noise). */}
           {editingDrill && (
             <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
-              {isEditingDetails ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="edit-drill-name"
-                      className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
-                    >
-                      Name
-                    </label>
-                    <input
-                      id="edit-drill-name"
-                      type="text"
-                      value={editDetailsName}
-                      onChange={(e) => setEditDetailsName(e.target.value)}
-                      className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="edit-drill-notes"
-                      className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
-                    >
-                      Notes (optional)
-                    </label>
-                    <textarea
-                      id="edit-drill-notes"
-                      value={editDetailsNotes}
-                      onChange={(e) =>
-                        setEditDetailsNotes(e.target.value.slice(0, 300))
-                      }
-                      placeholder="e.g. Slow at 60. Focus on left-hand timing."
-                      rows={2}
-                      className="resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-xs uppercase tracking-wider text-primary">
+                  Editing drill
+                </span>
+                <div className="flex shrink-0 gap-2">
+                  {isDirty && (
                     <button
                       type="button"
-                      onClick={() => setIsEditingDetails(false)}
-                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={handleDiscardChanges}
+                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-destructive/50 transition-colors"
                     >
-                      Cancel
+                      Discard changes
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveDetails}
-                      disabled={!editDetailsName.trim()}
-                      className="rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Save details
-                    </button>
-                  </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleDoneEditing}
+                    className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Done editing
+                  </button>
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-mono text-xs uppercase tracking-wider text-primary">
-                        Editing drill
-                      </span>
-                      <span className="text-sm font-medium text-foreground">
-                        {editingDrill.name}
-                      </span>
-                      {editingDrill.notes && (
-                        <span className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                          {editingDrill.notes}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 gap-2">
-                      {isDirty && (
-                        <button
-                          type="button"
-                          onClick={handleDiscardChanges}
-                          className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-destructive/50 transition-colors"
-                        >
-                          Discard changes
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleStartEditDetails}
-                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-                      >
-                        Edit details
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDoneEditing}
-                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        Done editing
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+              </div>
+              <input
+                key={`${editingDrill.id}-name`}
+                type="text"
+                defaultValue={editingDrill.name}
+                onBlur={(e) =>
+                  drillsLib.updateDrillMeta(editingDrill.id, {
+                    name: e.target.value,
+                  })
+                }
+                placeholder="Drill name"
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium focus:border-primary focus:outline-none"
+              />
+              <textarea
+                key={`${editingDrill.id}-notes`}
+                defaultValue={editingDrill.notes ?? ""}
+                onBlur={(e) =>
+                  drillsLib.updateDrillMeta(editingDrill.id, {
+                    notes: e.target.value.slice(0, 300),
+                  })
+                }
+                placeholder="Add notes (optional) — e.g. Slow at 60. Focus on left-hand timing."
+                rows={2}
+                className="resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none focus:text-foreground"
+              />
             </div>
           )}
 
