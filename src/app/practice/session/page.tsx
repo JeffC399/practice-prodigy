@@ -32,16 +32,21 @@ export default function PracticeSessionPage() {
   const isCountIn = state.phase === "count-in";
   const isPlaying = state.phase === "playing";
 
-  const totalMeasures = config.drillMeasures * config.repetitions;
+  const totalMeasures = config.repeatIndefinitely
+    ? null
+    : config.drillMeasures * config.repetitions;
   const totalPlayingBeats =
-    totalMeasures * config.timeSignature.beatsPerMeasure;
+    totalMeasures !== null
+      ? totalMeasures * config.timeSignature.beatsPerMeasure
+      : undefined;
   const countInBeats =
     config.countInMeasures * config.timeSignature.beatsPerMeasure;
 
   // Idle preview: always shows the deterministic order so the user can
   // see what the drill looks like before pressing Start. The actual
   // randomized sequence is sampled fresh in handleToggle so randomized
-  // drills get a new pull each time the user starts.
+  // drills get a new pull each time the user starts. Idle preview is
+  // never indefinite — only the active play uses the large buffer.
   const idlePreviewSequence = useMemo(
     () =>
       generateSequence({
@@ -49,6 +54,7 @@ export default function PracticeSessionPage() {
         orderingStrategy: config.orderingStrategy,
         drillMeasures: config.drillMeasures,
         repetitions: config.repetitions,
+        repeatIndefinitely: false,
         randomizeChords: false,
       }),
     [
@@ -91,6 +97,7 @@ export default function PracticeSessionPage() {
           orderingStrategy: config.orderingStrategy,
           drillMeasures: config.drillMeasures,
           repetitions: config.repetitions,
+          repeatIndefinitely: config.repeatIndefinitely,
           randomizeChords: config.randomizeChords,
         }),
       );
@@ -126,14 +133,18 @@ export default function PracticeSessionPage() {
           {config.randomizeChords && (
             <span className="text-primary">Random</span>
           )}
+          {config.repeatIndefinitely && (
+            <span className="text-primary">Loop ∞</span>
+          )}
           <span>{config.bpm} BPM</span>
           <span>
             {config.timeSignature.beatsPerMeasure}/
             {config.timeSignature.beatUnit}
           </span>
           <span>
-            {config.drillMeasures} × {config.repetitions} ={" "}
-            {totalMeasures} measures
+            {config.repeatIndefinitely
+              ? `${config.drillMeasures} measures / rep`
+              : `${config.drillMeasures} × ${config.repetitions} = ${totalMeasures} measures`}
           </span>
         </div>
       </header>
@@ -217,7 +228,8 @@ function PhaseBadge({
   isPlaying: boolean;
   countInRemaining: number;
   measure: number;
-  totalMeasures: number;
+  /** Null when the drill loops indefinitely. */
+  totalMeasures: number | null;
 }) {
   let label: string;
   if (isIdle) {
@@ -225,7 +237,10 @@ function PhaseBadge({
   } else if (isCountIn) {
     label = `Count-in · ${countInRemaining}`;
   } else if (isPlaying) {
-    label = `Measure ${measure} of ${totalMeasures}`;
+    label =
+      totalMeasures === null
+        ? `Measure ${measure}`
+        : `Measure ${measure} of ${totalMeasures}`;
   } else {
     label = "";
   }

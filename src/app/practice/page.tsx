@@ -76,6 +76,7 @@ export default function PracticeSetupPage() {
     setCountInMeasures,
     setDrillMeasures,
     setRepetitions,
+    setRepeatIndefinitely,
     setRandomizeChords,
     setNotationStyle,
     setArpeggioPattern,
@@ -688,24 +689,58 @@ export default function PracticeSetupPage() {
                   min={REPS_MIN}
                   max={REPS_MAX}
                   onChange={setRepetitions}
-                  className="w-full"
+                  className={`w-full ${
+                    config.repeatIndefinitely
+                      ? "opacity-40 pointer-events-none"
+                      : ""
+                  }`}
                 />
               </FormField>
             </div>
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={config.repeatIndefinitely}
+                onChange={(e) => setRepeatIndefinitely(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border bg-background accent-primary cursor-pointer"
+              />
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                  Loop until stopped
+                </span>
+                <span className="text-xs text-muted-foreground leading-relaxed">
+                  {config.repeatIndefinitely
+                    ? "Repetitions ignored — drill keeps going until you press Stop."
+                    : "When on, the drill loops indefinitely instead of running a fixed number of repetitions."}
+                </span>
+              </div>
+            </label>
             <p className="text-xs text-muted-foreground">
-              <span className="font-mono tabular-nums text-foreground">
-                {config.drillMeasures}
-              </span>{" "}
-              measure{config.drillMeasures === 1 ? "" : "s"} ×{" "}
-              <span className="font-mono tabular-nums text-foreground">
-                {config.repetitions}
-              </span>{" "}
-              rep{config.repetitions === 1 ? "" : "s"} ={" "}
-              <span className="font-mono tabular-nums text-foreground">
-                {config.drillMeasures * config.repetitions}
-              </span>{" "}
-              total measure
-              {config.drillMeasures * config.repetitions === 1 ? "" : "s"}.
+              {config.repeatIndefinitely ? (
+                <>
+                  <span className="font-mono tabular-nums text-foreground">
+                    {config.drillMeasures}
+                  </span>{" "}
+                  measure{config.drillMeasures === 1 ? "" : "s"} per rep ·
+                  loops until you stop.
+                </>
+              ) : (
+                <>
+                  <span className="font-mono tabular-nums text-foreground">
+                    {config.drillMeasures}
+                  </span>{" "}
+                  measure{config.drillMeasures === 1 ? "" : "s"} ×{" "}
+                  <span className="font-mono tabular-nums text-foreground">
+                    {config.repetitions}
+                  </span>{" "}
+                  rep{config.repetitions === 1 ? "" : "s"} ={" "}
+                  <span className="font-mono tabular-nums text-foreground">
+                    {config.drillMeasures * config.repetitions}
+                  </span>{" "}
+                  total measure
+                  {config.drillMeasures * config.repetitions === 1 ? "" : "s"}.
+                </>
+              )}
             </p>
           </FormSection>
 

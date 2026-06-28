@@ -70,6 +70,13 @@ export type PracticeConfig = {
   /** How many times to run the drill. Each rep re-samples when randomized. */
   repetitions: number;
   /**
+   * When true, ignore `repetitions` and run the drill until the user
+   * stops. Maps to a large pre-generated sequence buffer in practice
+   * (no actual infinity), but functionally limitless for any normal
+   * practice session.
+   */
+  repeatIndefinitely: boolean;
+  /**
    * When true, each repetition draws a fresh random sample from the
    * chord pool (without replacement, up to pool size; pool shuffled
    * and looped if drillMeasures > pool size). When false, plays the
@@ -100,6 +107,7 @@ const DEFAULT_CONFIG: PracticeConfig = {
   measuresPerChord: 1,
   drillMeasures: 8,
   repetitions: 1,
+  repeatIndefinitely: false,
   randomizeChords: false,
   bpm: 90,
   timeSignature: { beatsPerMeasure: 4, beatUnit: 4 },
@@ -123,6 +131,7 @@ type PracticeConfigStore = PracticeConfig & {
   setCountInMeasures: (measures: number) => void;
   setDrillMeasures: (measures: number) => void;
   setRepetitions: (reps: number) => void;
+  setRepeatIndefinitely: (repeat: boolean) => void;
   setRandomizeChords: (randomize: boolean) => void;
   setNotationStyle: (style: ChordNotationStyle) => void;
   setArpeggioPattern: (pattern: ArpeggioPattern) => void;
@@ -196,6 +205,8 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         set({
           repetitions: clamp(Math.round(repetitions), REPS_MIN, REPS_MAX),
         }),
+      setRepeatIndefinitely: (repeatIndefinitely) =>
+        set({ repeatIndefinitely }),
       setRandomizeChords: (randomizeChords) => set({ randomizeChords }),
       setNotationStyle: (notationStyle) => set({ notationStyle }),
       setArpeggioPattern: (arpeggioPattern) => set({ arpeggioPattern }),
@@ -204,7 +215,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -236,6 +247,12 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           next.drillMeasures = oldMeasures;
           next.repetitions = DEFAULT_CONFIG.repetitions;
           next.randomizeChords = DEFAULT_CONFIG.randomizeChords;
+        }
+
+        // v3 → v4: new `repeatIndefinitely` toggle; defaults to false
+        // so existing setups behave identically.
+        if (version <= 3) {
+          next.repeatIndefinitely = DEFAULT_CONFIG.repeatIndefinitely;
         }
 
         return next;

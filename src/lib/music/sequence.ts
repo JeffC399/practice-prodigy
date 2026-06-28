@@ -26,21 +26,37 @@ export type SequenceConfig = {
   orderingStrategy: OrderingStrategy;
   drillMeasures: number;
   repetitions: number;
+  repeatIndefinitely: boolean;
   randomizeChords: boolean;
 };
 
 /**
+ * Cap on the number of measures pre-generated when the user selects
+ * "Loop until stopped." Functionally infinite — even at a slow 60 BPM
+ * 4/4 drill (the lower end of normal practice tempo), this is ~70
+ * minutes before the buffer is exhausted, and at faster tempos /
+ * busier meters the wall-clock budget only grows. Users will stop
+ * long before reaching this limit; if they don't, the drill ends
+ * cleanly and they can Start again.
+ */
+export const INDEFINITE_MEASURE_BUFFER = 4096;
+
+/**
  * Produce the full chord-per-measure sequence for a drill. Returns an
- * array of length `drillMeasures × repetitions`. The drill screen
- * regenerates this on every Start so randomized drills get fresh
- * sampling each session.
+ * array of length `drillMeasures × repetitions` (or roughly
+ * INDEFINITE_MEASURE_BUFFER when `repeatIndefinitely` is true). The
+ * drill screen regenerates this on every Start so randomized drills
+ * get fresh sampling each session.
  */
 export function generateSequence(config: SequenceConfig): Chord[] {
   if (config.pool.length === 0) {
     throw new Error("generateSequence: empty chord pool");
   }
+  const effectiveReps = config.repeatIndefinitely
+    ? Math.max(1, Math.ceil(INDEFINITE_MEASURE_BUFFER / config.drillMeasures))
+    : config.repetitions;
   const result: Chord[] = [];
-  for (let r = 0; r < config.repetitions; r++) {
+  for (let r = 0; r < effectiveReps; r++) {
     if (config.randomizeChords) {
       result.push(...sampleForRep(config.pool, config.drillMeasures));
     } else {
