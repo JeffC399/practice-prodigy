@@ -176,15 +176,19 @@ export default function PracticeSetupPage() {
               Sequence · {poolSize} chord{poolSize === 1 ? "" : "s"}
             </div>
             <div
-              className={`flex flex-wrap items-center justify-center text-center font-mono font-semibold text-foreground leading-tight tracking-tight ${
-                isLongForm
-                  ? "gap-x-5 gap-y-2 text-2xl"
-                  : "gap-x-6 gap-y-2 text-5xl"
-              }`}
+              className="flex flex-wrap items-center justify-center gap-2"
               aria-live="polite"
             >
               {renderedChords.map((label, i) => (
-                <span key={i}>{label}</span>
+                <span
+                  key={i}
+                  className={`rounded-md border border-border/50 bg-background/40 px-3 py-1.5 font-mono font-semibold text-foreground leading-none tracking-tight ${chipTextClass(
+                    poolSize,
+                    isLongForm,
+                  )}`}
+                >
+                  {label}
+                </span>
               ))}
             </div>
             <div className="flex items-center gap-2 pt-2">
@@ -360,25 +364,42 @@ export default function PracticeSetupPage() {
                 }
                 htmlFor="bpm"
               >
-                <div className="flex items-center gap-4">
-                  <input
-                    id="bpm"
-                    type="range"
-                    min={BPM_MIN}
-                    max={BPM_MAX}
-                    value={config.bpm}
-                    onChange={(e) => setBpm(Number(e.target.value))}
-                    className="flex-1 accent-primary"
-                  />
-                  <input
-                    type="number"
-                    min={BPM_MIN}
-                    max={BPM_MAX}
-                    value={config.bpm}
-                    onChange={(e) => setBpm(Number(e.target.value) || BPM_MIN)}
-                    className="w-20 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none"
-                    aria-label="BPM (numeric)"
-                  />
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {TEMPO_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setBpm(preset)}
+                        className={`rounded-md border px-3 py-1 font-mono text-xs tabular-nums transition-colors ${
+                          config.bpm === preset
+                            ? "border-primary bg-primary/15 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-border"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <input
+                      id="bpm"
+                      type="range"
+                      min={BPM_MIN}
+                      max={BPM_MAX}
+                      value={config.bpm}
+                      onChange={(e) => setBpm(Number(e.target.value))}
+                      className="flex-1 accent-primary"
+                    />
+                    <ClampedNumberInput
+                      value={config.bpm}
+                      min={BPM_MIN}
+                      max={BPM_MAX}
+                      onChange={setBpm}
+                      ariaLabel="BPM (numeric)"
+                      className="w-20"
+                    />
+                  </div>
                 </div>
               </FormField>
 
@@ -420,29 +441,23 @@ export default function PracticeSetupPage() {
                 </Select>
               </FormField>
               <FormField label="Drill length (measures)" htmlFor="drill-measures">
-                <input
+                <ClampedNumberInput
                   id="drill-measures"
-                  type="number"
+                  value={config.drillMeasures}
                   min={DRILL_MIN}
                   max={DRILL_MAX}
-                  value={config.drillMeasures}
-                  onChange={(e) =>
-                    setDrillMeasures(Number(e.target.value) || DRILL_MIN)
-                  }
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none"
+                  onChange={setDrillMeasures}
+                  className="w-full"
                 />
               </FormField>
               <FormField label="Repetitions" htmlFor="repetitions">
-                <input
+                <ClampedNumberInput
                   id="repetitions"
-                  type="number"
+                  value={config.repetitions}
                   min={REPS_MIN}
                   max={REPS_MAX}
-                  value={config.repetitions}
-                  onChange={(e) =>
-                    setRepetitions(Number(e.target.value) || REPS_MIN)
-                  }
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none"
+                  onChange={setRepetitions}
+                  className="w-full"
                 />
               </FormField>
             </div>
@@ -534,4 +549,92 @@ function Select(
       {children}
     </select>
   );
+}
+
+/** Quick-pick tempo buttons that sit above the slider. */
+const TEMPO_PRESETS = [40, 60, 80, 100, 120, 140, 160, 200] as const;
+
+/**
+ * Number input that lets the user type intermediate values (including
+ * ones temporarily below the min) without snapping each keystroke. The
+ * store is only updated when the typed value is valid and in range;
+ * on blur we commit + clamp. Pattern fixes the bug where typing "31"
+ * was impossible because the leading "3" got clamped to the min.
+ */
+function ClampedNumberInput({
+  id,
+  value,
+  min,
+  max,
+  onChange,
+  className,
+  ariaLabel,
+}: {
+  id?: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  const display = focused && draft !== null ? draft : String(value);
+
+  return (
+    <input
+      id={id}
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={display}
+      aria-label={ariaLabel}
+      onFocus={() => {
+        setFocused(true);
+        setDraft(String(value));
+      }}
+      onChange={(e) => {
+        const v = e.target.value.replace(/[^0-9]/g, "");
+        setDraft(v);
+        const n = Number(v);
+        if (v !== "" && !isNaN(n) && n >= min && n <= max) {
+          onChange(n);
+        }
+      }}
+      onBlur={() => {
+        setFocused(false);
+        if (draft === null) return;
+        const n = Number(draft);
+        const clamped =
+          draft !== "" && !isNaN(n)
+            ? Math.max(min, Math.min(max, n))
+            : min;
+        onChange(clamped);
+        setDraft(null);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      className={`rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none ${className ?? ""}`}
+    />
+  );
+}
+
+/**
+ * Adaptive text size for sequence preview chips — shrink as the pool
+ * grows so a 20-chord pool doesn't dominate the screen. Long-form
+ * notation scales down an extra tier because each chord label is
+ * already several words long.
+ */
+function chipTextClass(poolSize: number, isLongForm: boolean): string {
+  if (isLongForm) {
+    if (poolSize <= 6) return "text-base";
+    if (poolSize <= 14) return "text-sm";
+    return "text-xs";
+  }
+  if (poolSize <= 6) return "text-3xl";
+  if (poolSize <= 12) return "text-2xl";
+  if (poolSize <= 20) return "text-xl";
+  return "text-lg";
 }
