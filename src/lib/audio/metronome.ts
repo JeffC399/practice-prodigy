@@ -170,6 +170,22 @@ class MetronomeEngine {
     this.scheduledId = transport.scheduleRepeat((time) => {
       this.beatCounter += 1;
       const counter = this.beatCounter;
+
+      // Hard end-of-session boundary: as soon as the counter steps PAST the
+      // configured number of playing beats, stop the engine and skip this
+      // tick's click. Deferring stop via setTimeout AFTER playing the last
+      // beat (previous approach) left a window for one or two more beats
+      // to slip through due to Tone.js audio-callback lookahead — audio
+      // events scheduled at specific sample times play even if the
+      // Transport stops after they were scheduled.
+      if (
+        config.totalPlayingBeats !== undefined &&
+        counter >= config.totalPlayingBeats
+      ) {
+        setTimeout(() => this.stop(), 0);
+        return;
+      }
+
       const isDownbeat = this.isDownbeatFor(counter);
 
       // Audio: trigger click at the exact sample-accurate time.
@@ -187,15 +203,6 @@ class MetronomeEngine {
 
       // Visual: schedule UI update tied to the same sample-accurate time.
       Tone.getDraw().schedule(() => this.advanceUiState(counter), time);
-
-      // If we've finished the configured playing length, schedule stop AFTER this beat.
-      if (
-        config.totalPlayingBeats !== undefined &&
-        counter >= config.totalPlayingBeats - 1
-      ) {
-        const oneBeatMs = (60 / config.bpm) * 1000;
-        setTimeout(() => this.stop(), oneBeatMs + 80);
-      }
     }, beatNotation);
 
     transport.start();
@@ -230,6 +237,10 @@ class MetronomeEngine {
     }
     transport.stop();
     transport.position = 0;
+    // Cancel any UI draw callbacks queued via Tone.getDraw().schedule that
+    // haven't fired yet — without this, a stale draw can briefly bounce
+    // the UI back into a non-idle state immediately after stop.
+    Tone.getDraw().cancel();
     this.beatCounter = 0;
     this.config = null;
     this.setState(IDLE_STATE);
