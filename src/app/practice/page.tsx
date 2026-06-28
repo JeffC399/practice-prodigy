@@ -116,8 +116,10 @@ export default function PracticeSetupPage() {
             </p>
           </div>
 
-          {/* Chord preview */}
-          <section className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-10">
+          {/* Chord preview. min-h locks the card height to the tallest
+              natural size so changing notation style doesn't reflow the
+              page — long-form just centers inside the same frame. */}
+          <section className="flex min-h-72 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-10">
             <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               Chord
             </div>
