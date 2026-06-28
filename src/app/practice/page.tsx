@@ -26,9 +26,11 @@ import {
   BPM_MAX,
   BPM_MIN,
   COUNT_IN_OPTIONS,
+  DRILL_MAX,
+  DRILL_MIN,
   POOL_MAX,
-  SESSION_MAX,
-  SESSION_MIN,
+  REPS_MAX,
+  REPS_MIN,
   TIME_SIGNATURES,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
@@ -60,7 +62,9 @@ export default function PracticeSetupPage() {
     setBpm,
     setTimeSignature,
     setCountInMeasures,
-    setSessionMeasures,
+    setDrillMeasures,
+    setRepetitions,
+    setRandomizeChords,
     setNotationStyle,
     setArpeggioPattern,
   } = config;
@@ -264,10 +268,28 @@ export default function PracticeSetupPage() {
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Add chord
               </button>
-              <p className="pt-1 text-xs text-muted-foreground">
-                Custom order — the drill plays chords in the order shown
-                above, looping until the session length is reached.
-              </p>
+              <label className="flex items-start gap-3 pt-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={config.randomizeChords}
+                  onChange={(e) => setRandomizeChords(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-border bg-background accent-primary cursor-pointer"
+                />
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                    Randomize chord order
+                  </span>
+                  <span className="text-xs text-muted-foreground leading-relaxed">
+                    {config.randomizeChords
+                      ? `Each repetition samples ${Math.min(config.drillMeasures, poolSize)} chord${
+                          Math.min(config.drillMeasures, poolSize) === 1
+                            ? ""
+                            : "s"
+                        } at random from your pool of ${poolSize}. Fresh sample every rep.`
+                      : "Custom order — drill plays the pool top-to-bottom, looping if it's shorter than the drill length."}
+                  </span>
+                </div>
+              </label>
             </div>
           </FormSection>
 
@@ -381,7 +403,7 @@ export default function PracticeSetupPage() {
 
           {/* Session shape */}
           <FormSection title="Session">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <FormField label="Count-in" htmlFor="count-in">
                 <Select
                   id="count-in"
@@ -397,20 +419,48 @@ export default function PracticeSetupPage() {
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Length (measures)" htmlFor="session-measures">
+              <FormField label="Drill length (measures)" htmlFor="drill-measures">
                 <input
-                  id="session-measures"
+                  id="drill-measures"
                   type="number"
-                  min={SESSION_MIN}
-                  max={SESSION_MAX}
-                  value={config.sessionMeasures}
+                  min={DRILL_MIN}
+                  max={DRILL_MAX}
+                  value={config.drillMeasures}
                   onChange={(e) =>
-                    setSessionMeasures(Number(e.target.value) || SESSION_MIN)
+                    setDrillMeasures(Number(e.target.value) || DRILL_MIN)
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none"
+                />
+              </FormField>
+              <FormField label="Repetitions" htmlFor="repetitions">
+                <input
+                  id="repetitions"
+                  type="number"
+                  min={REPS_MIN}
+                  max={REPS_MAX}
+                  value={config.repetitions}
+                  onChange={(e) =>
+                    setRepetitions(Number(e.target.value) || REPS_MIN)
                   }
                   className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm tabular-nums focus:border-primary focus:outline-none"
                 />
               </FormField>
             </div>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-mono tabular-nums text-foreground">
+                {config.drillMeasures}
+              </span>{" "}
+              measure{config.drillMeasures === 1 ? "" : "s"} ×{" "}
+              <span className="font-mono tabular-nums text-foreground">
+                {config.repetitions}
+              </span>{" "}
+              rep{config.repetitions === 1 ? "" : "s"} ={" "}
+              <span className="font-mono tabular-nums text-foreground">
+                {config.drillMeasures * config.repetitions}
+              </span>{" "}
+              total measure
+              {config.drillMeasures * config.repetitions === 1 ? "" : "s"}.
+            </p>
           </FormSection>
 
           {/* Start button */}

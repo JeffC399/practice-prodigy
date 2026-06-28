@@ -3,22 +3,26 @@
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { ARPEGGIO_PATTERN_SHORT_NAMES } from "@/lib/music/arpeggio";
 import { renderChord } from "@/lib/music/render-chord";
-import { chordAtMeasure } from "@/lib/music/sequence";
+import { generateSequence } from "@/lib/music/sequence";
 import { usePracticeConfig } from "@/lib/state/practice-config";
 import { Play, Square, Settings2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { Chord } from "@/lib/music/chord";
 
 /**
  * Active drill screen. Reads the active practice configuration from the
- * persisted store and runs the metronome accordingly. The setup screen
- * (/practice) is the entry point; this route is where the actual drilling
- * happens.
+ * persisted store, generates a fresh chord sequence on Start, and runs
+ * the metronome through it.
  *
- * Sequence drilling: chord advances on measure boundaries via
- * `chordAtMeasure`. A small NEXT badge above the current chord previews
- * what's coming (PROJECT-DESIGN.md §4.1 Always-Visible mode); Late-Reveal
- * mode lands in a polish slice.
+ * Sequence drilling: the per-measure chord assignments are pre-computed
+ * once per Start (via `generateSequence`) and looked up by measure
+ * number. For randomized drills this means every Start re-samples,
+ * exactly matching the "fresh sample per rep" semantic the user chose.
+ *
+ * NEXT chord preview is rendered above the current chord
+ * (PROJECT-DESIGN.md §4.1 Always-Visible mode); Late-Reveal lands in
+ * a polish slice.
  */
 export default function PracticeSessionPage() {
   const config = usePracticeConfig();
@@ -28,66 +32,68 @@ export default function PracticeSessionPage() {
   const isCountIn = state.phase === "count-in";
   const isPlaying = state.phase === "playing";
 
+  const totalMeasures = config.drillMeasures * config.repetitions;
   const totalPlayingBeats =
-    config.sessionMeasures * config.timeSignature.beatsPerMeasure;
+    totalMeasures * config.timeSignature.beatsPerMeasure;
   const countInBeats =
     config.countInMeasures * config.timeSignature.beatsPerMeasure;
 
-  // During count-in / idle we show the FIRST chord of the sequence so
-  // the user has a moment to set up. During playing the chord advances
-  // by measure.
+  // Idle preview: always shows the deterministic order so the user can
+  // see what the drill looks like before pressing Start. The actual
+  // randomized sequence is sampled fresh in handleToggle so randomized
+  // drills get a new pull each time the user starts.
+  const idlePreviewSequence = useMemo(
+    () =>
+      generateSequence({
+        pool: config.chordPool,
+        orderingStrategy: config.orderingStrategy,
+        drillMeasures: config.drillMeasures,
+        repetitions: config.repetitions,
+        randomizeChords: false,
+      }),
+    [
+      config.chordPool,
+      config.orderingStrategy,
+      config.drillMeasures,
+      config.repetitions,
+    ],
+  );
+
+  const [activeSequence, setActiveSequence] = useState<Chord[] | null>(null);
+  const sequence = isIdle
+    ? idlePreviewSequence
+    : (activeSequence ?? idlePreviewSequence);
+
   const activeMeasure =
     isPlaying && state.measureInSession > 0 ? state.measureInSession : 1;
-  const nextMeasure = activeMeasure + 1;
-  const hasNext =
-    config.chordPool.length > 1 ||
-    nextMeasure <=
-      Math.ceil(
-        config.sessionMeasures / Math.max(1, config.measuresPerChord),
-      ) *
-        config.measuresPerChord;
+  const currentChord = sequence[activeMeasure - 1] ?? sequence[0];
+  const nextChord =
+    activeMeasure < sequence.length ? sequence[activeMeasure] : null;
 
-  const currentChord = useMemo(
-    () =>
-      chordAtMeasure(
-        config.chordPool,
-        config.orderingStrategy,
-        activeMeasure,
-        config.measuresPerChord,
-      ),
-    [
-      config.chordPool,
-      config.orderingStrategy,
-      activeMeasure,
-      config.measuresPerChord,
-    ],
+  const currentLabel = useMemo(
+    () => renderChord(currentChord, config.notationStyle),
+    [currentChord, config.notationStyle],
   );
-  const nextChord = useMemo(
+  const nextLabel = useMemo(
     () =>
-      hasNext
-        ? chordAtMeasure(
-            config.chordPool,
-            config.orderingStrategy,
-            nextMeasure,
-            config.measuresPerChord,
-          )
-        : null,
-    [
-      hasNext,
-      config.chordPool,
-      config.orderingStrategy,
-      nextMeasure,
-      config.measuresPerChord,
-    ],
+      nextChord ? renderChord(nextChord, config.notationStyle) : null,
+    [nextChord, config.notationStyle],
   );
-
-  const currentLabel = renderChord(currentChord, config.notationStyle);
-  const nextLabel = nextChord
-    ? renderChord(nextChord, config.notationStyle)
-    : null;
 
   const handleToggle = () => {
     if (isIdle) {
+      // Fresh sequence at every Start. For randomizeChords this
+      // re-samples (the "fresh sample per rep" semantic the user picked);
+      // for deterministic it's a harmless rebuild.
+      setActiveSequence(
+        generateSequence({
+          pool: config.chordPool,
+          orderingStrategy: config.orderingStrategy,
+          drillMeasures: config.drillMeasures,
+          repetitions: config.repetitions,
+          randomizeChords: config.randomizeChords,
+        }),
+      );
       void start({
         bpm: config.bpm,
         beatsPerMeasure: config.timeSignature.beatsPerMeasure,
@@ -117,15 +123,17 @@ export default function PracticeSessionPage() {
           <span className="text-foreground">
             {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
           </span>
+          {config.randomizeChords && (
+            <span className="text-primary">Random</span>
+          )}
           <span>{config.bpm} BPM</span>
           <span>
             {config.timeSignature.beatsPerMeasure}/
             {config.timeSignature.beatUnit}
           </span>
           <span>
-            {config.chordPool.length} chord
-            {config.chordPool.length === 1 ? "" : "s"} ·{" "}
-            {config.sessionMeasures} measures
+            {config.drillMeasures} × {config.repetitions} ={" "}
+            {totalMeasures} measures
           </span>
         </div>
       </header>
@@ -138,7 +146,7 @@ export default function PracticeSessionPage() {
             isPlaying={isPlaying}
             countInRemaining={state.countInBeatsRemaining}
             measure={state.measureInSession}
-            totalMeasures={config.sessionMeasures}
+            totalMeasures={totalMeasures}
           />
 
           {/* NEXT preview */}

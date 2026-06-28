@@ -7,10 +7,10 @@ import type { ChordNotationStyle } from "@/lib/music/render-chord";
 /**
  * Persistent practice configuration store.
  *
- * Holds the chord pool, tempo, meter, count-in, and session length that
- * drive the /practice/session drill screen. Persisted to localStorage so
- * the user's last setup survives reloads and revisits — they don't have
- * to re-pick everything every time.
+ * Holds the chord pool, tempo, meter, drill length, repetitions, and
+ * randomization toggles that drive the /practice/session drill screen.
+ * Persisted to localStorage so the user's last setup survives reloads
+ * and revisits — they don't have to re-pick everything every time.
  *
  * This is the first concrete piece of the **cascading defaults**
  * architecture (PROJECT-DESIGN.md §3.2). For this slice it's a single
@@ -41,8 +41,9 @@ export const COUNT_IN_OPTIONS = [
 
 /**
  * Ordering strategies per PROJECT-DESIGN.md §4.4. v1 ships all 8; this
- * slice implements only "custom" (the user's exact pool order). The
- * remaining 7 land in the next slice without changing the store shape.
+ * slice implements "custom" (deterministic) and "randomSamplePerRep"
+ * (fresh random sample from the chord pool on every repetition). The
+ * remaining 6 land in a later slice without changing the store shape.
  */
 export const ORDERING_STRATEGIES = [
   "custom",
@@ -61,28 +62,45 @@ export type PracticeConfig = {
   chordPool: Chord[];
   orderingStrategy: OrderingStrategy;
   measuresPerChord: number;
+  /**
+   * Length of ONE drill repetition, in measures. Total played
+   * measures = drillMeasures × repetitions.
+   */
+  drillMeasures: number;
+  /** How many times to run the drill. Each rep re-samples when randomized. */
+  repetitions: number;
+  /**
+   * When true, each repetition draws a fresh random sample from the
+   * chord pool (without replacement, up to pool size; pool shuffled
+   * and looped if drillMeasures > pool size). When false, plays the
+   * pool in `orderingStrategy` order, looping as needed.
+   */
+  randomizeChords: boolean;
   bpm: number;
   timeSignature: TimeSignature;
   countInMeasures: number;
-  sessionMeasures: number;
   notationStyle: ChordNotationStyle;
   arpeggioPattern: ArpeggioPattern;
 };
 
 export const BPM_MIN = 30;
 export const BPM_MAX = 300;
-export const SESSION_MIN = 1;
-export const SESSION_MAX = 64;
+export const DRILL_MIN = 1;
+export const DRILL_MAX = 64;
+export const REPS_MIN = 1;
+export const REPS_MAX = 32;
 export const POOL_MAX = 32;
 
 const DEFAULT_CONFIG: PracticeConfig = {
   chordPool: [{ root: "A", quality: "min7" }],
   orderingStrategy: "custom",
   measuresPerChord: 1,
+  drillMeasures: 8,
+  repetitions: 1,
+  randomizeChords: false,
   bpm: 90,
   timeSignature: { beatsPerMeasure: 4, beatUnit: 4 },
   countInMeasures: 1,
-  sessionMeasures: 8,
   notationStyle: "jazz-minus",
   arpeggioPattern: "arp-7ths",
 };
@@ -96,7 +114,9 @@ type PracticeConfigStore = PracticeConfig & {
   setBpm: (bpm: number) => void;
   setTimeSignature: (timeSignature: TimeSignature) => void;
   setCountInMeasures: (measures: number) => void;
-  setSessionMeasures: (measures: number) => void;
+  setDrillMeasures: (measures: number) => void;
+  setRepetitions: (reps: number) => void;
+  setRandomizeChords: (randomize: boolean) => void;
   setNotationStyle: (style: ChordNotationStyle) => void;
   setArpeggioPattern: (pattern: ArpeggioPattern) => void;
   resetToDefaults: () => void;
@@ -109,8 +129,6 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
       addChord: (chord) =>
         set((state) => {
           if (state.chordPool.length >= POOL_MAX) return {};
-          // Default a new chord to a copy of the last one — usually the
-          // user's next chord is closely related to the previous.
           const newChord: Chord =
             chord ??
             (state.chordPool.length > 0
@@ -120,7 +138,6 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         }),
       removeChordAt: (index) =>
         set((state) => {
-          // Keep at least one chord — the drill needs something to play.
           if (state.chordPool.length <= 1) return {};
           return {
             chordPool: state.chordPool.filter((_, i) => i !== index),
@@ -143,14 +160,19 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         set({ bpm: clamp(Math.round(bpm), BPM_MIN, BPM_MAX) }),
       setTimeSignature: (timeSignature) => set({ timeSignature }),
       setCountInMeasures: (countInMeasures) => set({ countInMeasures }),
-      setSessionMeasures: (sessionMeasures) =>
+      setDrillMeasures: (drillMeasures) =>
         set({
-          sessionMeasures: clamp(
-            Math.round(sessionMeasures),
-            SESSION_MIN,
-            SESSION_MAX,
+          drillMeasures: clamp(
+            Math.round(drillMeasures),
+            DRILL_MIN,
+            DRILL_MAX,
           ),
         }),
+      setRepetitions: (repetitions) =>
+        set({
+          repetitions: clamp(Math.round(repetitions), REPS_MIN, REPS_MAX),
+        }),
+      setRandomizeChords: (randomizeChords) => set({ randomizeChords }),
       setNotationStyle: (notationStyle) => set({ notationStyle }),
       setArpeggioPattern: (arpeggioPattern) => set({ arpeggioPattern }),
       resetToDefaults: () => set(DEFAULT_CONFIG),
@@ -158,28 +180,41 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 2,
-      // v1 → v2: single `chord` field became `chordPool` array. Wrap
-      // the old chord into a single-element pool so users don't lose
-      // their last setup across the schema change.
+      version: 3,
       migrate: (persistedState, version) => {
         if (
-          version === 1 &&
-          persistedState &&
-          typeof persistedState === "object"
+          !persistedState ||
+          typeof persistedState !== "object"
         ) {
-          const old = persistedState as Record<string, unknown>;
-          const oldChord = old.chord as Chord | undefined;
-          const migrated: Record<string, unknown> = { ...old };
-          delete migrated.chord;
-          migrated.chordPool = oldChord
+          return persistedState;
+        }
+        const next = { ...persistedState } as Record<string, unknown>;
+
+        // v1 → v2: single `chord` field became `chordPool` array.
+        if (version === 1) {
+          const oldChord = next.chord as Chord | undefined;
+          delete next.chord;
+          next.chordPool = oldChord
             ? [oldChord]
             : DEFAULT_CONFIG.chordPool;
-          migrated.orderingStrategy = DEFAULT_CONFIG.orderingStrategy;
-          migrated.measuresPerChord = DEFAULT_CONFIG.measuresPerChord;
-          return migrated;
+          next.orderingStrategy = DEFAULT_CONFIG.orderingStrategy;
+          next.measuresPerChord = DEFAULT_CONFIG.measuresPerChord;
         }
-        return persistedState;
+
+        // v2 → v3: `sessionMeasures` renamed to `drillMeasures` and the
+        // drill grew a `repetitions` × `drillMeasures` total-length
+        // model. New `randomizeChords` toggle defaults off so existing
+        // setups behave identically.
+        if (version <= 2) {
+          const oldMeasures = (next.sessionMeasures as number | undefined) ??
+            DEFAULT_CONFIG.drillMeasures;
+          delete next.sessionMeasures;
+          next.drillMeasures = oldMeasures;
+          next.repetitions = DEFAULT_CONFIG.repetitions;
+          next.randomizeChords = DEFAULT_CONFIG.randomizeChords;
+        }
+
+        return next;
       },
     },
   ),
