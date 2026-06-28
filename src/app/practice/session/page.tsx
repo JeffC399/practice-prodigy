@@ -1,11 +1,16 @@
 "use client";
 
+import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { ARPEGGIO_PATTERN_SHORT_NAMES } from "@/lib/music/arpeggio";
 import { renderChord } from "@/lib/music/render-chord";
 import { generateSequence } from "@/lib/music/sequence";
-import { usePracticeConfig } from "@/lib/state/practice-config";
-import { Play, Square, Settings2 } from "lucide-react";
+import {
+  BPM_MAX,
+  BPM_MIN,
+  usePracticeConfig,
+} from "@/lib/state/practice-config";
+import { Minus, Play, Plus, Square, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Chord } from "@/lib/music/chord";
@@ -147,6 +152,15 @@ export default function PracticeSessionPage() {
 
   const isLongForm = config.notationStyle === "long-form";
 
+  const bumpBpm = (delta: number) => {
+    const next = Math.max(BPM_MIN, Math.min(BPM_MAX, config.bpm + delta));
+    if (next === config.bpm) return;
+    config.setBpm(next);
+    // Push the live tempo to the metronome transport immediately so the
+    // change takes effect at the next tick, even mid-drill.
+    metronomeEngine.setBpm(next);
+  };
+
   return (
     <main className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -168,7 +182,31 @@ export default function PracticeSessionPage() {
           {config.repeatIndefinitely && (
             <span className="text-primary">Loop ∞</span>
           )}
-          <span>{config.bpm} BPM</span>
+          {/* Live tempo nudge — adjusts the metronome and the persisted
+              config in one click; works mid-drill. */}
+          <span className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => bumpBpm(-5)}
+              disabled={config.bpm <= BPM_MIN}
+              aria-label="Decrease tempo by 5 BPM"
+              className="flex h-5 w-5 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <Minus className="h-3 w-3" aria-hidden="true" />
+            </button>
+            <span className="text-foreground tabular-nums w-12 text-center">
+              ♩={config.bpm}
+            </span>
+            <button
+              type="button"
+              onClick={() => bumpBpm(+5)}
+              disabled={config.bpm >= BPM_MAX}
+              aria-label="Increase tempo by 5 BPM"
+              className="flex h-5 w-5 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus className="h-3 w-3" aria-hidden="true" />
+            </button>
+          </span>
           <span>
             {config.timeSignature.beatsPerMeasure}/
             {config.timeSignature.beatUnit}

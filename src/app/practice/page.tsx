@@ -264,6 +264,20 @@ export default function PracticeSetupPage() {
   const poolSize = config.chordPool.length;
   const isLongForm = config.notationStyle === "long-form";
 
+  // One-line summaries surfaced in the collapsed section headers so the
+  // user always sees the current value without expanding.
+  const chordPoolSummary = `${poolSize} chord${poolSize === 1 ? "" : "s"}${
+    config.randomizeChords ? " · Random" : ""
+  }`;
+  const patternSummary =
+    ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern];
+  const tempoMeterSummary = `♩ = ${config.bpm} · ${config.timeSignature.beatsPerMeasure}/${config.timeSignature.beatUnit}`;
+  const sessionSummary = config.repeatIndefinitely
+    ? `${config.drillMeasures} measures / rep · Loop ∞`
+    : `${config.drillMeasures} × ${config.repetitions} = ${
+        config.drillMeasures * config.repetitions
+      } measures`;
+
   return (
     <main className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -405,7 +419,7 @@ export default function PracticeSetupPage() {
           </section>
 
           {/* Chord pool builder */}
-          <FormSection title="Chord pool">
+          <CollapsibleSection title="Chord pool" summary={chordPoolSummary}>
             <div className="flex flex-col gap-3">
               {/* Quick-build wizard — collapsible, closed by default */}
               <div className="rounded-md border border-border bg-background/30">
@@ -657,10 +671,10 @@ export default function PracticeSetupPage() {
                 </div>
               </label>
             </div>
-          </FormSection>
+          </CollapsibleSection>
 
           {/* Arpeggio pattern */}
-          <FormSection title="Pattern">
+          <CollapsibleSection title="Pattern" summary={patternSummary}>
             <div className="flex flex-col gap-3">
               <div className="flex items-stretch gap-3">
                 <Select
@@ -710,10 +724,10 @@ export default function PracticeSetupPage() {
                 )}
               </p>
             </div>
-          </FormSection>
+          </CollapsibleSection>
 
           {/* Tempo & meter */}
-          <FormSection title="Tempo & meter">
+          <CollapsibleSection title="Tempo & meter" summary={tempoMeterSummary}>
             <div className="flex flex-col gap-6">
               <FormField
                 label={
@@ -782,10 +796,10 @@ export default function PracticeSetupPage() {
                 </Select>
               </FormField>
             </div>
-          </FormSection>
+          </CollapsibleSection>
 
           {/* Session shape */}
-          <FormSection title="Session">
+          <CollapsibleSection title="Session" summary={sessionSummary}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <FormField label="Count-in" htmlFor="count-in">
                 <Select
@@ -872,7 +886,7 @@ export default function PracticeSetupPage() {
                 </>
               )}
             </p>
-          </FormSection>
+          </CollapsibleSection>
 
           {/* Start button */}
           <div className="flex flex-col gap-3">
@@ -1090,6 +1104,58 @@ function FormSection({
         {title}
       </h2>
       {children}
+    </section>
+  );
+}
+
+/**
+ * Section that collapses to its header. Header shows the section title
+ * (small mono caps) AND a one-line summary of the current state in the
+ * foreground color so the user never loses sight of "what's set" even
+ * when the section is closed. Click anywhere on the header to toggle.
+ * Default-closed — keeps the setup screen clean; users open just the
+ * section they want to tinker with.
+ */
+function CollapsibleSection({
+  title,
+  summary,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  summary: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="flex flex-col rounded-md border border-border bg-background/30">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-background/60 transition-colors"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            {title}
+          </span>
+          <span className="text-sm font-medium text-foreground">
+            {summary}
+          </span>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden="true"
+        />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
+          {children}
+        </div>
+      )}
     </section>
   );
 }

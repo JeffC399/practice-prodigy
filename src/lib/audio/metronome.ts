@@ -229,6 +229,16 @@ class MetronomeEngine {
     }
   }
 
+  /**
+   * Update the transport BPM live. Tone.js handles the change cleanly
+   * — the next scheduled tick uses the new tempo. Used by the drill
+   * screen's ±5 tempo nudge so users can adjust mid-drill without
+   * stopping and reopening the setup form.
+   */
+  setBpm(bpm: number): void {
+    Tone.getTransport().bpm.value = bpm;
+  }
+
   stop(): void {
     const transport = Tone.getTransport();
     if (this.scheduledId !== null) {
