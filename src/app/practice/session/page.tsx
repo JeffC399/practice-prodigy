@@ -84,12 +84,13 @@ export default function PracticeSessionPage() {
     ? idlePreviewSequence
     : (activeSequence ?? idlePreviewSequence);
 
-  // The metronome reports (measure, beatInMeasure). Convert to a 1-indexed
-  // absolute beat counter so we can index into the beat-level sequence.
-  const absoluteBeat =
-    isPlaying && state.measureInSession > 0
-      ? (state.measureInSession - 1) * beatsPerMeasure + state.beatInMeasure
-      : 1;
+  // The metronome exposes absoluteBeat (1-indexed; counts both play
+  // AND prep beats) directly now so we can index into the beat-level
+  // sequence without recomputing from measure + beatInMeasure (which
+  // are play-only after the prep-window refactor).
+  const absoluteBeat = isPlaying && state.absoluteBeat > 0
+    ? state.absoluteBeat
+    : 1;
   const currentEntry = useMemo<SequenceBeat>(
     () =>
       sequence[absoluteBeat - 1] ??

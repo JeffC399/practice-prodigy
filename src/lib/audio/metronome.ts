@@ -18,12 +18,27 @@ export type MetronomePhase = "idle" | "count-in" | "playing";
 
 export type MetronomeState = {
   phase: MetronomePhase;
-  /** 1-indexed beat within the current measure (1..beatsPerMeasure). 0 when idle. */
+  /**
+   * 1-indexed beat within the current PLAY measure (1..beatsPerMeasure).
+   * 0 during idle, count-in, AND inter-chord prep beats — prep beats are
+   * "outside" the measure structure so the next chord change always lands
+   * on beat 1 of a new measure.
+   */
   beatInMeasure: number;
-  /** 1-indexed measure within the playing portion of the session. 0 during count-in/idle. */
+  /**
+   * 1-indexed PLAY measure within the playing portion of the session.
+   * Doesn't advance during prep beats (they don't consume measure slots).
+   * 0 during count-in/idle.
+   */
   measureInSession: number;
   /** Beats of count-in still remaining (decrements after each count-in beat). 0 when not in count-in. */
   countInBeatsRemaining: number;
+  /**
+   * 1-indexed absolute beat within the playing portion of the session.
+   * Counts BOTH play and prep beats — used by the drill UI to index into
+   * the beat-level sequence. 0 during idle/count-in.
+   */
+  absoluteBeat: number;
 };
 
 export type MetronomeConfig = {
@@ -56,6 +71,7 @@ const IDLE_STATE: MetronomeState = {
   beatInMeasure: 0,
   measureInSession: 0,
   countInBeatsRemaining: 0,
+  absoluteBeat: 0,
 };
 
 class MetronomeEngine {
@@ -73,6 +89,14 @@ class MetronomeEngine {
    * count-in; non-negative values = playing. Increments once per scheduled beat.
    */
   private beatCounter = 0;
+  /**
+   * Counter that advances ONLY on play beats (skips prep/transition beats).
+   * Drives the user-visible measure / beat-in-measure so that after a prep
+   * window, the next play beat is beat 1 of a new measure (regardless of
+   * how many prep beats slipped in between). Starts at -1; first play beat
+   * increments to 0.
+   */
+  private playBeatCounter = 0;
 
   subscribe(listener: MetronomeListener): () => void {
     this.listeners.add(listener);
@@ -132,15 +156,16 @@ class MetronomeEngine {
     }
   }
 
-  private beatInMeasureFor(counter: number): number {
+  /**
+   * Beat-in-measure for COUNT-IN beats only (counter < 0). Negative
+   * counter shifted by total countInBeats so the very first count-in
+   * beat reads as beat 1 of a count-in measure.
+   */
+  private beatInMeasureForCountIn(counter: number): number {
     if (!this.config) return 1;
     const m = this.config.beatsPerMeasure;
     const shifted = counter + this.config.countInBeats;
-    return ((shifted % m) + m) % m + 1; // 1-indexed
-  }
-
-  private isDownbeatFor(counter: number): boolean {
-    return this.beatInMeasureFor(counter) === 1;
+    return ((shifted % m) + m) % m + 1;
   }
 
   async start(config: MetronomeConfig): Promise<void> {
@@ -152,6 +177,7 @@ class MetronomeEngine {
 
     this.config = config;
     this.beatCounter = -config.countInBeats - 1; // first scheduled tick increments to -countInBeats
+    this.playBeatCounter = -1; // first play tick increments to 0
 
     const transport = Tone.getTransport();
     transport.bpm.value = config.bpm;
@@ -164,6 +190,7 @@ class MetronomeEngine {
         beatInMeasure: 0,
         measureInSession: 0,
         countInBeatsRemaining: config.countInBeats,
+        absoluteBeat: 0,
       });
     } else {
       this.setState({
@@ -171,6 +198,7 @@ class MetronomeEngine {
         beatInMeasure: 0,
         measureInSession: 1,
         countInBeatsRemaining: 0,
+        absoluteBeat: 0,
       });
     }
 
@@ -194,53 +222,95 @@ class MetronomeEngine {
         return;
       }
 
-      const isDownbeat = this.isDownbeatFor(counter);
-
-      // Audio: trigger click at the exact sample-accurate time.
-      //   counter < 0                       → dry stick-click (initial count-in)
-      //   counter >= 0 + style "transition" → dry stick-click (inter-chord prep)
-      //   counter >= 0 + style "play"       → tonal sine click (playing)
-      // Inter-chord prep reuses the stick-click voice so the user can
-      // tell aurally whether they're supposed to be playing or just
-      // resting before the next chord.
+      // Classify this beat.
       const isPrep =
         counter >= 0 &&
         (config.beatStyles?.[counter] ?? "play") === "transition";
-      if (counter < 0 || isPrep) {
-        const synth = isDownbeat
+      const isPlay = counter >= 0 && !isPrep;
+      if (isPlay) this.playBeatCounter += 1;
+
+      // Downbeat semantics:
+      //   - count-in (counter < 0): use raw counter % beatsPerMeasure
+      //     so the count-in's own first beat reads as a downbeat.
+      //   - play: use playBeatCounter so the first play beat after a
+      //     prep window is beat 1 of a new measure (the user explicitly
+      //     wants chord changes to land on downbeats regardless of
+      //     intervening prep beats).
+      //   - prep: not really a measure beat — always use the softer
+      //     offbeat stick-click for consistency across the prep window.
+      const m = config.beatsPerMeasure;
+      const isCountInDownbeat =
+        counter < 0 && this.beatInMeasureForCountIn(counter) === 1;
+      const isPlayDownbeat = isPlay && this.playBeatCounter % m === 0;
+
+      // Audio: trigger click at the exact sample-accurate time.
+      if (counter < 0) {
+        const synth = isCountInDownbeat
           ? this.countInDownbeatSynth
           : this.countInOffbeatSynth;
         synth?.triggerAttackRelease("32n", time);
+      } else if (isPrep) {
+        // All prep beats use the softer offbeat stick-click — keeps the
+        // prep window aurally consistent so the user can lock onto it.
+        this.countInOffbeatSynth?.triggerAttackRelease("32n", time);
       } else {
-        const synth = isDownbeat ? this.downbeatSynth : this.offbeatSynth;
-        const pitch = isDownbeat ? "C6" : "G5";
+        const synth = isPlayDownbeat ? this.downbeatSynth : this.offbeatSynth;
+        const pitch = isPlayDownbeat ? "C6" : "G5";
         synth?.triggerAttackRelease(pitch, "32n", time);
       }
 
       // Visual: schedule UI update tied to the same sample-accurate time.
-      Tone.getDraw().schedule(() => this.advanceUiState(counter), time);
+      // Capture the play counter snapshot for this beat so a delayed draw
+      // doesn't see a stale value if subsequent beats have advanced it.
+      const playBeatSnapshot = this.playBeatCounter;
+      Tone.getDraw().schedule(
+        () => this.advanceUiState(counter, playBeatSnapshot),
+        time,
+      );
     }, beatNotation);
 
     transport.start();
   }
 
-  private advanceUiState(counter: number): void {
+  private advanceUiState(counter: number, playBeat: number): void {
     if (!this.config) return;
-    const beatInMeasure = this.beatInMeasureFor(counter);
-
     if (counter < 0) {
+      // Count-in beat. beatInMeasure of 0 keeps the BeatDots dim during
+      // count-in (the count-in label + sticky-click sound carry the
+      // signal); leaving them all dim matches the prep-beat treatment.
       this.setState({
         phase: "count-in",
-        beatInMeasure,
+        beatInMeasure: 0,
         measureInSession: 0,
         countInBeatsRemaining: -counter,
+        absoluteBeat: 0,
       });
-    } else {
+      return;
+    }
+    const m = this.config.beatsPerMeasure;
+    const isPrep =
+      (this.config.beatStyles?.[counter] ?? "play") === "transition";
+    if (isPrep) {
+      // Prep beat — keep measureInSession at the last-played value,
+      // beatInMeasure = 0 (no active dot). The next play beat will
+      // resume at beat 1 of a fresh measure.
+      const measure = playBeat >= 0 ? Math.floor(playBeat / m) + 1 : 0;
       this.setState({
         phase: "playing",
-        beatInMeasure,
-        measureInSession: Math.floor(counter / this.config.beatsPerMeasure) + 1,
+        beatInMeasure: 0,
+        measureInSession: measure,
         countInBeatsRemaining: 0,
+        absoluteBeat: counter + 1,
+      });
+    } else {
+      // Play beat — derived from the play-only counter so chord
+      // changes always land on beat 1.
+      this.setState({
+        phase: "playing",
+        beatInMeasure: (playBeat % m) + 1,
+        measureInSession: Math.floor(playBeat / m) + 1,
+        countInBeatsRemaining: 0,
+        absoluteBeat: counter + 1,
       });
     }
   }
