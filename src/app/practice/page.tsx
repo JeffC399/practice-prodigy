@@ -1,10 +1,12 @@
 "use client";
 
+import * as Tone from "tone";
 import { previewPlayer } from "@/lib/audio/preview";
 import {
   ARPEGGIO_PATTERNS,
   ARPEGGIO_PATTERN_DESCRIPTIONS,
   ARPEGGIO_PATTERN_DISPLAY_NAMES,
+  ARPEGGIO_PATTERN_SHORT_NAMES,
   generateArpeggio,
   type ArpeggioPattern,
 } from "@/lib/music/arpeggio";
@@ -35,8 +37,10 @@ import {
   TIME_SIGNATURES,
   usePracticeConfig,
 } from "@/lib/state/practice-config";
+import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
 import {
   ArrowRight,
+  Bookmark,
   ChevronDown,
   ListChecks,
   Play,
@@ -80,7 +84,9 @@ export default function PracticeSetupPage() {
     setRandomizeChords,
     setNotationStyle,
     setArpeggioPattern,
+    loadConfig,
   } = config;
+  const drillsLib = useDrillsLibrary();
 
   // Quick-build wizard state. Sets aren't directly reactive in
   // React, so each toggle creates a fresh Set.
@@ -136,6 +142,37 @@ export default function PracticeSetupPage() {
 
   const [isPreviewing, setIsPreviewing] = useState(false);
   const previewIdRef = useRef(0);
+
+  // Save-as-drill inline form state.
+  const [isSavingDrill, setIsSavingDrill] = useState(false);
+  const [saveDrillName, setSaveDrillName] = useState("");
+
+  const handleSaveDrill = () => {
+    const name = saveDrillName.trim();
+    if (!name) return;
+    // Strip the store's setter functions; PracticeConfig only has data fields.
+    const snapshot = JSON.parse(
+      JSON.stringify(config),
+    ) as import("@/lib/state/practice-config").PracticeConfig;
+    drillsLib.saveDrill(name, snapshot);
+    setSaveDrillName("");
+    setIsSavingDrill(false);
+  };
+
+  const handleLoadDrill = async (drill: Drill) => {
+    // Unlock audio context while still inside the click gesture so the
+    // session page's autostart can play immediately. Browsers gate
+    // audio to user gestures; without this, a Quick Start launch from
+    // a fresh tab would land on the drill page muted until the user
+    // pressed Start manually.
+    try {
+      await Tone.start();
+    } catch {
+      // Silent — if the unlock fails, the user just has to hit Start manually.
+    }
+    loadConfig(drill.config);
+    router.push("/practice/session?autostart=1");
+  };
 
   const firstChord = config.chordPool[0];
 
@@ -214,10 +251,34 @@ export default function PracticeSetupPage() {
             </h1>
             <p className="text-sm text-muted-foreground">
               Build a chord pool, pick a pattern, set tempo and meter. The
-              drill cycles through the pool one chord per measure. Settings
-              are remembered.
+              drill cycles through the pool one chord per measure. Save
+              your setup as a drill for one-click access next time.
             </p>
           </div>
+
+          {/* Quick Start — saved drills launch with one click. */}
+          <FormSection title="Quick start">
+            {drillsLib.drills.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground">
+                No saved drills yet. Configure one below and click{" "}
+                <span className="font-medium text-foreground">
+                  Save as drill
+                </span>{" "}
+                to add it here for one-click launch.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {drillsLib.drills.map((drill) => (
+                  <DrillCard
+                    key={drill.id}
+                    drill={drill}
+                    onLoad={handleLoadDrill}
+                    onDelete={drillsLib.deleteDrill}
+                  />
+                ))}
+              </div>
+            )}
+          </FormSection>
 
           {/* Sequence preview. Min-height keeps the card stable across
               notation styles even when the pool has just one chord. */}
@@ -745,20 +806,140 @@ export default function PracticeSetupPage() {
           </FormSection>
 
           {/* Start button */}
-          <button
-            type="button"
-            onClick={handleStart}
-            className="group flex items-center justify-between gap-3 rounded-lg bg-primary px-6 py-4 text-base font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
-          >
-            <span>Start practice</span>
-            <ArrowRight
-              className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
-              aria-hidden="true"
-            />
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleStart}
+              className="group flex items-center justify-between gap-3 rounded-lg bg-primary px-6 py-4 text-base font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
+            >
+              <span>Start practice</span>
+              <ArrowRight
+                className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </button>
+
+            {/* Save current setup as a Drill */}
+            {isSavingDrill ? (
+              <div className="flex flex-col gap-2 rounded-md border border-border bg-background/40 p-3">
+                <label
+                  htmlFor="drill-name"
+                  className="text-xs font-mono uppercase tracking-wider text-muted-foreground"
+                >
+                  Name this drill
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="drill-name"
+                    type="text"
+                    value={saveDrillName}
+                    onChange={(e) => setSaveDrillName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveDrill();
+                      if (e.key === "Escape") {
+                        setSaveDrillName("");
+                        setIsSavingDrill(false);
+                      }
+                    }}
+                    placeholder="e.g. Morning warm-up"
+                    autoFocus
+                    className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveDrill}
+                    disabled={!saveDrillName.trim()}
+                    className="rounded-md border border-primary/40 bg-primary/15 px-4 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveDrillName("");
+                      setIsSavingDrill(false);
+                    }}
+                    className="rounded-md border border-border bg-background px-4 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSavingDrill(true)}
+                className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              >
+                <Bookmark className="h-4 w-4" aria-hidden="true" />
+                Save current setup as drill
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </main>
+  );
+}
+
+/** A saved drill rendered as a tile in the Quick Start section. */
+function DrillCard({
+  drill,
+  onLoad,
+  onDelete,
+}: {
+  drill: Drill;
+  onLoad: (drill: Drill) => void;
+  onDelete: (id: string) => void;
+}) {
+  const c = drill.config;
+  const flags: string[] = [];
+  if (c.randomizeChords) flags.push("Random");
+  if (c.repeatIndefinitely) flags.push("Loop ∞");
+  const lengthLabel = c.repeatIndefinitely
+    ? `${c.drillMeasures} measures / rep`
+    : `${c.drillMeasures} × ${c.repetitions} = ${c.drillMeasures * c.repetitions} measures`;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => onLoad(drill)}
+        className="group block w-full rounded-lg border border-border bg-background/40 p-3 text-left transition-colors hover:border-primary/60 hover:bg-primary/5"
+      >
+        <div className="flex items-center gap-2 pr-7">
+          <Play
+            className="h-4 w-4 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <span className="flex-1 truncate font-medium text-foreground">
+            {drill.name}
+          </span>
+        </div>
+        <div className="mt-1.5 truncate font-mono text-xs text-muted-foreground">
+          {c.chordPool.length} chord{c.chordPool.length === 1 ? "" : "s"} ·{" "}
+          {ARPEGGIO_PATTERN_SHORT_NAMES[c.arpeggioPattern]} · ♩={c.bpm} ·{" "}
+          {c.timeSignature.beatsPerMeasure}/{c.timeSignature.beatUnit}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {lengthLabel}
+          {flags.length > 0 && (
+            <>
+              {" · "}
+              <span className="text-primary">{flags.join(" · ")}</span>
+            </>
+          )}
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={() => onDelete(drill.id)}
+        aria-label={`Delete drill ${drill.name}`}
+        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-border/60 hover:text-foreground transition-colors"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </div>
   );
 }
 

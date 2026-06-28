@@ -135,6 +135,8 @@ type PracticeConfigStore = PracticeConfig & {
   setRandomizeChords: (randomize: boolean) => void;
   setNotationStyle: (style: ChordNotationStyle) => void;
   setArpeggioPattern: (pattern: ArpeggioPattern) => void;
+  /** Replace every config field with values from a loaded Drill. */
+  loadConfig: (config: PracticeConfig) => void;
   resetToDefaults: () => void;
 };
 
@@ -210,6 +212,10 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
       setRandomizeChords: (randomizeChords) => set({ randomizeChords }),
       setNotationStyle: (notationStyle) => set({ notationStyle }),
       setArpeggioPattern: (arpeggioPattern) => set({ arpeggioPattern }),
+      loadConfig: (config) =>
+        // Spread defaults first so a drill saved under an older schema
+        // (missing fields added later) still loads with sensible values.
+        set(() => ({ ...DEFAULT_CONFIG, ...config })),
       resetToDefaults: () => set(DEFAULT_CONFIG),
     }),
     {

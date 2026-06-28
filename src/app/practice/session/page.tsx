@@ -7,7 +7,7 @@ import { generateSequence } from "@/lib/music/sequence";
 import { usePracticeConfig } from "@/lib/state/practice-config";
 import { Play, Square, Settings2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Chord } from "@/lib/music/chord";
 
 /**
@@ -86,6 +86,25 @@ export default function PracticeSessionPage() {
     [nextChord, config.notationStyle],
   );
 
+  // Quick Start auto-launch — if we arrived with ?autostart=1 (set by a
+  // Quick Start card click on /practice), start the drill once we mount.
+  // Read the URL directly so the page stays statically prerendered
+  // (useSearchParams would force us into a Suspense boundary).
+  const [autoStartFromUrl, setAutoStartFromUrl] = useState(false);
+  const autoStartFiredRef = useRef(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("autostart") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAutoStartFromUrl(true);
+      // Strip the flag so a refresh doesn't auto-relaunch the drill.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("autostart");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
   const handleToggle = () => {
     if (isIdle) {
       // Fresh sequence at every Start. For randomizeChords this
@@ -112,6 +131,19 @@ export default function PracticeSessionPage() {
       stop();
     }
   };
+
+  // Trigger autostart once when conditions align. The ref ensures we
+  // never fire twice even if handleToggle's identity changes.
+  useEffect(() => {
+    if (autoStartFromUrl && isIdle && !autoStartFiredRef.current) {
+      autoStartFiredRef.current = true;
+      handleToggle();
+    }
+    // handleToggle has unstable identity; the ref guards against
+    // duplicate invocation, so exhaustive-deps is intentionally
+    // omitted here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStartFromUrl, isIdle]);
 
   const isLongForm = config.notationStyle === "long-form";
 
