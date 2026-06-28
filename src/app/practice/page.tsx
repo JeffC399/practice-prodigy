@@ -117,36 +117,17 @@ export default function PracticeSetupPage() {
   // Has the live config diverged from the saved drill's config? Drives
   // the "Discard changes" affordance and the Save changes button state.
   //
-  // Both sides are spread-from-defaults FIRST so:
-  //   (a) key order is deterministic across both objects (JSON.stringify
-  //       reflects insertion order in V8)
-  //   (b) a drill saved under an older PracticeConfig schema (missing
-  //       newer fields) doesn't read as "dirty" just because the live
-  //       config has been auto-filled with defaults during loadConfig.
+  // Both sides go through extractPracticeConfig so:
+  //   (a) key order is identical (insertion order from the same code path)
+  //   (b) UI-state fields like loadedDrillId that may have leaked into
+  //       older saved drills get stripped on both sides
+  //   (c) drills saved under older schemas fall back to defaults for
+  //       newly-added fields — not "dirty" from the schema change alone
   const isDirty = useMemo(() => {
     if (!editingDrill) return false;
-    const live: PracticeConfig = {
-      ...DEFAULT_PRACTICE_CONFIG,
-      chordPool: config.chordPool,
-      orderingStrategy: config.orderingStrategy,
-      measuresPerChord: config.measuresPerChord,
-      drillMeasures: config.drillMeasures,
-      repetitions: config.repetitions,
-      repeatIndefinitely: config.repeatIndefinitely,
-      randomizeChords: config.randomizeChords,
-      bpm: config.bpm,
-      timeSignature: config.timeSignature,
-      countInMeasures: config.countInMeasures,
-      notationStyle: config.notationStyle,
-      arpeggioPattern: config.arpeggioPattern,
-      transitionUnit: config.transitionUnit,
-      transitionCount: config.transitionCount,
-    };
-    const saved: PracticeConfig = {
-      ...DEFAULT_PRACTICE_CONFIG,
-      ...editingDrill.config,
-    };
-    return JSON.stringify(live) !== JSON.stringify(saved);
+    const live = JSON.stringify(extractPracticeConfig(config));
+    const saved = JSON.stringify(extractPracticeConfig(editingDrill.config));
+    return live !== saved;
   }, [editingDrill, config]);
 
   // Quick-build wizard state. Sets aren't directly reactive in
@@ -214,12 +195,61 @@ export default function PracticeSetupPage() {
   const [chordPoolOpen, setChordPoolOpen] = useState(false);
   const poolRowRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  /** Take a snapshot of the current PracticeConfig (data fields only). */
-  const snapshotConfig = () => {
-    return JSON.parse(
-      JSON.stringify(config),
-    ) as import("@/lib/state/practice-config").PracticeConfig;
-  };
+  /**
+   * Pull a clean PracticeConfig out of any source (the live store or a
+   * saved drill's config). Listing fields explicitly is the only safe
+   * way to avoid UI-state fields like `loadedDrillId` leaking into a
+   * saved drill snapshot — JSON.stringify-the-whole-store dropped
+   * functions but didn't strip non-PracticeConfig data, which caused
+   * the Save changes button to read as dirty on fresh drill loads.
+   */
+  const extractPracticeConfig = (
+    source: Partial<PracticeConfig>,
+  ): PracticeConfig => ({
+    ...DEFAULT_PRACTICE_CONFIG,
+    ...(source.chordPool !== undefined && { chordPool: source.chordPool }),
+    ...(source.orderingStrategy !== undefined && {
+      orderingStrategy: source.orderingStrategy,
+    }),
+    ...(source.measuresPerChord !== undefined && {
+      measuresPerChord: source.measuresPerChord,
+    }),
+    ...(source.drillMeasures !== undefined && {
+      drillMeasures: source.drillMeasures,
+    }),
+    ...(source.repetitions !== undefined && {
+      repetitions: source.repetitions,
+    }),
+    ...(source.repeatIndefinitely !== undefined && {
+      repeatIndefinitely: source.repeatIndefinitely,
+    }),
+    ...(source.randomizeChords !== undefined && {
+      randomizeChords: source.randomizeChords,
+    }),
+    ...(source.bpm !== undefined && { bpm: source.bpm }),
+    ...(source.timeSignature !== undefined && {
+      timeSignature: source.timeSignature,
+    }),
+    ...(source.countInMeasures !== undefined && {
+      countInMeasures: source.countInMeasures,
+    }),
+    ...(source.notationStyle !== undefined && {
+      notationStyle: source.notationStyle,
+    }),
+    ...(source.arpeggioPattern !== undefined && {
+      arpeggioPattern: source.arpeggioPattern,
+    }),
+    ...(source.transitionUnit !== undefined && {
+      transitionUnit: source.transitionUnit,
+    }),
+    ...(source.transitionCount !== undefined && {
+      transitionCount: source.transitionCount,
+    }),
+  });
+
+  /** Snapshot of the live PracticeConfig (no loadedDrillId, no setters). */
+  const snapshotConfig = (): PracticeConfig =>
+    extractPracticeConfig(config);
 
   const handleSaveDrill = () => {
     const name = saveDrillName.trim();
