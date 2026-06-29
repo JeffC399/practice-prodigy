@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { ServiceWorkerRegister } from "@/components/shell/service-worker-register";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
 import "./globals.css";
@@ -19,6 +20,15 @@ export const metadata: Metadata = {
     "music education",
     "jazz",
   ],
+  // PWA: ensures iOS treats this as an installable app and uses the
+  // standalone window chrome (no Safari bar) when launched from Home
+  // Screen. Android reads display: standalone from the manifest, but
+  // iOS Safari still needs these apple-mobile-* hints.
+  appleWebApp: {
+    capable: true,
+    title: "Practice Prodigy",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
@@ -49,6 +59,7 @@ export default function RootLayout({
         <SiteHeader />
         {children}
         <SiteFooter />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
