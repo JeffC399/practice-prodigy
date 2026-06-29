@@ -64,6 +64,17 @@ export default function PracticeSessionPage() {
   const isIdle = state.phase === "idle";
   const isCountIn = state.phase === "count-in";
   const isPlaying = state.phase === "playing";
+  // "Preparation" means EITHER the start-of-session count-in OR an
+  // inter-chord transition window. Both are aurally identical (the
+  // metronome uses the stick-click for both), so the visual treatment
+  // should match: dimmed brightness, "Get ready" label, pulsing ring.
+  // Computed once here and threaded everywhere the visual prep signals
+  // need to fire.
+  //
+  // Note: isCountIn alone was driving the visual treatment before, which
+  // missed the inter-chord prep case entirely — the badge stayed
+  // "Measure N" and the panels stayed in their playing state even
+  // though the metronome was audibly in a prep window.
 
   const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
   const countInBeats = config.countInMeasures * beatsPerMeasure;
@@ -134,6 +145,12 @@ export default function PracticeSessionPage() {
    */
   const bigDisplayChord = currentEntry.chord;
   const isTransition = currentEntry.kind === "transition";
+  // Unified "preparation" predicate — true during the start-of-session
+  // count-in AND during inter-chord transition windows. Drives the
+  // visual prep signals (Get ready label, pulsing ring, dim opacity,
+  // badge styling) so they fire whenever the metronome is aurally
+  // in stick-click mode, not just at session start.
+  const isPreparing = isCountIn || (isPlaying && isTransition);
 
   const nextChord = useMemo(
     () => findNextDifferentChord(sequence, absoluteBeat - 1),
@@ -522,6 +539,7 @@ export default function PracticeSessionPage() {
             isIdle={isIdle}
             isCountIn={isCountIn}
             isPlaying={isPlaying}
+            isTransition={isPlaying && isTransition}
             countInRemaining={state.countInBeatsRemaining}
             measure={state.measureInSession}
             totalMeasures={totalPlayMeasures}
@@ -534,7 +552,7 @@ export default function PracticeSessionPage() {
               patternLabel={ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
               isLongForm={isLongForm}
               isIdle={isIdle}
-              isCountIn={isCountIn}
+              isPreparing={isPreparing}
               // Keys are chord-RUN-stable (not beat-stable) so the
               // fade-and-rise animation only retriggers when the
               // chord actually changes — not on every beat tick.
@@ -582,7 +600,7 @@ export default function PracticeSessionPage() {
                     isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
                   }`}
                   style={{
-                    opacity: isIdle ? 0.4 : isCountIn ? 0.8 : 1,
+                    opacity: isIdle ? 0.4 : isPreparing ? 0.8 : 1,
                   }}
                   aria-live="polite"
                 >
@@ -631,6 +649,7 @@ function PhaseBadge({
   isIdle,
   isCountIn,
   isPlaying,
+  isTransition,
   countInRemaining,
   measure,
   totalMeasures,
@@ -638,16 +657,29 @@ function PhaseBadge({
   isIdle: boolean;
   isCountIn: boolean;
   isPlaying: boolean;
+  /** True only when playing AND currently in a prep/transition beat. */
+  isTransition: boolean;
   countInRemaining: number;
   measure: number;
   /** Null when the drill loops indefinitely. */
   totalMeasures: number | null;
 }) {
+  // Unified "preparation" treatment: pulsing dot + amber label text
+  // applies during count-in AND during inter-chord transition windows.
+  // Both use the stick-click sound; the badge mirrors that.
+  const isPreparing = isCountIn || isTransition;
   let label: string;
   if (isIdle) {
     label = "Ready";
   } else if (isCountIn) {
     label = `Count-in · ${countInRemaining}`;
+  } else if (isTransition) {
+    // Keep the measure context (so the user knows where they are in
+    // the drill) but append "· Get ready" to match the aural signal.
+    label =
+      totalMeasures === null
+        ? `Measure ${measure} · Get ready`
+        : `Measure ${measure} of ${totalMeasures} · Get ready`;
   } else if (isPlaying) {
     label =
       totalMeasures === null
@@ -661,14 +693,14 @@ function PhaseBadge({
     <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
       <span
         className={`inline-block h-2 w-2 rounded-full transition-colors ${
-          isPlaying
-            ? "bg-primary"
-            : isCountIn
-              ? "bg-primary animate-pulse"
+          isPreparing
+            ? "bg-primary animate-pulse"
+            : isPlaying
+              ? "bg-primary"
               : "bg-muted-foreground/40"
         }`}
       />
-      <span className={isCountIn ? "text-primary" : ""}>{label}</span>
+      <span className={isPreparing ? "text-primary" : ""}>{label}</span>
     </div>
   );
 }
@@ -739,7 +771,7 @@ function TwoPaneDisplay({
   patternLabel,
   isLongForm,
   isIdle,
-  isCountIn,
+  isPreparing,
   currentChordKey,
   nextChordKey,
 }: {
@@ -748,7 +780,12 @@ function TwoPaneDisplay({
   patternLabel: string;
   isLongForm: boolean;
   isIdle: boolean;
-  isCountIn: boolean;
+  /**
+   * True when the metronome is in EITHER count-in or inter-chord
+   * transition mode. Drives the unified visual prep treatment so the
+   * panels look the same whenever the audio is in stick-click mode.
+   */
+  isPreparing: boolean;
   currentChordKey: string;
   nextChordKey: string;
 }) {
@@ -766,7 +803,7 @@ function TwoPaneDisplay({
   // playing = 1.0 — both transitions clearly LIGHT UP the chord.
   // Combined with the per-panel label swap ("Now" -> "Get ready") and
   // the pulsing border on the Now panel, count-in is unmissable.
-  const containerOpacity = isIdle ? 0.4 : isCountIn ? 0.8 : 1;
+  const containerOpacity = isIdle ? 0.4 : isPreparing ? 0.8 : 1;
   return (
     <div
       className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 transition-opacity duration-300"
@@ -774,9 +811,9 @@ function TwoPaneDisplay({
       aria-live="polite"
     >
       <TwoPanePanel
-        label={isCountIn ? "Get ready" : "Now"}
+        label={isPreparing ? "Get ready" : "Now"}
         emphasized
-        pulsing={isCountIn}
+        pulsing={isPreparing}
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
