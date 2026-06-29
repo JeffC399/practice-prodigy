@@ -118,10 +118,10 @@ export const MODULES: ModuleEntry[] = [
     id: "lead-sheets",
     name: "Lead Sheet Builder",
     shortName: "Lead Sheets",
-    status: "sketch",
-    bucket: "later",
+    status: "designed",
+    bucket: "next",
     description:
-      "Drag chords onto a 4-bars-per-line canvas. Simple (chords-only) + advanced (chords + melody + lyrics). Print + share.",
+      "Author lead sheets: title + composer + credits, key + time + tempo + style, chords + melody + lyrics, form markings (repeats, D.C. / D.S. / Coda), print + share. Basic tier designed (see LEAD-SHEET-DESIGN.md); advanced tier (MusicXML, multi-voice, mid-piece key/time changes) sketched separately.",
     icon: FileMusic,
   },
   {
