@@ -229,6 +229,7 @@ type ConcreteStartFrom = (typeof CONCRETE_START_FROMS)[number];
 export function buildStartFromForSession(
   startFrom: PatternStartFrom,
   totalMeasures: number,
+  options: { lockFirstMeasureToRoot?: boolean } = {},
 ): ConcreteStartFrom[] {
   if (startFrom !== "random") {
     return Array.from({ length: totalMeasures }, () => startFrom);
@@ -236,13 +237,19 @@ export function buildStartFromForSession(
   // Random: roll one of root/3rd/5th/7th per measure. Clamping to the
   // pattern's actual rotation count happens at apply time (so e.g.
   // Triads ignore "7th" rolls by wrapping back to root).
-  return Array.from(
-    { length: totalMeasures },
-    () =>
-      CONCRETE_START_FROMS[
-        Math.floor(Math.random() * CONCRETE_START_FROMS.length)
-      ],
-  );
+  const out: ConcreteStartFrom[] = [];
+  for (let i = 0; i < totalMeasures; i++) {
+    if (i === 0 && options.lockFirstMeasureToRoot) {
+      out.push("root");
+    } else {
+      out.push(
+        CONCRETE_START_FROMS[
+          Math.floor(Math.random() * CONCRETE_START_FROMS.length)
+        ],
+      );
+    }
+  }
+  return out;
 }
 
 /**

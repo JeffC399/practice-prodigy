@@ -453,38 +453,46 @@ export function CustomPatternEditor({
 }
 
 /**
- * Play a rhythm-aware preview of the in-progress draft. Pitched notes
- * get scheduled by their cumulative start beat × beatDurationMs; rests
- * advance the clock without scheduling audio. The previewPlayer's
- * `playArpeggio` schedules a flat one-note-per-beat sequence, so for
- * rhythm preview we'd need a richer audio path. For v1, we approximate
- * by playing the pitched-only sequence at the right BPM so the user
- * hears the pitches in order (durations affect when each note STARTS
- * relative to the next, not their sustain). Truly rhythm-accurate
- * preview is a polish follow-up.
+ * Play a rhythm-aware preview of the in-progress draft. Builds a list
+ * of events with explicit startBeat + durationBeats and hands them to
+ * previewPlayer.playRhythm — which schedules each event at the right
+ * transport position and sustains it for its full duration. Rests
+ * advance the clock without scheduling audio.
  */
 async function playRhythmPreview(
   notes: PatternNote[],
   myId: number,
   onComplete: () => void,
 ) {
-  const pitched = notes.filter(
-    (n): n is Extract<PatternNote, { kind: "note" }> => n.kind === "note",
-  );
-  if (pitched.length === 0) {
+  if (notes.length === 0) {
     onComplete();
     return;
   }
-  const midiNotes = pitched.map((n) =>
-    semitoneToMidi(PREVIEW_CHORD.root, PREVIEW_ANCHOR_OCTAVE, n.semitones),
-  );
-  await previewPlayer.playArpeggio(midiNotes, PREVIEW_BPM);
-  // Pattern's total beat length (including rests) is what determines
-  // the on-screen "is previewing" state duration.
-  const totalBeats = notes.reduce(
-    (acc, n) => acc + NOTE_DURATION_BEATS[n.duration],
-    0,
-  );
+  const events: Array<{
+    midi: number | null;
+    startBeat: number;
+    durationBeats: number;
+  }> = [];
+  let cursor = 0;
+  for (const n of notes) {
+    const dur = NOTE_DURATION_BEATS[n.duration];
+    if (n.kind === "rest") {
+      events.push({ midi: null, startBeat: cursor, durationBeats: dur });
+    } else {
+      events.push({
+        midi: semitoneToMidi(
+          PREVIEW_CHORD.root,
+          PREVIEW_ANCHOR_OCTAVE,
+          n.semitones,
+        ),
+        startBeat: cursor,
+        durationBeats: dur,
+      });
+    }
+    cursor += dur;
+  }
+  await previewPlayer.playRhythm(events, PREVIEW_BPM);
+  const totalBeats = cursor;
   const totalMs = (totalBeats * (60 / PREVIEW_BPM) + 0.4) * 1000;
   setTimeout(onComplete, totalMs);
   void myId;

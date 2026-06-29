@@ -150,6 +150,8 @@ export default function PracticeSetupPage() {
     setPatternOrdering,
     setPatternDisplay,
     setPatternStartFrom,
+    setLockFirstMeasureToRoot,
+    cleanDeadPatternRefs,
     loadConfig,
     loadedDrillId,
     setLoadedDrillId,
@@ -171,6 +173,16 @@ export default function PracticeSetupPage() {
     open: boolean;
     editingId: string | null;
   }>({ open: false, editingId: null });
+  // Sweep dead pattern references whenever the custom-patterns library
+  // changes (or on mount). Custom patterns get deleted from the library
+  // via the editor's Delete button; without this sweep the patternPool
+  // keeps the orphan ID and the setup-screen dropdown shows a
+  // "Deleted pattern" entry. The action is idempotent — it bails out
+  // when nothing would change, so this effect never loops.
+  useEffect(() => {
+    const validIds = new Set(customPatterns.map((p) => p.id));
+    cleanDeadPatternRefs(validIds);
+  }, [customPatterns, cleanDeadPatternRefs]);
   const resume = useResumeSession();
   const resumable = isResumable(resume.active);
   const handleResumeClick = async () => {
@@ -1401,6 +1413,28 @@ export default function PracticeSetupPage() {
                       Custom patterns and Triads&rsquo; 7th slot ignore the
                       modifier (Triads wrap to root).
                     </p>
+                    {/* Random sub-option: lock the very first measure of
+                        the drill to root so the user has a footing at
+                        session start before subsequent measures
+                        randomize. Only meaningful when Random is the
+                        active value. */}
+                    {config.patternStartFrom === "random" && anyBuiltIn && (
+                      <label className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.lockFirstMeasureToRoot}
+                          onChange={(e) =>
+                            setLockFirstMeasureToRoot(e.target.checked)
+                          }
+                          className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                        />
+                        <span>
+                          Lock first measure to root — gives you a footing
+                          at the start before subsequent measures
+                          randomize.
+                        </span>
+                      </label>
+                    )}
                   </div>
                 );
               })()}

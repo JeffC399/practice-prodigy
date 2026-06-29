@@ -423,7 +423,9 @@ export default function PracticeSessionPage() {
           ),
         );
         setActiveStartFroms(
-          buildStartFromForSession(config.patternStartFrom, playMeasures),
+          buildStartFromForSession(config.patternStartFrom, playMeasures, {
+          lockFirstMeasureToRoot: config.lockFirstMeasureToRoot,
+        }),
         );
         const beatStyles = r.sequence.map((b) => b.kind);
         void start({
@@ -543,6 +545,7 @@ export default function PracticeSessionPage() {
         patternOrdering: config.patternOrdering,
         patternDisplay: config.patternDisplay,
         patternStartFrom: config.patternStartFrom,
+        lockFirstMeasureToRoot: config.lockFirstMeasureToRoot,
       },
       drillName: currentDrill?.name ?? null,
       loadedDrillId: config.loadedDrillId,

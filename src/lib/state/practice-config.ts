@@ -5,10 +5,12 @@ import type {
   PatternStartFrom,
 } from "@/lib/music/arpeggio";
 import {
+  isBuiltInPattern,
   LEGACY_BUILT_IN_PATTERN_IDS,
   PATTERN_START_FROM_OPTIONS,
   remapLegacyPatternId,
 } from "@/lib/music/arpeggio";
+import { isCustomPatternId } from "@/lib/music/custom-patterns";
 import type { Chord, PitchClass, ChordQuality } from "@/lib/music/chord";
 import type { ChordNotationStyle } from "@/lib/music/render-chord";
 import type { PatternDisplay } from "./user-prefs";
@@ -206,6 +208,13 @@ export type PracticeConfig = {
    * Default "root" preserves pre-Phase-15 behavior.
    */
   patternStartFrom: PatternStartFrom;
+  /**
+   * When `patternStartFrom === "random"`, lock the FIRST measure of the
+   * drill to root (regardless of the random roll) so the user has a
+   * footing at session start. Subsequent measures still randomize.
+   * No-op for non-random Start-from values.
+   */
+  lockFirstMeasureToRoot: boolean;
 };
 
 export const BPM_MIN = 30;
@@ -257,6 +266,7 @@ export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   // can pin a specific display mode by setting this explicitly.
   patternDisplay: null,
   patternStartFrom: "root",
+  lockFirstMeasureToRoot: false,
 };
 
 type PracticeConfigStore = PracticeConfig & {
@@ -307,6 +317,18 @@ type PracticeConfigStore = PracticeConfig & {
   setPatternDisplay: (display: PatternDisplay | null) => void;
   /** Set the Start-from modifier (root/3rd/5th/7th/random). */
   setPatternStartFrom: (startFrom: PatternStartFrom) => void;
+  /** Toggle the Lock-first-measure-to-root sub-option of Random Start-from. */
+  setLockFirstMeasureToRoot: (lock: boolean) => void;
+  /**
+   * Sweep the patternPool of dead references (custom pattern IDs that
+   * are no longer in the custom-patterns library). Pass the set of
+   * currently-valid custom IDs from `useCustomPatternsLibrary`. If the
+   * primary `arpeggioPattern` was a dead ref, falls back to the first
+   * surviving pool entry; if the pool ends up empty, resets to the
+   * default ("7th-chords"). Safe to call on every render — the action
+   * checks for actual change before mutating to avoid render loops.
+   */
+  cleanDeadPatternRefs: (validCustomIds: ReadonlySet<string>) => void;
   /** Replace every config field with values from a loaded Drill. */
   loadConfig: (config: PracticeConfig) => void;
   resetToDefaults: () => void;
@@ -454,6 +476,36 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
       setPatternOrdering: (patternOrdering) => set({ patternOrdering }),
       setPatternDisplay: (patternDisplay) => set({ patternDisplay }),
       setPatternStartFrom: (patternStartFrom) => set({ patternStartFrom }),
+      setLockFirstMeasureToRoot: (lockFirstMeasureToRoot) =>
+        set({ lockFirstMeasureToRoot }),
+      cleanDeadPatternRefs: (validCustomIds) =>
+        set((state) => {
+          const isAlive = (id: string): boolean =>
+            isBuiltInPattern(id) ||
+            (isCustomPatternId(id) && validCustomIds.has(id));
+          const cleanedPool = state.patternPool.filter(isAlive);
+          // Pool ended up empty? Reset to the default so the drill is
+          // still playable. Otherwise keep the survivors.
+          const nextPool =
+            cleanedPool.length > 0
+              ? cleanedPool
+              : [DEFAULT_PRACTICE_CONFIG.arpeggioPattern];
+          const nextPrimary = isAlive(state.arpeggioPattern)
+            ? state.arpeggioPattern
+            : nextPool[0];
+          // Idempotency: bail out when nothing would change. This is
+          // critical because the action runs inside a setup-page effect
+          // that subscribes to the customs library — without this guard
+          // we'd loop on every render.
+          const poolChanged =
+            cleanedPool.length !== state.patternPool.length;
+          const primaryChanged = nextPrimary !== state.arpeggioPattern;
+          if (!poolChanged && !primaryChanged) return {};
+          return {
+            patternPool: nextPool,
+            arpeggioPattern: nextPrimary,
+          };
+        }),
       loadConfig: (config) =>
         // Spread defaults first so a drill saved under an older schema
         // (missing fields added later) still loads with sensible values.
@@ -485,7 +537,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 12,
+      version: 13,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -610,6 +662,14 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
             )
           ) {
             next.patternStartFrom = "root";
+          }
+        }
+
+        // v12 → v13: Phase 16 added Lock-first-measure-to-root for
+        // Random Start-from. Default false preserves prior behavior.
+        if (version <= 12) {
+          if (typeof next.lockFirstMeasureToRoot !== "boolean") {
+            next.lockFirstMeasureToRoot = false;
           }
         }
 

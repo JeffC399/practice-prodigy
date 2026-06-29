@@ -88,6 +88,56 @@ class PreviewPlayer {
     transport.start();
   }
 
+  /**
+   * Rhythm-aware preview. Each event carries its own `startBeat` (offset
+   * from preview start, in beats) and `durationBeats` (sustain length).
+   * Notes with `midi: null` are rests — they advance the clock without
+   * scheduling audio. Used by the custom-pattern editor so the audition
+   * matches the rhythm the user just wrote.
+   */
+  async playRhythm(
+    events: Array<{ midi: number | null; startBeat: number; durationBeats: number }>,
+    bpm: number,
+  ): Promise<void> {
+    if (events.length === 0) return;
+
+    await Tone.start();
+    this.ensureSynth();
+    this.cancel();
+
+    const transport = Tone.getTransport();
+    transport.bpm.value = bpm;
+    transport.position = 0;
+
+    const beatSeconds = 60 / bpm;
+    let totalBeats = 0;
+    for (const e of events) {
+      const endBeat = e.startBeat + e.durationBeats;
+      if (endBeat > totalBeats) totalBeats = endBeat;
+      if (e.midi === null) continue;
+      const midi = e.midi;
+      // Sustain a hair shorter than the note's full duration so back-
+      // to-back notes don't bleed into each other on the same synth.
+      const sustainSeconds = Math.max(0.05, e.durationBeats * beatSeconds * 0.9);
+      const id = transport.schedule((time) => {
+        this.synth?.triggerAttackRelease(
+          Tone.Frequency(midi, "midi").toFrequency(),
+          sustainSeconds,
+          time,
+        );
+      }, LEAD_IN_SECONDS + e.startBeat * beatSeconds);
+      this.scheduledEvents.push(id);
+    }
+
+    const totalSeconds =
+      LEAD_IN_SECONDS + totalBeats * beatSeconds + 0.5;
+    this.endEvent = transport.scheduleOnce(() => {
+      this.cancel();
+    }, totalSeconds);
+
+    transport.start();
+  }
+
   /** Cancel any in-flight preview. Safe to call when nothing is playing. */
   cancel(): void {
     const transport = Tone.getTransport();
