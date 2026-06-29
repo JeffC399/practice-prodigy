@@ -9,6 +9,7 @@ import {
   CUSTOM_PATTERN_MAX_NOTES,
   DEFAULT_NOTE_DURATION,
   NOTE_DURATION_BEATS,
+  NOTE_DURATION_GLYPHS,
   NOTE_DURATION_LABELS,
   NOTE_DURATIONS,
   REST_LABEL,
@@ -291,11 +292,11 @@ export function CustomPatternEditor({
                         <button
                           type="button"
                           onClick={() => cycleNoteDuration(idx)}
-                          className="rounded-full bg-background/40 border border-border px-1.5 py-0 text-[10px] font-mono text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
-                          aria-label={`Change duration (currently ${n.duration})`}
-                          title="Click to cycle duration"
+                          className="rounded-full bg-background/40 border border-border px-1.5 py-0 text-[12px] leading-none text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                          aria-label={`Change duration (currently ${NOTE_DURATION_LABELS[n.duration]})`}
+                          title={`${NOTE_DURATION_LABELS[n.duration]} — click to cycle`}
                         >
-                          {NOTE_DURATION_LABELS[n.duration]}
+                          {NOTE_DURATION_GLYPHS[n.duration]}
                         </button>
                         <button
                           type="button"
@@ -340,7 +341,7 @@ export function CustomPatternEditor({
                   onChange={(e) =>
                     setNextDuration(e.target.value as NoteDuration)
                   }
-                  className="rounded border border-border bg-background px-1 py-0 text-[11px] font-mono ml-1"
+                  className="rounded border border-border bg-background px-1.5 py-0 text-[11px] ml-1"
                   aria-label="Default duration for newly-added notes"
                 >
                   {NOTE_DURATIONS.map((d) => (

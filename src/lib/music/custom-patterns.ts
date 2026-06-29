@@ -45,15 +45,41 @@ export const NOTE_DURATION_BEATS: Record<NoteDuration, number> = {
   "whole": 4,
 };
 
+/**
+ * Long, unambiguous labels for the editor's duration dropdown.
+ * Spell out "Dotted" so the dotted-vs-undotted distinction is
+ * unmissable (was previously "qtr." vs "qtr" — easy to misread).
+ */
 export const NOTE_DURATION_LABELS: Record<NoteDuration, string> = {
-  "16th": "16th",
-  "8th": "8th",
-  "dotted8th": "8th.",
-  "quarter": "qtr",
-  "dottedQuarter": "qtr.",
-  "half": "half",
-  "dottedHalf": "half.",
-  "whole": "whole",
+  "16th": "Sixteenth",
+  "8th": "Eighth",
+  "dotted8th": "Dotted eighth",
+  "quarter": "Quarter",
+  "dottedQuarter": "Dotted quarter",
+  "half": "Half",
+  "dottedHalf": "Dotted half",
+  "whole": "Whole",
+};
+
+/**
+ * Compact musical-notation glyphs for chip-style displays where
+ * vertical real estate is tight. Uses standard Unicode music symbols:
+ *   ♬ beamed sixteenth pair (closest BMP analog to a 16th)
+ *   ♪ eighth note
+ *   ♩ quarter note
+ *   𝅗𝅥 half note (supplementary plane, may render as box on legacy fonts)
+ *   𝅝 whole note (supplementary plane)
+ * Dotted variants append a literal "." per standard notation.
+ */
+export const NOTE_DURATION_GLYPHS: Record<NoteDuration, string> = {
+  "16th": "♬",
+  "8th": "♪",
+  "dotted8th": "♪.",
+  "quarter": "♩",
+  "dottedQuarter": "♩.",
+  "half": "𝅗𝅥",
+  "dottedHalf": "𝅗𝅥.",
+  "whole": "𝅝",
 };
 
 /** Default duration assigned to a freshly-tapped note in the editor. */
