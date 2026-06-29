@@ -362,6 +362,13 @@ export default function PracticeSessionPage() {
     };
   }, [isPlaying, activeSequence, currentBeatIndex]);
 
+  // Chord-run start indexes — used to key the two-pane animations so
+  // the panels only retrigger their fade-and-rise when the actual
+  // chord changes, not on every beat. Falls back to 0 when idle / no
+  // sequence yet so the keys stay stable through the count-in.
+  const currentRunStart = jumpTargets.restart ?? 0;
+  const nextRunStart = jumpTargets.skip ?? 0;
+
   // "Restart" at the very first beat of the very first chord is a no-op,
   // so we disable it there — otherwise the button is always available
   // during play, including transition beats (where it restarts the just-
@@ -524,21 +531,27 @@ export default function PracticeSessionPage() {
             <TwoPaneDisplay
               currentLabel={currentLabel}
               nextLabel={nextLabel}
+              patternLabel={ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
               isLongForm={isLongForm}
               isIdle={isIdle}
-              currentChordKey={`${bigDisplayChord.root}-${bigDisplayChord.quality}-${absoluteBeat - 1}`}
+              isCountIn={isCountIn}
+              // Keys are chord-RUN-stable (not beat-stable) so the
+              // fade-and-rise animation only retriggers when the
+              // chord actually changes — not on every beat tick.
+              currentChordKey={`${bigDisplayChord.root}-${bigDisplayChord.quality}-${currentRunStart}`}
               nextChordKey={
                 nextChord
-                  ? `${nextChord.root}-${nextChord.quality}-${absoluteBeat - 1}`
+                  ? `${nextChord.root}-${nextChord.quality}-${nextRunStart}`
                   : "none"
               }
             />
           ) : (
             <>
-              {/* NEXT preview always shows the upcoming different chord —
-                  this is the only place the user reads what's coming. The
-                  metronome's stick-click sound during prep beats does the
-                  "don't play yet" signaling, not the visual. */}
+              {/* NEXT preview always shows the upcoming different chord +
+                  the pattern to play over it — this is the only place the
+                  user reads what's coming. The metronome's stick-click
+                  sound during prep beats does the "don't play yet"
+                  signaling, not the visual. */}
               {nextLabel && !isIdle ? (
                 <div className="flex items-center gap-3 font-mono text-sm text-muted-foreground">
                   <span className="uppercase tracking-wider text-xs">Next</span>
@@ -549,6 +562,9 @@ export default function PracticeSessionPage() {
                   >
                     {nextLabel}
                   </span>
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                    {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+                  </span>
                 </div>
               ) : (
                 <div className="h-6" aria-hidden="true" />
@@ -556,14 +572,29 @@ export default function PracticeSessionPage() {
 
               {/* Big chord — anchored on the most-recently-PLAYED chord.
                   Stays put during prep beats so the visual stays calm; the
-                  audio change (stick-click) is the prep signal. */}
-              <div
-                className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center text-foreground ${
-                  isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
-                } ${isIdle ? "opacity-40" : "opacity-100"}`}
-                aria-live="polite"
-              >
-                {currentLabel}
+                  audio change (stick-click) is the prep signal. Opacity
+                  dims slightly during count-in to mirror the aural
+                  stick-click distinction. */}
+              <div className="flex flex-col items-center gap-3">
+                <div
+                  className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center text-foreground ${
+                    isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
+                  } ${
+                    isIdle
+                      ? "opacity-40"
+                      : isCountIn
+                        ? "opacity-70"
+                        : "opacity-100"
+                  }`}
+                  aria-live="polite"
+                >
+                  {currentLabel}
+                </div>
+                {!isIdle && (
+                  <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+                  </span>
+                )}
               </div>
             </>
           )}
@@ -689,34 +720,51 @@ function BeatDots({
  * "Now" panel gets a subtle primary-tinted background to anchor focus
  * (which one to play right now).
  *
- * AnimatePresence + per-chord keys produce a fade-and-rise transition
- * when chords change. The animation is intentionally short (180ms) so
- * mid-drill chord changes never feel like the UI is lagging behind
- * the audio.
+ * AnimatePresence keyed on the chord-RUN-start index (not beat index)
+ * produces a fade-and-rise transition ONLY when the chord changes,
+ * not on every beat. Earlier versions keyed on the beat index, which
+ * made both panels blink every tick — visually loud and conflicted
+ * with the per-beat dot animation that's already there.
+ *
+ * Count-in vs play distinction: the panels render at 70% opacity
+ * during count-in (mirroring the aural distinction the stick-click
+ * makes vs the tonal click). Snaps to 100% when play begins.
+ *
+ * Pattern label: each panel shows the arpeggio pattern below the
+ * chord so the user always sees both "what chord" and "what pattern
+ * to play over it" at a glance. Once pattern-pool ordering ships, the
+ * label will differ per panel; for now it's the global pattern.
  */
 function TwoPaneDisplay({
   currentLabel,
   nextLabel,
+  patternLabel,
   isLongForm,
   isIdle,
+  isCountIn,
   currentChordKey,
   nextChordKey,
 }: {
   currentLabel: string;
   nextLabel: string | null;
+  patternLabel: string;
   isLongForm: boolean;
   isIdle: boolean;
+  isCountIn: boolean;
   currentChordKey: string;
   nextChordKey: string;
 }) {
   const chordTextSize = isLongForm
     ? "text-3xl sm:text-4xl"
     : "text-7xl sm:text-8xl";
+  const containerOpacity = isIdle
+    ? "opacity-50"
+    : isCountIn
+      ? "opacity-70"
+      : "opacity-100";
   return (
     <div
-      className={`grid w-full grid-cols-1 gap-6 sm:grid-cols-2 ${
-        isIdle ? "opacity-50" : "opacity-100"
-      } transition-opacity duration-200`}
+      className={`grid w-full grid-cols-1 gap-6 sm:grid-cols-2 ${containerOpacity} transition-opacity duration-200`}
       aria-live="polite"
     >
       <TwoPanePanel label="Now" emphasized>
@@ -727,9 +775,16 @@ function TwoPaneDisplay({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className={`font-mono font-semibold leading-none tracking-tight text-foreground text-center ${chordTextSize}`}
+            className="flex flex-col items-center gap-2"
           >
-            {currentLabel}
+            <span
+              className={`font-mono font-semibold leading-none tracking-tight text-foreground text-center ${chordTextSize}`}
+            >
+              {currentLabel}
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              {patternLabel}
+            </span>
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
@@ -741,9 +796,16 @@ function TwoPaneDisplay({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className={`font-mono font-semibold leading-none tracking-tight text-foreground/70 text-center ${chordTextSize}`}
+            className="flex flex-col items-center gap-2"
           >
-            {nextLabel ?? "—"}
+            <span
+              className={`font-mono font-semibold leading-none tracking-tight text-foreground/70 text-center ${chordTextSize}`}
+            >
+              {nextLabel ?? "—"}
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+              {nextLabel ? patternLabel : " "}
+            </span>
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
