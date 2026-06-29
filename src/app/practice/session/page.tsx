@@ -20,6 +20,8 @@ import {
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary } from "@/lib/state/drills-library";
 import { useResumeSession } from "@/lib/state/resume-session";
+import { useUserPrefs } from "@/lib/state/user-prefs";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Minus,
   Play,
@@ -50,6 +52,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export default function PracticeSessionPage() {
   const config = usePracticeConfig();
   const drillsLib = useDrillsLibrary();
+  const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const { state, start, stop } = useMetronome();
 
   // When the user launched this session from a Quick Start card, anchor
@@ -482,36 +485,53 @@ export default function PracticeSessionPage() {
             totalMeasures={totalPlayMeasures}
           />
 
-          {/* NEXT preview always shows the upcoming different chord —
-              this is the only place the user reads what's coming. The
-              metronome's stick-click sound during prep beats does the
-              "don't play yet" signaling, not the visual. */}
-          {nextLabel && !isIdle ? (
-            <div className="flex items-center gap-3 font-mono text-sm text-muted-foreground">
-              <span className="uppercase tracking-wider text-xs">Next</span>
-              <span
-                className={`font-semibold text-foreground/80 ${
-                  isLongForm ? "text-lg" : "text-2xl"
-                } leading-none tracking-tight`}
-              >
-                {nextLabel}
-              </span>
-            </div>
+          {practiceLayout === "two-pane" ? (
+            <TwoPaneDisplay
+              currentLabel={currentLabel}
+              nextLabel={nextLabel}
+              isLongForm={isLongForm}
+              isIdle={isIdle}
+              currentChordKey={`${bigDisplayChord.root}-${bigDisplayChord.quality}-${absoluteBeat - 1}`}
+              nextChordKey={
+                nextChord
+                  ? `${nextChord.root}-${nextChord.quality}-${absoluteBeat - 1}`
+                  : "none"
+              }
+            />
           ) : (
-            <div className="h-6" aria-hidden="true" />
-          )}
+            <>
+              {/* NEXT preview always shows the upcoming different chord —
+                  this is the only place the user reads what's coming. The
+                  metronome's stick-click sound during prep beats does the
+                  "don't play yet" signaling, not the visual. */}
+              {nextLabel && !isIdle ? (
+                <div className="flex items-center gap-3 font-mono text-sm text-muted-foreground">
+                  <span className="uppercase tracking-wider text-xs">Next</span>
+                  <span
+                    className={`font-semibold text-foreground/80 ${
+                      isLongForm ? "text-lg" : "text-2xl"
+                    } leading-none tracking-tight`}
+                  >
+                    {nextLabel}
+                  </span>
+                </div>
+              ) : (
+                <div className="h-6" aria-hidden="true" />
+              )}
 
-          {/* Big chord — anchored on the most-recently-PLAYED chord.
-              Stays put during prep beats so the visual stays calm; the
-              audio change (stick-click) is the prep signal. */}
-          <div
-            className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center text-foreground ${
-              isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
-            } ${isIdle ? "opacity-40" : "opacity-100"}`}
-            aria-live="polite"
-          >
-            {currentLabel}
-          </div>
+              {/* Big chord — anchored on the most-recently-PLAYED chord.
+                  Stays put during prep beats so the visual stays calm; the
+                  audio change (stick-click) is the prep signal. */}
+              <div
+                className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center text-foreground ${
+                  isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
+                } ${isIdle ? "opacity-40" : "opacity-100"}`}
+                aria-live="polite"
+              >
+                {currentLabel}
+              </div>
+            </>
+          )}
 
           <BeatDots
             beatsPerMeasure={beatsPerMeasure}
@@ -621,5 +641,106 @@ function BeatDots({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Two-pane practice layout — equally-weighted Now / Next panels side
+ * by side. Selected from the user-prefs store; renders in place of the
+ * single-pane "big chord + small NEXT preview" arrangement.
+ *
+ * Both panels get the same dimensions + typography so the Next chord
+ * reads as comfortable read-ahead rather than peripheral hint. The
+ * "Now" panel gets a subtle primary-tinted background to anchor focus
+ * (which one to play right now).
+ *
+ * AnimatePresence + per-chord keys produce a fade-and-rise transition
+ * when chords change. The animation is intentionally short (180ms) so
+ * mid-drill chord changes never feel like the UI is lagging behind
+ * the audio.
+ */
+function TwoPaneDisplay({
+  currentLabel,
+  nextLabel,
+  isLongForm,
+  isIdle,
+  currentChordKey,
+  nextChordKey,
+}: {
+  currentLabel: string;
+  nextLabel: string | null;
+  isLongForm: boolean;
+  isIdle: boolean;
+  currentChordKey: string;
+  nextChordKey: string;
+}) {
+  const chordTextSize = isLongForm
+    ? "text-3xl sm:text-4xl"
+    : "text-7xl sm:text-8xl";
+  return (
+    <div
+      className={`grid w-full grid-cols-1 gap-6 sm:grid-cols-2 ${
+        isIdle ? "opacity-50" : "opacity-100"
+      } transition-opacity duration-200`}
+      aria-live="polite"
+    >
+      <TwoPanePanel label="Now" emphasized>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={currentChordKey}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className={`font-mono font-semibold leading-none tracking-tight text-foreground text-center ${chordTextSize}`}
+          >
+            {currentLabel}
+          </motion.div>
+        </AnimatePresence>
+      </TwoPanePanel>
+      <TwoPanePanel label="Next">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={nextChordKey}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className={`font-mono font-semibold leading-none tracking-tight text-foreground/70 text-center ${chordTextSize}`}
+          >
+            {nextLabel ?? "—"}
+          </motion.div>
+        </AnimatePresence>
+      </TwoPanePanel>
+    </div>
+  );
+}
+
+function TwoPanePanel({
+  label,
+  emphasized,
+  children,
+}: {
+  label: string;
+  emphasized?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className={`flex flex-col items-center justify-center gap-4 rounded-xl border px-6 py-10 min-h-[14rem] ${
+        emphasized
+          ? "border-primary/40 bg-primary/5"
+          : "border-border bg-card/40"
+      }`}
+    >
+      <span
+        className={`font-mono text-[11px] uppercase tracking-wider ${
+          emphasized ? "text-primary" : "text-muted-foreground"
+        }`}
+      >
+        {label}
+      </span>
+      {children}
+    </section>
   );
 }

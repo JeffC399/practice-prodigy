@@ -57,6 +57,12 @@ import {
   useResumeSession,
 } from "@/lib/state/resume-session";
 import {
+  PRACTICE_LAYOUTS,
+  PRACTICE_LAYOUT_DESCRIPTIONS,
+  PRACTICE_LAYOUT_DISPLAY_NAMES,
+  useUserPrefs,
+} from "@/lib/state/user-prefs";
+import {
   ArrowRight,
   Bookmark,
   Check,
@@ -130,6 +136,8 @@ export default function PracticeSetupPage() {
     setLoadedDrillId,
   } = config;
   const drillsLib = useDrillsLibrary();
+  const practiceLayout = useUserPrefs((s) => s.practiceLayout);
+  const setPracticeLayout = useUserPrefs((s) => s.setPracticeLayout);
   const resume = useResumeSession();
   const resumable = isResumable(resume.active);
   const handleResumeClick = async () => {
@@ -1449,6 +1457,52 @@ export default function PracticeSetupPage() {
                 </>
               )}
             </p>
+          </CollapsibleSection>
+
+          {/* Display — user-global preference for how the drill screen
+              renders. Lives in user-prefs, NOT PracticeConfig, so the
+              choice applies across every drill (it's a personal viewing
+              preference, not a per-drill property). Phase 9 Settings
+              will surface this same choice on /settings as well. */}
+          <CollapsibleSection
+            title="Display"
+            summary={PRACTICE_LAYOUT_DISPLAY_NAMES[practiceLayout]}
+          >
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {PRACTICE_LAYOUTS.map((layout) => {
+                  const selected = layout === practiceLayout;
+                  return (
+                    <button
+                      key={layout}
+                      type="button"
+                      onClick={() => setPracticeLayout(layout)}
+                      className={`flex flex-col gap-1 rounded-md border px-3 py-2 text-left transition-colors ${
+                        selected
+                          ? "border-primary/50 bg-primary/10"
+                          : "border-border bg-background hover:border-primary/40"
+                      }`}
+                    >
+                      <span
+                        className={`text-sm font-medium ${
+                          selected ? "text-primary" : "text-foreground"
+                        }`}
+                      >
+                        {PRACTICE_LAYOUT_DISPLAY_NAMES[layout]}
+                      </span>
+                      <span className="text-xs text-muted-foreground leading-relaxed">
+                        {PRACTICE_LAYOUT_DESCRIPTIONS[layout]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Applies to the drill screen. This setting is yours
+                personally — it doesn&rsquo;t save with each drill, so
+                you can change it once and every drill respects it.
+              </p>
+            </div>
           </CollapsibleSection>
 
           {/* Pre-flight preview — shows the first chords the user will
