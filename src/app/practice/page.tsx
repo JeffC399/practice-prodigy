@@ -1627,16 +1627,26 @@ function Select(
  * defining it inside the function caused a temporal-dead-zone crash
  * when the isDirty useMemo (declared earlier in the same scope) tried
  * to call it.
+ *
+ * NOTE: chordPoolIds is intentionally NOT copied from `source` and is
+ * always pinned to a constant placeholder. The IDs are an internal
+ * view artifact for drag-tracking (parallel to chordPool, regenerated
+ * non-deterministically by loadConfig when the saved length doesn't
+ * match the live pool). Two configs with identical chordPools but
+ * different slot IDs behave identically — so the IDs must be excluded
+ * from both the save snapshot and the dirty comparison, otherwise a
+ * just-loaded drill spuriously reports "dirty" (chordPoolIds drift on
+ * load → live differs from saved → Save changes button mis-highlights
+ * on every load of a drill saved before Phase 2's id-array was added).
  */
+const EMPTY_IDS: string[] = [];
 function extractPracticeConfig(
   source: Partial<PracticeConfig>,
 ): PracticeConfig {
   return {
     ...DEFAULT_PRACTICE_CONFIG,
+    chordPoolIds: EMPTY_IDS,
     ...(source.chordPool !== undefined && { chordPool: source.chordPool }),
-    ...(source.chordPoolIds !== undefined && {
-      chordPoolIds: source.chordPoolIds,
-    }),
     ...(source.orderingStrategy !== undefined && {
       orderingStrategy: source.orderingStrategy,
     }),
