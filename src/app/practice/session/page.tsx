@@ -172,13 +172,28 @@ export default function PracticeSessionPage() {
   const isPreparing = isCountIn || (isPlaying && isTransition);
 
   // Per-measure pattern labels — drives the small "Arp 7ths" / "Scale
-  // Tones" subtitle under the Now and Next chord displays. For drills
-  // with patternPool length === 1 this is just the constant; for
-  // multi-pattern drills it changes per measure. During count-in or
-  // before Start, falls back to the pool's first entry.
-  const currentMeasureIdx = isPlaying
-    ? Math.max(0, state.measureInSession - 1)
-    : 0;
+  // Tones" subtitle under the Now and Next chord displays. The
+  // displayed pattern needs to match the displayed CHORD at each
+  // position, which means special-casing the inter-chord prep window:
+  //
+  //   - Idle / count-in: showing chord m1, so pattern = patterns[0]
+  //   - Playing measure N (non-transition): showing chord m_N, so
+  //     pattern = patterns[N - 1]
+  //   - Inter-chord prep BEFORE measure N+1: showing UPCOMING chord
+  //     m_{N+1} (bigDisplayChord already does this), so pattern =
+  //     patterns[N], which is state.measureInSession (it stayed at
+  //     N during prep because the engine pauses the measure counter
+  //     during transition beats).
+  //
+  // Earlier the index was `measureInSession - 1` even during prep,
+  // which lagged behind the chord display by one measure — chord
+  // moved to the upcoming one but the pattern was still showing the
+  // just-played one.
+  const currentMeasureIdx = !isPlaying
+    ? 0
+    : isTransition
+      ? state.measureInSession
+      : Math.max(0, state.measureInSession - 1);
   const nextMeasureIdx = currentMeasureIdx + 1;
   const fallbackPattern: ArpeggioPattern = config.patternPool[0] ?? config.arpeggioPattern;
   const currentPattern =
