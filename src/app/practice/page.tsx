@@ -239,6 +239,49 @@ export default function PracticeSetupPage() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const previewIdRef = useRef(0);
 
+  // Tap-tempo state. Each tap timestamps Date.now(); after 2+ taps we
+  // compute BPM from the average interval. A pause of >2s resets the
+  // buffer so a long delay doesn't pollute the running average.
+  const [tapTimes, setTapTimes] = useState<number[]>([]);
+  // Inactivity reset — clears the tap buffer after 2.5s of no taps so
+  // the next tap starts a fresh session. Cleared on every tap.
+  const tapResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+    };
+  }, []);
+
+  const handleTapTempo = () => {
+    const now = Date.now();
+    setTapTimes((prev) => {
+      // Reset if the previous tap was too long ago (drift / new session).
+      const fresh =
+        prev.length > 0 && now - prev[prev.length - 1] > 2000 ? [] : prev;
+      // Keep the last 8 taps — long enough to smooth the running average,
+      // short enough that tempo changes mid-tapping converge quickly.
+      const next = [...fresh, now].slice(-8);
+      if (next.length >= 2) {
+        const intervals: number[] = [];
+        for (let i = 1; i < next.length; i++) {
+          intervals.push(next[i] - next[i - 1]);
+        }
+        const avgMs =
+          intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const bpm = Math.round(60000 / avgMs);
+        // setBpm itself clamps to [BPM_MIN, BPM_MAX].
+        setBpm(bpm);
+      }
+      return next;
+    });
+    // (Re)arm the inactivity reset.
+    if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+    tapResetTimerRef.current = setTimeout(() => setTapTimes([]), 2500);
+  };
+
+  const handleHalveTempo = () => setBpm(Math.round(config.bpm / 2));
+  const handleDoubleTempo = () => setBpm(config.bpm * 2);
+
   // Save-as-drill inline form state.
   const [isSavingDrill, setIsSavingDrill] = useState(false);
   const [saveDrillName, setSaveDrillName] = useState("");
@@ -1174,6 +1217,57 @@ export default function PracticeSetupPage() {
                       ariaLabel="BPM (numeric)"
                       className="w-20"
                     />
+                  </div>
+                  {/* Tap tempo + halve/double row. Tap derives BPM from
+                      the user's tap interval (2+ taps required); halve
+                      and double snap to common woodshed tempos. */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleTapTempo}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        tapTimes.length > 0
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/40"
+                      }`}
+                      aria-label="Tap to set tempo"
+                    >
+                      <span>Tap tempo</span>
+                      {tapTimes.length > 0 && (
+                        <span className="font-mono tabular-nums text-[10px] opacity-80">
+                          {tapTimes.length === 1
+                            ? "tap again…"
+                            : `${tapTimes.length} taps`}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleHalveTempo}
+                      disabled={config.bpm <= BPM_MIN}
+                      aria-label="Halve tempo"
+                      title="Halve tempo (÷2)"
+                      className="rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      &divide;2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDoubleTempo}
+                      disabled={config.bpm >= BPM_MAX}
+                      aria-label="Double tempo"
+                      title="Double tempo (×2)"
+                      className="rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      &times;2
+                    </button>
+                    <p className="text-[11px] text-muted-foreground/80 leading-snug">
+                      {tapTimes.length === 0
+                        ? "Tap 2+ times to set tempo by feel."
+                        : tapTimes.length === 1
+                          ? "Got it — tap again to lock the tempo."
+                          : `Locked at ♪ = ${config.bpm}.`}
+                    </p>
                   </div>
                 </div>
               </FormField>
