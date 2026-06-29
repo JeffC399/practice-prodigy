@@ -573,19 +573,17 @@ export default function PracticeSessionPage() {
               {/* Big chord — anchored on the most-recently-PLAYED chord.
                   Stays put during prep beats so the visual stays calm; the
                   audio change (stick-click) is the prep signal. Opacity
-                  dims slightly during count-in to mirror the aural
-                  stick-click distinction. */}
+                  dims during count-in (set via inline style so Tailwind
+                  class purging can't silently drop it) to mirror the
+                  aural stick-click distinction. */}
               <div className="flex flex-col items-center gap-3">
                 <div
-                  className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-200 text-center text-foreground ${
+                  className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-300 text-center text-foreground ${
                     isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
-                  } ${
-                    isIdle
-                      ? "opacity-40"
-                      : isCountIn
-                        ? "opacity-70"
-                        : "opacity-100"
                   }`}
+                  style={{
+                    opacity: isIdle ? 0.4 : isCountIn ? 0.5 : 1,
+                  }}
                   aria-live="polite"
                 >
                   {currentLabel}
@@ -757,14 +755,15 @@ function TwoPaneDisplay({
   const chordTextSize = isLongForm
     ? "text-3xl sm:text-4xl"
     : "text-7xl sm:text-8xl";
-  const containerOpacity = isIdle
-    ? "opacity-50"
-    : isCountIn
-      ? "opacity-70"
-      : "opacity-100";
+  // Opacity applied via inline style (not Tailwind class) so the value
+  // is guaranteed to land regardless of class purging. Count-in gets a
+  // deeper dim than the initial "opacity-70 was too subtle to notice"
+  // pass — 0.5 reads as unmistakably "this is preparation."
+  const containerOpacity = isIdle ? 0.45 : isCountIn ? 0.5 : 1;
   return (
     <div
-      className={`grid w-full grid-cols-1 gap-6 sm:grid-cols-2 ${containerOpacity} transition-opacity duration-200`}
+      className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 transition-opacity duration-300"
+      style={{ opacity: containerOpacity }}
       aria-live="polite"
     >
       <TwoPanePanel label="Now" emphasized>
