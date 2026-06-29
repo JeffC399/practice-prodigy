@@ -353,6 +353,23 @@ class MetronomeEngine {
   }
 
   /**
+   * Play a single test click. Used by the setup-page "Test sound"
+   * button so users can verify audio is working before they commit to
+   * a drill. Unlocks the audio context on the user-gesture call and
+   * ensures the synths are loaded.
+   *
+   * Some browsers (older Safari, locked-down enterprise installs)
+   * can fail to play audio silently — this affordance lets the user
+   * catch that early, instead of pressing Start and wondering why
+   * the metronome doesn't sound.
+   */
+  async playTestClick(): Promise<void> {
+    await Tone.start();
+    this.ensureSynths();
+    this.downbeatSynth?.triggerAttackRelease("C6", "32n");
+  }
+
+  /**
    * Jump the engine's position to a specific 0-indexed beat in the
    * configured sequence. Used by the mid-drill controls (restart
    * current chord, skip to next chord, rewind one chord) — lets the

@@ -1,6 +1,7 @@
 "use client";
 
 import * as Tone from "tone";
+import { metronomeEngine } from "@/lib/audio/metronome";
 import { previewPlayer } from "@/lib/audio/preview";
 import {
   ARPEGGIO_PATTERNS,
@@ -77,6 +78,7 @@ import {
   Plus,
   Square,
   Trash2,
+  Volume2,
   X,
 } from "lucide-react";
 import {
@@ -289,6 +291,22 @@ export default function PracticeSetupPage() {
 
   const handleHalveTempo = () => setBpm(Math.round(config.bpm / 2));
   const handleDoubleTempo = () => setBpm(config.bpm * 2);
+
+  // Test sound — plays one metronome click so the user can verify
+  // audio is wired up before they commit to a drill. Useful for
+  // testers whose browser hasn't yet been gestured (some older Safari
+  // versions and locked-down enterprise installs can fail silently).
+  const [audioTestedAt, setAudioTestedAt] = useState<number | null>(null);
+  const handleTestSound = async () => {
+    try {
+      await metronomeEngine.playTestClick();
+      setAudioTestedAt(Date.now());
+      setTimeout(() => setAudioTestedAt(null), 2500);
+    } catch {
+      // Swallow — if the unlock fails the user has bigger problems
+      // than the metronome (browser audio is fully blocked).
+    }
+  };
 
   // Save-as-drill inline form state.
   const [isSavingDrill, setIsSavingDrill] = useState(false);
@@ -1268,6 +1286,22 @@ export default function PracticeSetupPage() {
                       className="rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       &times;2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTestSound}
+                      aria-label="Test sound"
+                      title="Play one click to confirm audio works"
+                      className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        audioTestedAt !== null
+                          ? "border-primary/40 bg-primary/15 text-primary"
+                          : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {audioTestedAt !== null
+                        ? "Played"
+                        : "Test sound"}
                     </button>
                     <p className="text-[11px] text-muted-foreground/80 leading-snug">
                       {tapTimes.length === 0

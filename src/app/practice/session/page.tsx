@@ -31,9 +31,18 @@ import {
   SkipBack,
   SkipForward,
   Square,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+/** Summary surfaced in the DrillCompleteOverlay on natural completion. */
+type CompletedSummary = {
+  drillName: string | null;
+  totalMeasures: number;
+  elapsedMs: number;
+  avgBpm: number;
+};
 
 /**
  * Active drill screen. Reads the active practice configuration from the
@@ -208,8 +217,27 @@ export default function PracticeSessionPage() {
 
   const resume = useResumeSession();
 
+  // Session-stats tracking — track session start time + BPM samples
+  // so we can present a "Drill complete!" summary card when a non-
+  // looping drill ends naturally. Refs (not state) for the trackers
+  // because they don't drive renders; useState for the summary
+  // itself because that DOES drive the overlay render.
+  const sessionStartRef = useRef<number | null>(null);
+  const bpmSamplesRef = useRef<number[]>([]);
+  // userStopped flips true when the user explicitly clicks Stop —
+  // distinguishes manual stop from natural completion. Cleared on
+  // every fresh Start.
+  const userStoppedRef = useRef(false);
+  const [completedSummary, setCompletedSummary] =
+    useState<CompletedSummary | null>(null);
+
   const handleToggle = () => {
     if (isIdle) {
+      // Reset session-stats tracking for the new drill.
+      sessionStartRef.current = Date.now();
+      bpmSamplesRef.current = [config.bpm];
+      userStoppedRef.current = false;
+      setCompletedSummary(null);
       // Resume path — start from a previously-interrupted session,
       // re-using its pre-rolled sequence (so random strategies don't
       // re-shuffle to a new chord at the resume position) and skipping
@@ -259,7 +287,10 @@ export default function PracticeSessionPage() {
       });
     } else {
       // User-pressed Stop is intentional cessation — don't offer this
-      // session for resume the next time they hit /practice.
+      // session for resume the next time they hit /practice, AND
+      // don't show the completion-stats overlay (that's reserved for
+      // drills the user played all the way through).
+      userStoppedRef.current = true;
       stop();
       resume.clear();
     }
@@ -343,6 +374,26 @@ export default function PracticeSessionPage() {
       // button branch in handleToggle ALSO clears; double-clear is
       // harmless.)
       resume.clear();
+      // If the drill ended WITHOUT the user pressing Stop AND the
+      // drill was fixed-length (not an indefinite loop), surface a
+      // stats overlay celebrating the finish.
+      if (!userStoppedRef.current && !config.repeatIndefinitely) {
+        const start = sessionStartRef.current ?? Date.now();
+        const elapsedMs = Date.now() - start;
+        const samples = bpmSamplesRef.current;
+        const avgBpm =
+          samples.length > 0
+            ? Math.round(
+                samples.reduce((a, b) => a + b, 0) / samples.length,
+              )
+            : config.bpm;
+        setCompletedSummary({
+          drillName: currentDrill?.name ?? null,
+          totalMeasures: config.drillMeasures * config.repetitions,
+          elapsedMs,
+          avgBpm,
+        });
+      }
     }
     prevPhaseRef.current = state.phase;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -371,6 +422,17 @@ export default function PracticeSessionPage() {
     config.setBpm(next);
     metronomeEngine.setBpm(next);
   };
+
+  // (Session stats refs/state are declared earlier in the component
+  // body — above handleToggle — so React's immutability lint sees the
+  // useState declaration before any reference to its setter.)
+
+  // Sample the live BPM every time it changes during play so we can
+  // average it for the stats card. Skips during idle / count-in.
+  useEffect(() => {
+    if (!isPlaying) return;
+    bpmSamplesRef.current.push(config.bpm);
+  }, [isPlaying, config.bpm]);
 
   // Mid-drill jump targets — computed once per render against the live
   // sequence so the button enabled/disabled states stay accurate as the
@@ -553,6 +615,30 @@ export default function PracticeSessionPage() {
             totalMeasures={totalPlayMeasures}
           />
 
+          {/* Progress bar — peripheral indicator of how far through a
+              fixed-length drill the user is. Hidden during count-in /
+              prep (the chord display does the heavy lifting then) and
+              hidden entirely for indefinite loops (no total to track
+              progress against). Thin and unobtrusive; sits below the
+              PhaseBadge so the eye can glance without leaving the
+              drill area. */}
+          {isPlaying &&
+            !isTransition &&
+            totalPlayMeasures !== null &&
+            totalPlayMeasures > 0 && (
+              <div
+                className="h-1 w-full max-w-md overflow-hidden rounded-full bg-border/60"
+                aria-hidden="true"
+              >
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{
+                    width: `${Math.min(100, (state.measureInSession / totalPlayMeasures) * 100)}%`,
+                  }}
+                />
+              </div>
+            )}
+
           {practiceLayout === "two-pane" ? (
             <TwoPaneDisplay
               currentLabel={currentLabel}
@@ -650,7 +736,128 @@ export default function PracticeSessionPage() {
           </button>
         </div>
       </div>
+      {completedSummary && (
+        <DrillCompleteOverlay
+          summary={completedSummary}
+          onPracticeAgain={() => {
+            setCompletedSummary(null);
+            handleToggle();
+          }}
+          onDismiss={() => setCompletedSummary(null)}
+        />
+      )}
     </main>
+  );
+}
+
+/**
+ * Drill-complete summary overlay — celebratory wrap-up when a fixed-
+ * length (non-looping) drill ends naturally. Stays on top of the
+ * drill screen until the user dismisses or presses Practice again.
+ *
+ * Reuses dismiss patterns from the feedback modal: Esc closes, click
+ * outside closes, explicit X button. The "Practice again" button
+ * resets stats tracking and re-fires handleToggle for a fresh run.
+ */
+function DrillCompleteOverlay({
+  summary,
+  onPracticeAgain,
+  onDismiss,
+}: {
+  summary: CompletedSummary;
+  onPracticeAgain: () => void;
+  onDismiss: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDismiss();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
+
+  const minutes = Math.floor(summary.elapsedMs / 60000);
+  const seconds = Math.round((summary.elapsedMs % 60000) / 1000);
+  const elapsedLabel =
+    minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-background/85 backdrop-blur-sm px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="drill-complete-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onDismiss();
+      }}
+    >
+      <div className="flex w-full max-w-md flex-col gap-5 rounded-lg border border-primary/40 bg-card p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
+              Drill complete
+            </span>
+            <h2
+              id="drill-complete-title"
+              className="text-xl font-semibold text-foreground"
+            >
+              {summary.drillName ?? "Nice work!"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-background/60 hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <dl className="grid grid-cols-3 gap-3">
+          <StatItem label="Measures" value={String(summary.totalMeasures)} />
+          <StatItem label="Time" value={elapsedLabel} />
+          <StatItem
+            label="Avg BPM"
+            value={`♩=${summary.avgBpm}`}
+          />
+        </dl>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Link
+            href="/practice"
+            onClick={onDismiss}
+            className="rounded-md border border-border bg-background px-4 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+          >
+            Back to setup
+          </Link>
+          <button
+            type="button"
+            onClick={onPracticeAgain}
+            className="rounded-md border border-primary/40 bg-primary/20 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/30 transition-colors"
+          >
+            Practice again
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-md border border-border bg-background px-3 py-2 text-center">
+      <dt className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="font-mono text-sm font-semibold text-foreground tabular-nums">
+        {value}
+      </dd>
+    </div>
   );
 }
 
@@ -733,17 +940,31 @@ function BeatDots({
         const baseColor = isTransition
           ? "bg-primary/40"
           : "bg-primary";
+        // Beat-1 punch — when the downbeat fires during normal play
+        // (not transition), an extra "ping" ring radiates outward
+        // around the dot. Gives a third visual signal of the meter
+        // (alongside the existing scale-up and the audio click) for
+        // users who want to lock to the beat visually.
+        const showDownbeatPunch =
+          isActive && isDownbeat && !isTransition;
         return (
           <div
             key={beatNumber}
-            className={`h-3 w-3 rounded-full transition-all duration-100 ${
-              isActive
-                ? isDownbeat
-                  ? `${baseColor} scale-150`
-                  : `${isTransition ? "bg-primary/30" : "bg-primary/80"} scale-125`
-                : "bg-muted-foreground/30 scale-100"
-            }`}
-          />
+            className="relative flex h-3 w-3 items-center justify-center"
+          >
+            <div
+              className={`absolute inset-0 rounded-full transition-all duration-100 ${
+                isActive
+                  ? isDownbeat
+                    ? `${baseColor} scale-150`
+                    : `${isTransition ? "bg-primary/30" : "bg-primary/80"} scale-125`
+                  : "bg-muted-foreground/30 scale-100"
+              }`}
+            />
+            {showDownbeatPunch && (
+              <span className="absolute inset-0 rounded-full bg-primary opacity-70 animate-ping" />
+            )}
+          </div>
         );
       })}
     </div>
@@ -856,17 +1077,21 @@ function TwoPaneDisplay({
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
-      {/* Next panel — during prep, dims further (on top of the
-          container's 0.5 dim) so the eye is pulled to the Now panel.
-          Net result: Now ~50% bright with pulsing ring, Next ~25%
-          bright with no ring. Information stays available; focus is
-          unambiguous. Hide-entirely would create layout shift; this
-          preserves the chord-after-next info without competing for
-          attention. */}
-      <div
-        style={{ opacity: isPreparing ? 0.5 : 1 }}
-        className="transition-opacity duration-300"
-      >
+      {/* Next panel — hidden entirely during prep (user explicitly
+          chose hide over dim 2026-06-29). The Now panel stays in its
+          grid cell (left); the right cell becomes empty space so the
+          student's attention is fully on the chord they're about to
+          play. AnimatePresence handles a smooth fade-out / fade-in so
+          the transition isn't jarring. */}
+      <AnimatePresence initial={false}>
+        {!isPreparing && (
+          <motion.div
+            key="next-panel"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
       <TwoPanePanel label="Next">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -888,7 +1113,9 @@ function TwoPaneDisplay({
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
