@@ -151,6 +151,14 @@ export default function PracticeSessionPage() {
   // badge styling) so they fire whenever the metronome is aurally
   // in stick-click mode, not just at session start.
   const isPreparing = isCountIn || (isPlaying && isTransition);
+  // Monotonic per-beat key used by the prep ring's pulse animation —
+  // changes on every beat tick regardless of phase. During count-in,
+  // countInBeatsRemaining decrements; during play/transition,
+  // absoluteBeat increments. Either change makes this string change,
+  // remounting the ring overlay and re-firing its flash animation.
+  // Result: the pulse lands ON each beat instead of running on a
+  // fixed 2s Tailwind loop that's out of phase with the audio.
+  const beatTick = `${state.countInBeatsRemaining}-${state.absoluteBeat}`;
 
   const nextChord = useMemo(
     () => findNextDifferentChord(sequence, absoluteBeat - 1),
@@ -553,6 +561,7 @@ export default function PracticeSessionPage() {
               isLongForm={isLongForm}
               isIdle={isIdle}
               isPreparing={isPreparing}
+              beatTick={beatTick}
               // Keys are chord-RUN-stable (not beat-stable) so the
               // fade-and-rise animation only retriggers when the
               // chord actually changes — not on every beat tick.
@@ -773,6 +782,7 @@ function TwoPaneDisplay({
   isLongForm,
   isIdle,
   isPreparing,
+  beatTick,
   currentChordKey,
   nextChordKey,
 }: {
@@ -787,6 +797,12 @@ function TwoPaneDisplay({
    * panels look the same whenever the audio is in stick-click mode.
    */
   isPreparing: boolean;
+  /**
+   * Per-beat monotonic key. Used by the prep ring overlay to flash
+   * synchronized to the audio clicks — when this string changes, the
+   * ring re-mounts and re-fires its initial-to-animate transition.
+   */
+  beatTick: string;
   currentChordKey: string;
   nextChordKey: string;
 }) {
@@ -804,11 +820,10 @@ function TwoPaneDisplay({
   // playing = 1.0 — both transitions clearly LIGHT UP the chord.
   // Combined with the per-panel label swap ("Now" -> "Get ready") and
   // the pulsing border on the Now panel, count-in is unmissable.
-  // 0.6 during prep is meaningfully darker than full play (1.0) so the
-  // dim reads visibly — earlier 0.8 was only 20% off, which the user
-  // reported as invisible. Still brighter than idle's 0.4 so prep
-  // and stopped don't look the same.
-  const containerOpacity = isIdle ? 0.4 : isPreparing ? 0.6 : 1;
+  // 0.5 during prep — half-bright vs full play (1.0), unmistakable.
+  // Still brighter than idle's 0.35 so prep and "stopped" don't read
+  // as the same thing.
+  const containerOpacity = isIdle ? 0.35 : isPreparing ? 0.5 : 1;
   return (
     <div
       className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 transition-opacity duration-300"
@@ -819,6 +834,7 @@ function TwoPaneDisplay({
         label={isPreparing ? "Get ready" : "Now"}
         emphasized
         pulsing={isPreparing}
+        beatTick={beatTick}
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -869,18 +885,21 @@ function TwoPanePanel({
   label,
   emphasized,
   pulsing,
+  beatTick,
   children,
 }: {
   label: string;
   emphasized?: boolean;
   /**
-   * When true, a Tailwind animate-pulse ring overlays the panel
-   * border — used during count-in on the "Now" panel as a visual
-   * mirror of the aural stick-click pulse. The ring is an absolute
-   * positioned overlay so the chord text inside doesn't pulse;
-   * only the border perimeter does.
+   * When true, a beat-synchronized ring overlay flashes on every
+   * audio click — count-in beats and inter-chord prep beats. The
+   * overlay is keyed on `beatTick` so it re-mounts each beat,
+   * re-firing the flash animation. Result: the visual pulse lands
+   * ON the audio click, not on a fixed 2s loop that's out of phase.
    */
   pulsing?: boolean;
+  /** Monotonic per-beat key — drives the ring-flash animation. */
+  beatTick?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -892,19 +911,32 @@ function TwoPanePanel({
       }`}
     >
       {pulsing && (
-        <span
+        <motion.span
+          // Re-keying on each beat re-mounts the span, which restarts
+          // the initial → animate transition. That's how the ring
+          // flashes ON the audio beat instead of looping out-of-phase.
+          key={beatTick}
+          initial={{ opacity: 1, scale: 1 }}
+          animate={{ opacity: 0.25, scale: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-xl ring-4 ring-primary animate-pulse"
+          className="pointer-events-none absolute -inset-0.5 rounded-xl ring-4 ring-primary"
+          // Amber glow boxShadow added inline so it pulses in lockstep
+          // with the ring opacity. The 18px blur reads as a clear
+          // "halo" around the panel edge during the flash.
+          style={{ boxShadow: "0 0 18px 2px rgba(245, 158, 11, 0.7)" }}
         />
       )}
       <span
-        className={`font-mono text-[11px] uppercase tracking-wider ${
+        className={`relative z-10 font-mono text-[11px] uppercase tracking-wider ${
           emphasized ? "text-primary" : "text-muted-foreground"
         }`}
       >
         {label}
       </span>
-      {children}
+      <div className="relative z-10 flex flex-col items-center gap-4">
+        {children}
+      </div>
     </section>
   );
 }
