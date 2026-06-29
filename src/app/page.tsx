@@ -1,21 +1,12 @@
-import { Music, ArrowRight } from "lucide-react";
+import { ArrowRight, Map } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="flex w-full max-w-xl flex-col gap-10">
-        {/* Brand mark */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/30">
-            <Music className="h-5 w-5 text-primary" aria-hidden="true" />
-          </div>
-          <span className="font-mono text-sm tracking-wider text-muted-foreground uppercase">
-            Practice Prodigy
-          </span>
-        </div>
-
-        {/* Headline */}
+        {/* Headline. Brand mark sits in the persistent shell header
+            above — no need to repeat it here. */}
         <div className="flex flex-col gap-4">
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
             A pro-quality practice platform for musicians.
@@ -43,36 +34,36 @@ export default function Home() {
               Build a chord pool, pick a pattern, and drill. Cycles chords
               measure by measure with a NEXT preview, all four notation
               styles, four arpeggio patterns, and audible Preview before
-              you start. Ordering strategies, presets, and pattern library
-              next.
+              you start.
             </span>
           </p>
         </div>
 
-        {/* Practice CTA */}
-        <Link
-          href="/practice"
-          className="group flex items-center justify-between gap-3 rounded-lg bg-primary px-6 py-4 text-base font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
-        >
-          <span>Set up a drill</span>
-          <ArrowRight
-            className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
-            aria-hidden="true"
-          />
-        </Link>
-
-        {/* Footer links */}
-        <div className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs text-muted-foreground">
-          <a
-            href="https://github.com/JeffC399/practice-prodigy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground transition-colors"
+        {/* Primary CTA + secondary roadmap link */}
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/practice"
+            className="group flex items-center justify-between gap-3 rounded-lg bg-primary px-6 py-4 text-base font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
           >
-            github
-          </a>
-          <span>Next.js 16 · React 19 · Tailwind 4 · shadcn/ui</span>
-          <span>Tone.js · tonal · Dexie · Zustand · Framer Motion</span>
+            <span>Set up a drill</span>
+            <ArrowRight
+              className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
+          </Link>
+          <Link
+            href="/roadmap"
+            className="group flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-6 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Map className="h-4 w-4" aria-hidden="true" />
+              See the 9-module roadmap
+            </span>
+            <ArrowRight
+              className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
+          </Link>
         </div>
       </div>
     </main>

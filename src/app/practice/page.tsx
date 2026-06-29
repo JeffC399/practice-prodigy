@@ -89,7 +89,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
@@ -473,14 +472,10 @@ export default function PracticeSetupPage() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Link
-          href="/"
-          className="font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Practice Prodigy
-        </Link>
-        <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+      {/* Page sub-header. The brand link + module switcher live in the
+          persistent shell above; this just labels the current surface. */}
+      <header className="flex items-center justify-end border-b border-border px-6 py-2">
+        <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
           Setup
         </div>
       </header>
