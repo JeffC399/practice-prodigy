@@ -1305,24 +1305,29 @@ export default function PracticeSetupPage() {
                     </div>
                   );
                 })}
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Tick one pattern for a single-pattern drill (the v1
-                  default) or multiple to cycle through them. The drill
-                  always keeps at least one pattern.
-                </p>
+                {/* "Add" tile — sits inline with the pattern grid as
+                    a dashed-border invitation to author a custom
+                    pattern. Reads as "and you can add your own here
+                    too" alongside the built-ins. Matches built-in
+                    tile height via the same py-2 + two-line inner
+                    layout. */}
                 <button
                   type="button"
                   onClick={() =>
                     setEditorState({ open: true, editingId: null })
                   }
-                  className="flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/15 transition-colors"
+                  className="group flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/30 px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
+                  aria-label="Create a new custom pattern"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-4 w-4 transition-transform group-hover:scale-110" />
                   New custom pattern
                 </button>
               </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Tick one pattern for a single-pattern drill (the v1
+                default) or multiple to cycle through them. The drill
+                always keeps at least one pattern.
+              </p>
 
               {/* Ordering picker — only relevant when pool has 2+
                   patterns. Custom (cycles through in checkbox order) is
