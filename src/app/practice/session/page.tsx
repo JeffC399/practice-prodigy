@@ -600,7 +600,7 @@ export default function PracticeSessionPage() {
                     isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
                   }`}
                   style={{
-                    opacity: isIdle ? 0.4 : isPreparing ? 0.8 : 1,
+                    opacity: isIdle ? 0.4 : isPreparing ? 0.6 : 1,
                   }}
                   aria-live="polite"
                 >
@@ -674,12 +674,13 @@ function PhaseBadge({
   } else if (isCountIn) {
     label = `Count-in · ${countInRemaining}`;
   } else if (isTransition) {
-    // Keep the measure context (so the user knows where they are in
-    // the drill) but append "· Get ready" to match the aural signal.
-    label =
-      totalMeasures === null
-        ? `Measure ${measure} · Get ready`
-        : `Measure ${measure} of ${totalMeasures} · Get ready`;
+    // Drop the "Measure N · " prefix during the prep window between
+    // chords — that measure has technically finished playing and the
+    // user is preparing for the next one. "Get Ready" alone is
+    // cleaner and avoids the "Measure 1 · Get Ready" ambiguity (which
+    // measure am I on?). The Next panel tells the user what's
+    // coming; the badge just needs to say "prep is happening."
+    label = "Get Ready";
   } else if (isPlaying) {
     label =
       totalMeasures === null
@@ -803,7 +804,11 @@ function TwoPaneDisplay({
   // playing = 1.0 — both transitions clearly LIGHT UP the chord.
   // Combined with the per-panel label swap ("Now" -> "Get ready") and
   // the pulsing border on the Now panel, count-in is unmissable.
-  const containerOpacity = isIdle ? 0.4 : isPreparing ? 0.8 : 1;
+  // 0.6 during prep is meaningfully darker than full play (1.0) so the
+  // dim reads visibly — earlier 0.8 was only 20% off, which the user
+  // reported as invisible. Still brighter than idle's 0.4 so prep
+  // and stopped don't look the same.
+  const containerOpacity = isIdle ? 0.4 : isPreparing ? 0.6 : 1;
   return (
     <div
       className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 transition-opacity duration-300"
@@ -889,7 +894,7 @@ function TwoPanePanel({
       {pulsing && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-primary/70 animate-pulse"
+          className="pointer-events-none absolute inset-0 rounded-xl ring-4 ring-primary animate-pulse"
         />
       )}
       <span
