@@ -125,17 +125,17 @@ export default function PracticeSetupPage() {
     setLoadedDrillId,
   } = config;
   const drillsLib = useDrillsLibrary();
-  // Quick Start surfaces both lists: the user's own drills first (sorted by
-  // most-recently-launched), then the shipped built-ins in seed order. The
-  // user's own drills always take precedence at the top — anything they
-  // saved is more relevant than the canned library.
-  const sortedDrills = useMemo(
-    () => [
-      ...[...drillsLib.drills].sort(
+  // Quick Start surfaces two distinct lists, in their own sections:
+  //   "Your drills" — the user's saved drills, sorted most-recently-launched
+  //                   first. Always-open section; carries an empty state.
+  //   "Built-in drills" — the shipped library in seed order. Collapsible
+  //                       and collapsed by default to keep the repeat-user
+  //                       surface compact; one click expands.
+  const userDrills = useMemo(
+    () =>
+      [...drillsLib.drills].sort(
         (a, b) => (b.lastLoadedAt ?? 0) - (a.lastLoadedAt ?? 0),
       ),
-      ...SHIPPED_DRILLS,
-    ],
     [drillsLib.drills],
   );
   // Editing lookup considers both lists — a shipped drill can be opened
@@ -558,33 +558,67 @@ export default function PracticeSetupPage() {
             </div>
           )}
 
-          {/* Quick Start — one-click launch for both the user's saved
-              drills and the shipped built-in library. */}
-          <FormSection title="Quick start">
+          {/* Quick Start — your own drills are the primary surface; the
+              shipped library tucks into a collapsible below so the page
+              stays compact for repeat users. */}
+          <FormSection title="Your drills">
+            {userDrills.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
+                No saved drills yet. Configure one below and click{" "}
+                <span className="font-medium text-foreground">
+                  Save as drill
+                </span>{" "}
+                to add it here — or expand the built-in library below to
+                launch one of the 10 drills that ship with Practice
+                Prodigy.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {userDrills.map((drill) => (
+                  <DrillCard
+                    key={drill.id}
+                    drill={drill}
+                    isEditing={drill.id === loadedDrillId}
+                    isShipped={false}
+                    onLaunch={handleLoadDrill}
+                    onEdit={handleEditDrill}
+                    onDelete={drillsLib.deleteDrill}
+                  />
+                ))}
+              </div>
+            )}
+          </FormSection>
+          <CollapsibleSection
+            title="Built-in drills"
+            summary={`${SHIPPED_DRILLS.length} ready to launch · jazz · blues · pop · rock`}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {sortedDrills.map((drill) => (
+              {SHIPPED_DRILLS.map((drill) => (
                 <DrillCard
                   key={drill.id}
                   drill={drill}
                   isEditing={drill.id === loadedDrillId}
-                  isShipped={isShippedDrill(drill.id)}
+                  isShipped={true}
                   onLaunch={handleLoadDrill}
                   onEdit={handleEditDrill}
                   onDelete={drillsLib.deleteDrill}
                 />
               ))}
             </div>
-            {drillsLib.drills.length === 0 && (
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                These are the built-in drills that ship with Practice
-                Prodigy. Configure your own setup below and click{" "}
-                <span className="font-medium text-foreground">
-                  Save as drill
-                </span>{" "}
-                to add your own to this list.
-              </p>
-            )}
-          </FormSection>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Built-in drills ship with Practice Prodigy and can&rsquo;t
+              be deleted. Open one with the pencil to tweak it — the only
+              save path is{" "}
+              <span className="font-medium text-foreground">
+                Save as new drill
+              </span>
+              , so your customized copy lives in{" "}
+              <span className="font-medium text-foreground">
+                Your drills
+              </span>{" "}
+              above.
+            </p>
+          </CollapsibleSection>
 
           {/* Sequence preview. Min-height keeps the card stable across
               notation styles even when the pool has just one chord. */}
@@ -1384,7 +1418,7 @@ function DrillCard({
         onClick={() => onLaunch(drill)}
         className="group block w-full p-3 text-left"
       >
-        <div className={`flex items-center gap-2 ${isShipped ? "pr-28" : "pr-20"}`}>
+        <div className="flex items-center gap-2 pr-20">
           <Play
             className="h-4 w-4 shrink-0 text-primary"
             aria-hidden="true"
@@ -1414,18 +1448,10 @@ function DrillCard({
         )}
       </button>
       {/* Card actions. Shipped drills only show edit (delete hidden — they
-          can't be removed, they're built in). User drills get the
-          two-click delete confirm to prevent accidental loss. */}
+          can't be removed, they're built in; the section header already
+          conveys "built-in", so no per-card chip is needed). User drills
+          get the two-click delete confirm to prevent accidental loss. */}
       <div className="absolute right-2 top-2 flex items-center gap-1">
-        {isShipped && (
-          <span
-            className="flex items-center gap-1 rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
-            title="Built-in drill — ships with Practice Prodigy"
-          >
-            <Lock className="h-2.5 w-2.5" aria-hidden="true" />
-            Built-in
-          </span>
-        )}
         {!isShipped && confirmingDelete ? (
           <>
             <button
