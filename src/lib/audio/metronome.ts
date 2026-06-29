@@ -62,6 +62,15 @@ export type MetronomeConfig = {
    * default to "play".
    */
   beatStyles?: Array<"play" | "transition">;
+  /**
+   * Optional starting index into the play beats. Used by the resume-
+   * session flow so the engine begins at (say) beat 64 of a sequence
+   * the user was previously running, not at beat 0. countInBeats is
+   * typically 0 when this is set — resume means "continue where you
+   * were," not "start with a count-in at the wrong position." Defaults
+   * to 0 (normal fresh-start behavior).
+   */
+  initialBeatIndex?: number;
 };
 
 export type MetronomeListener = (state: MetronomeState) => void;
@@ -176,14 +185,29 @@ class MetronomeEngine {
     this.ensureSynths();
 
     this.config = config;
-    this.beatCounter = -config.countInBeats - 1; // first scheduled tick increments to -countInBeats
-    this.playBeatCounter = -1; // first play tick increments to 0
+    const initialBeat = config.initialBeatIndex ?? 0;
+
+    // Pre-count play-vs-transition beats up to the resume position so
+    // the play counter ends up in lockstep. For fresh starts (initial
+    // = 0) this loop is a no-op and playBeatsBeforeInitial stays at 0.
+    let playBeatsBeforeInitial = 0;
+    for (let i = 0; i < initialBeat; i++) {
+      const isPrep =
+        (config.beatStyles?.[i] ?? "play") === "transition";
+      if (!isPrep) playBeatsBeforeInitial += 1;
+    }
+
+    this.beatCounter = -config.countInBeats - 1 + initialBeat;
+    this.playBeatCounter = playBeatsBeforeInitial - 1;
 
     const transport = Tone.getTransport();
     transport.bpm.value = config.bpm;
     transport.timeSignature = [config.beatsPerMeasure, config.beatUnit];
 
-    // Initial UI state before first tick fires.
+    // Initial UI state before first tick fires. For resume (initial > 0)
+    // we surface the correct measure number immediately so there's no
+    // "measure 1" flash before the right value kicks in on tick 1.
+    const m = config.beatsPerMeasure;
     if (config.countInBeats > 0) {
       this.setState({
         phase: "count-in",
@@ -196,9 +220,12 @@ class MetronomeEngine {
       this.setState({
         phase: "playing",
         beatInMeasure: 0,
-        measureInSession: 1,
+        measureInSession: Math.max(
+          1,
+          Math.floor(playBeatsBeforeInitial / m) + 1,
+        ),
         countInBeatsRemaining: 0,
-        absoluteBeat: 0,
+        absoluteBeat: initialBeat,
       });
     }
 
@@ -366,19 +393,23 @@ class MetronomeEngine {
       if (!isPrep) playBeatsBeforeTarget += 1;
     }
 
+    // Pre-set counters so the NEXT scheduled tick increments INTO the
+    // target. Critical: do NOT overwrite to targetBeatIndex here —
+    // earlier versions did, which made the audio click for beat
+    // targetBeatIndex silently drop (the next tick's `+= 1` skipped
+    // over it). Visual showed target but audio resumed at target+1.
     this.beatCounter = targetBeatIndex - 1;
     this.playBeatCounter = playBeatsBeforeTarget - 1;
 
-    // Drive immediate UI feedback. Mirror the per-tick logic: pretend
-    // the next tick just fired and call advanceUiState with the
-    // POST-increment counter values.
+    // Drive immediate UI feedback — mirror the values advanceUiState
+    // will be called with when the next real tick fires. The actual
+    // tick will call advanceUiState again with the same values
+    // (idempotent); this is just for zero-perceptible-lag visuals.
     const isTargetPrep =
       (this.config.beatStyles?.[targetBeatIndex] ?? "play") === "transition";
     const playBeatAfterTick = isTargetPrep
       ? playBeatsBeforeTarget - 1
       : playBeatsBeforeTarget;
-    this.beatCounter = targetBeatIndex;
-    this.playBeatCounter = playBeatAfterTick;
     this.advanceUiState(targetBeatIndex, playBeatAfterTick);
   }
 

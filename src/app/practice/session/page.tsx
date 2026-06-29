@@ -19,6 +19,7 @@ import {
   usePracticeConfig,
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary } from "@/lib/state/drills-library";
+import { useResumeSession } from "@/lib/state/resume-session";
 import {
   Minus,
   Play,
@@ -159,22 +160,49 @@ export default function PracticeSessionPage() {
   // Read the URL directly so the page stays statically prerendered
   // (useSearchParams would force us into a Suspense boundary).
   const [autoStartFromUrl, setAutoStartFromUrl] = useState(false);
+  const [resumeFromUrl, setResumeFromUrl] = useState(false);
   const autoStartFiredRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("autostart") === "1") {
+    const url = new URL(window.location.href);
+    if (params.get("resume") === "1") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      setResumeFromUrl(true);
+      url.searchParams.delete("resume");
+      window.history.replaceState({}, "", url.toString());
+    } else if (params.get("autostart") === "1") {
       setAutoStartFromUrl(true);
-      // Strip the flag so a refresh doesn't auto-relaunch the drill.
-      const url = new URL(window.location.href);
       url.searchParams.delete("autostart");
       window.history.replaceState({}, "", url.toString());
     }
   }, []);
 
+  const resume = useResumeSession();
+
   const handleToggle = () => {
     if (isIdle) {
+      // Resume path — start from a previously-interrupted session,
+      // re-using its pre-rolled sequence (so random strategies don't
+      // re-shuffle to a new chord at the resume position) and skipping
+      // the count-in (resume = continue, not restart).
+      const r = resume.active;
+      if (resumeFromUrl && r) {
+        setActiveSequence(r.sequence);
+        const beatStyles = r.sequence.map((b) => b.kind);
+        void start({
+          bpm: config.bpm,
+          beatsPerMeasure,
+          beatUnit: config.timeSignature.beatUnit,
+          countInBeats: 0,
+          totalPlayingBeats: config.repeatIndefinitely
+            ? undefined
+            : r.sequence.length,
+          beatStyles,
+          initialBeatIndex: r.beatIndex,
+        });
+        return;
+      }
       // Fresh sequence at every Start. Random strategies re-roll;
       // deterministic strategies are a harmless rebuild.
       const fresh = generateSequence({
@@ -202,14 +230,23 @@ export default function PracticeSessionPage() {
         beatStyles,
       });
     } else {
+      // User-pressed Stop is intentional cessation — don't offer this
+      // session for resume the next time they hit /practice.
       stop();
+      resume.clear();
     }
   };
 
   // Trigger autostart once when conditions align. The ref ensures we
-  // never fire twice even if handleToggle's identity changes.
+  // never fire twice even if handleToggle's identity changes. Both the
+  // Quick-Start autostart and the resume flow funnel through the same
+  // ref so they can't race against each other.
   useEffect(() => {
-    if (autoStartFromUrl && isIdle && !autoStartFiredRef.current) {
+    if (
+      (autoStartFromUrl || resumeFromUrl) &&
+      isIdle &&
+      !autoStartFiredRef.current
+    ) {
       autoStartFiredRef.current = true;
       handleToggle();
     }
@@ -217,7 +254,71 @@ export default function PracticeSessionPage() {
     // duplicate invocation, so exhaustive-deps is intentionally
     // omitted here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStartFromUrl, isIdle]);
+  }, [autoStartFromUrl, resumeFromUrl, isIdle]);
+
+  // Persist a resume snapshot on each play-measure boundary. The
+  // sequence + position are captured so a browser crash leaves a
+  // recovery target on the next /practice visit. A ref guards against
+  // re-saving the same measure across re-renders.
+  const lastSavedMeasureRef = useRef<number>(0);
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (activeSequence === null) return;
+    // Only fire on the downbeat of a play measure — beatInMeasure
+    // === 1 happens once per measure (transition beats use 0).
+    if (state.beatInMeasure !== 1) return;
+    if (state.measureInSession === lastSavedMeasureRef.current) return;
+    lastSavedMeasureRef.current = state.measureInSession;
+    resume.save({
+      config: {
+        chordPool: config.chordPool,
+        chordPoolIds: config.chordPoolIds,
+        orderingStrategy: config.orderingStrategy,
+        measuresPerChord: config.measuresPerChord,
+        drillMeasures: config.drillMeasures,
+        repetitions: config.repetitions,
+        repeatIndefinitely: config.repeatIndefinitely,
+        transitionUnit: config.transitionUnit,
+        transitionCount: config.transitionCount,
+        bpm: config.bpm,
+        timeSignature: config.timeSignature,
+        countInMeasures: config.countInMeasures,
+        notationStyle: config.notationStyle,
+        arpeggioPattern: config.arpeggioPattern,
+      },
+      drillName: currentDrill?.name ?? null,
+      loadedDrillId: config.loadedDrillId,
+      beatIndex: absoluteBeat - 1,
+      measureNumber: state.measureInSession,
+      totalMeasures: totalPlayMeasures,
+      sequence: activeSequence,
+    });
+    // resume + config are intentionally read-only inside the effect;
+    // the dep array only needs the values that drive WHEN to save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isPlaying,
+    state.beatInMeasure,
+    state.measureInSession,
+    activeSequence,
+  ]);
+
+  // Reset the per-session saved-measure tracker whenever the engine
+  // returns to idle (either user-pressed Stop or natural end) so the
+  // next Start re-saves from measure 1 onward.
+  const prevPhaseRef = useRef(state.phase);
+  useEffect(() => {
+    if (prevPhaseRef.current !== "idle" && state.phase === "idle") {
+      lastSavedMeasureRef.current = 0;
+      // Natural completion path — clear the resume blob so the
+      // banner doesn't reappear after a finished drill. (The Stop
+      // button branch in handleToggle ALSO clears; double-clear is
+      // harmless.)
+      resume.clear();
+    }
+    prevPhaseRef.current = state.phase;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase]);
 
   const isLongForm = config.notationStyle === "long-form";
 

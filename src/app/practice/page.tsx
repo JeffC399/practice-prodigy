@@ -53,6 +53,10 @@ import {
 } from "@/lib/data/shipped-drills";
 import { previewPlayChords } from "@/lib/music/sequence";
 import {
+  isResumable,
+  useResumeSession,
+} from "@/lib/state/resume-session";
+import {
   ArrowRight,
   Bookmark,
   Check,
@@ -127,6 +131,19 @@ export default function PracticeSetupPage() {
     setLoadedDrillId,
   } = config;
   const drillsLib = useDrillsLibrary();
+  const resume = useResumeSession();
+  const resumable = isResumable(resume.active);
+  const handleResumeClick = async () => {
+    if (!resume.active) return;
+    try {
+      await Tone.start();
+    } catch {
+      // Silent — Start button in the session will retry the unlock.
+    }
+    loadConfig(resume.active.config);
+    setLoadedDrillId(resume.active.loadedDrillId);
+    router.push("/practice/session?resume=1");
+  };
   // Quick Start surfaces two distinct lists, in their own sections:
   //   "Your drills" — the user's saved drills, sorted most-recently-launched
   //                   first. Always-open section; carries an empty state.
@@ -480,6 +497,84 @@ export default function PracticeSetupPage() {
               your setup as a drill for one-click access next time.
             </p>
           </div>
+
+          {/* Resume banner — surfaces when a previous in-flight session
+              was interrupted (browser crash, tab close, sleep) and the
+              snapshot is still recent (<10 min). One click resumes
+              from the exact same chord at the exact same beat; Dismiss
+              clears the snapshot. Sits above the editing badge as the
+              top-priority recovery action. */}
+          {resumable && resume.active && (
+            <div className="flex flex-col gap-3 rounded-md border border-primary/40 bg-primary/10 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-primary">
+                  <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                  Resume last session
+                </div>
+                <div className="flex flex-wrap shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResumeClick}
+                    className="rounded-md border border-primary/50 bg-primary/20 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/30 transition-colors"
+                  >
+                    Resume
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resume.clear()}
+                    className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+              <p className="text-sm text-foreground leading-relaxed">
+                {resume.active.drillName ? (
+                  <>
+                    Pick up{" "}
+                    <span className="font-medium text-primary">
+                      {resume.active.drillName}
+                    </span>{" "}
+                    at measure{" "}
+                    <span className="font-mono tabular-nums">
+                      {resume.active.measureNumber}
+                    </span>
+                    {resume.active.totalMeasures !== null && (
+                      <>
+                        {" "}
+                        of{" "}
+                        <span className="font-mono tabular-nums">
+                          {resume.active.totalMeasures}
+                        </span>
+                      </>
+                    )}
+                    .
+                  </>
+                ) : (
+                  <>
+                    Pick up your last session at measure{" "}
+                    <span className="font-mono tabular-nums">
+                      {resume.active.measureNumber}
+                    </span>
+                    {resume.active.totalMeasures !== null && (
+                      <>
+                        {" "}
+                        of{" "}
+                        <span className="font-mono tabular-nums">
+                          {resume.active.totalMeasures}
+                        </span>
+                      </>
+                    )}
+                    .
+                  </>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Same chord, same beat — no count-in, just continues
+                from where you left off.
+              </p>
+            </div>
+          )}
 
           {/* Editing badge — two flavors:
                 User drill: name and notes are always-editable inline,
