@@ -65,6 +65,40 @@ export const ARPEGGIO_PATTERN_DEGREES: Record<ArpeggioPattern, string> = {
 };
 
 /**
+ * Number of NOTES (not characters) in each pattern. Used by the lit-up
+ * degrees display to calculate sub-beat timing — notes per measure
+ * divided by beats-per-measure gives notes-per-beat. Multi-character
+ * "notes" like LT count as 1 note.
+ */
+export const ARPEGGIO_PATTERN_NOTE_COUNT: Record<ArpeggioPattern, number> = {
+  "scale-tones": 8,
+  "arp-7ths": 4,
+  "triads-with-lt": 4,
+  descending: 4,
+};
+
+/**
+ * Split the degrees string of a pattern into per-note segments. The
+ * "1-3-5-7" string becomes [{ idx: 0, label: "1" }, { idx: 1, label:
+ * "3" }, ...]. Used by the drill screen's lit-up degrees display to
+ * render each digit independently so we can highlight just the
+ * currently-playing note.
+ *
+ * The dashes between digits ARE NOT included in the result — the
+ * caller can interleave them at render time if it wants the visual
+ * separator. (Phase 12 renders without dashes since the highlight
+ * itself provides spacing cues; dashes were a quirk of the static
+ * label form.)
+ */
+export function parsePatternDegrees(
+  pattern: ArpeggioPattern,
+): Array<{ idx: number; label: string }> {
+  return ARPEGGIO_PATTERN_DEGREES[pattern]
+    .split("-")
+    .map((label, idx) => ({ idx, label }));
+}
+
+/**
  * Anchor the chord's root at octave 2 — sits comfortably in the middle
  * of a 4-string bass's range (E1–G4, with E2–C4 being the meat). Pattern
  * notes ascend or descend from there per the pattern definition.

@@ -4,7 +4,9 @@ import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import {
   ARPEGGIO_PATTERN_DEGREES,
+  ARPEGGIO_PATTERN_NOTE_COUNT,
   ARPEGGIO_PATTERN_SHORT_NAMES,
+  parsePatternDegrees,
   type ArpeggioPattern,
 } from "@/lib/music/arpeggio";
 import { renderChord } from "@/lib/music/render-chord";
@@ -200,21 +202,11 @@ export default function PracticeSessionPage() {
     activePatterns?.[currentMeasureIdx] ?? fallbackPattern;
   const nextPattern =
     activePatterns?.[nextMeasureIdx] ?? currentPattern;
-  // Pattern subtitle format follows the user's Settings preference.
-  // "name" -> "Arp 7ths" (default), "degrees" -> "1-3-5-7",
-  // "hidden" -> empty string (rendering code skips empty labels).
-  const renderPatternLabel = (p: ArpeggioPattern): string => {
-    switch (patternDisplay) {
-      case "name":
-        return ARPEGGIO_PATTERN_SHORT_NAMES[p];
-      case "degrees":
-        return ARPEGGIO_PATTERN_DEGREES[p];
-      case "hidden":
-        return "";
-    }
-  };
-  const currentPatternLabel = renderPatternLabel(currentPattern);
-  const nextPatternLabel = renderPatternLabel(nextPattern);
+  // PatternSubtitle (below) handles the per-position rendering based
+  // on patternDisplay mode. Earlier versions pre-computed string
+  // labels here; the lit-up-degrees feature (Phase 12) needs to render
+  // each digit independently, so the rendering moved into the
+  // component itself. Only the header summary stays a string.
   /** Compact pattern-pool summary for the drill-screen header. Uses
    *  the name-form regardless of patternDisplay (so the header is
    *  always identifiable even when subtitles are degrees/hidden). */
@@ -222,6 +214,67 @@ export default function PracticeSessionPage() {
     config.patternPool.length <= 1
       ? ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern]
       : `${ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern]} +${config.patternPool.length - 1}`;
+
+  // Lit-up scale-degree tracking — for the "degrees" pattern-display
+  // mode, the digits in the current chord's subtitle pulse in time
+  // with when each note should actually be played. The state tracks
+  // which note index of the current measure's pattern is "active"
+  // right now. -1 means no note is highlighted (idle, count-in, prep).
+  //
+  // On each play-beat tick the effect resets to the first note of
+  // that beat and schedules setTimeout-based highlights for any
+  // sub-beat notes (e.g. Scale Tones: 8 notes in a 4-beat measure
+  // means 2 notes per beat -- the second one fires at half-beat).
+  const [activeNoteIdx, setActiveNoteIdx] = useState<number>(-1);
+  const noteHighlightTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    // Clear any pending sub-beat highlights from the previous beat.
+    noteHighlightTimersRef.current.forEach((t) => clearTimeout(t));
+    noteHighlightTimersRef.current = [];
+
+    if (!isPlaying || isTransition || state.beatInMeasure < 1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveNoteIdx(-1);
+      return;
+    }
+
+    const noteCount = ARPEGGIO_PATTERN_NOTE_COUNT[currentPattern];
+    const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
+    const notesPerBeat = noteCount / beatsPerMeasure;
+    const beat = state.beatInMeasure; // 1-indexed
+    const firstNoteOfBeat = Math.floor((beat - 1) * notesPerBeat);
+    setActiveNoteIdx(firstNoteOfBeat);
+
+    // Schedule sub-beat highlights when notesPerBeat > 1 (e.g.
+    // Scale Tones: 2 notes per beat in 4/4). The interval between
+    // sub-beat highlights is beatDurationMs / notesPerBeat.
+    if (notesPerBeat > 1) {
+      const beatDurationMs = 60000 / config.bpm;
+      const subBeatMs = beatDurationMs / notesPerBeat;
+      for (let sub = 1; sub < notesPerBeat; sub++) {
+        const noteIdx = firstNoteOfBeat + sub;
+        if (noteIdx >= noteCount) break;
+        const timer = setTimeout(
+          () => setActiveNoteIdx(noteIdx),
+          Math.round(sub * subBeatMs),
+        );
+        noteHighlightTimersRef.current.push(timer);
+      }
+    }
+
+    return () => {
+      noteHighlightTimersRef.current.forEach((t) => clearTimeout(t));
+      noteHighlightTimersRef.current = [];
+    };
+  }, [
+    isPlaying,
+    isTransition,
+    state.beatInMeasure,
+    state.measureInSession,
+    currentPattern,
+    config.timeSignature.beatsPerMeasure,
+    config.bpm,
+  ]);
 
   // Monotonic per-beat key used by the prep ring's pulse animation —
   // changes on every beat tick regardless of phase. During count-in,
@@ -733,8 +786,10 @@ export default function PracticeSessionPage() {
             <TwoPaneDisplay
               currentLabel={currentLabel}
               nextLabel={nextLabel}
-              currentPatternLabel={currentPatternLabel}
-              nextPatternLabel={nextPatternLabel}
+              currentPattern={currentPattern}
+              nextPattern={nextPattern}
+              patternDisplay={patternDisplay}
+              activeNoteIdx={activeNoteIdx}
               isLongForm={isLongForm}
               isIdle={isIdle}
               isPreparing={isPreparing}
@@ -766,11 +821,12 @@ export default function PracticeSessionPage() {
                   >
                     {nextLabel}
                   </span>
-                  {nextPatternLabel && (
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-                      {nextPatternLabel}
-                    </span>
-                  )}
+                  <PatternSubtitle
+                    pattern={nextPattern}
+                    mode={patternDisplay}
+                    activeNoteIdx={-1}
+                    tone="secondary"
+                  />
                 </div>
               ) : (
                 <div className="h-6" aria-hidden="true" />
@@ -812,9 +868,14 @@ export default function PracticeSessionPage() {
                 >
                   {currentLabel}
                 </div>
-                {!isIdle && currentPatternLabel && (
-                  <span className="relative z-10 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                    {currentPatternLabel}
+                {!isIdle && (
+                  <span className="relative z-10 text-xs">
+                    <PatternSubtitle
+                      pattern={currentPattern}
+                      mode={patternDisplay}
+                      activeNoteIdx={activeNoteIdx}
+                      tone="primary"
+                    />
                   </span>
                 )}
               </div>
@@ -972,6 +1033,75 @@ function StatItem({
   );
 }
 
+/**
+ * Pattern subtitle — renders the pattern info below a chord on the
+ * drill screen. In "name" mode it's a static text label. In "degrees"
+ * mode each digit is its own span and the one at `activeNoteIdx`
+ * gets a primary-color highlight, pulsing in time with when that
+ * note should be played (Phase 12). Pass activeNoteIdx = -1 to
+ * suppress all highlighting (Next panel, idle, prep).
+ */
+function PatternSubtitle({
+  pattern,
+  mode,
+  activeNoteIdx,
+  tone,
+}: {
+  pattern: ArpeggioPattern;
+  mode: "name" | "degrees" | "hidden";
+  /** -1 = no highlight. Otherwise the index of the note currently playing. */
+  activeNoteIdx: number;
+  /** "primary" (Now) gets normal contrast; "secondary" (Next) is dimmer. */
+  tone: "primary" | "secondary";
+}) {
+  if (mode === "hidden") return null;
+  const baseClass =
+    tone === "secondary"
+      ? "font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70"
+      : "font-mono text-[11px] uppercase tracking-wider text-muted-foreground";
+
+  if (mode === "name") {
+    return <span className={baseClass}>{ARPEGGIO_PATTERN_SHORT_NAMES[pattern]}</span>;
+  }
+  // degrees mode — per-digit rendering
+  const segments = parsePatternDegrees(pattern);
+  return (
+    <span
+      className={baseClass}
+      aria-label={`Scale degrees: ${ARPEGGIO_PATTERN_DEGREES[pattern]}`}
+    >
+      {segments.map((seg, i) => {
+        const isActive = activeNoteIdx === seg.idx;
+        const isPast = activeNoteIdx > seg.idx;
+        return (
+          <span key={seg.idx} className="inline-flex items-baseline">
+            <motion.span
+              animate={{
+                scale: isActive ? 1.4 : 1,
+                opacity: isActive ? 1 : isPast ? 0.4 : 0.9,
+              }}
+              transition={{ duration: 0.12, ease: "easeOut" }}
+              className={`inline-block min-w-[0.75em] text-center ${
+                isActive
+                  ? "text-primary font-semibold"
+                  : isPast
+                    ? "text-muted-foreground/50"
+                    : ""
+              }`}
+              style={{ originY: 0.5 }}
+            >
+              {seg.label}
+            </motion.span>
+            {i < segments.length - 1 && (
+              <span className="opacity-30">-</span>
+            )}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 function PhaseBadge({
   isIdle,
   isCountIn,
@@ -1110,8 +1240,10 @@ function BeatDots({
 function TwoPaneDisplay({
   currentLabel,
   nextLabel,
-  currentPatternLabel,
-  nextPatternLabel,
+  currentPattern,
+  nextPattern,
+  patternDisplay,
+  activeNoteIdx,
   isLongForm,
   isIdle,
   isPreparing,
@@ -1121,10 +1253,14 @@ function TwoPaneDisplay({
 }: {
   currentLabel: string;
   nextLabel: string | null;
-  /** Pattern label shown below the Now chord. May differ from next when patternPool > 1. */
-  currentPatternLabel: string;
-  /** Pattern label shown below the Next chord. */
-  nextPatternLabel: string;
+  /** Pattern playing under the Now chord; rendered as PatternSubtitle. */
+  currentPattern: ArpeggioPattern;
+  /** Pattern that will play under the Next chord. */
+  nextPattern: ArpeggioPattern;
+  /** name / degrees / hidden — drives subtitle rendering. */
+  patternDisplay: "name" | "degrees" | "hidden";
+  /** Currently playing note index in the current measure (-1 if no highlight). */
+  activeNoteIdx: number;
   isLongForm: boolean;
   isIdle: boolean;
   /**
@@ -1186,11 +1322,12 @@ function TwoPaneDisplay({
             >
               {currentLabel}
             </span>
-            {currentPatternLabel && (
-              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                {currentPatternLabel}
-              </span>
-            )}
+            <PatternSubtitle
+              pattern={currentPattern}
+              mode={patternDisplay}
+              activeNoteIdx={activeNoteIdx}
+              tone="primary"
+            />
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
@@ -1224,10 +1361,13 @@ function TwoPaneDisplay({
             >
               {nextLabel ?? "—"}
             </span>
-            {nextLabel && nextPatternLabel && (
-              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-                {nextPatternLabel}
-              </span>
+            {nextLabel && (
+              <PatternSubtitle
+                pattern={nextPattern}
+                mode={patternDisplay}
+                activeNoteIdx={-1}
+                tone="secondary"
+              />
             )}
           </motion.div>
         </AnimatePresence>
