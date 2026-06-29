@@ -334,6 +334,19 @@ export default function PracticeSessionPage() {
     metronomeEngine.setBpm(next);
   };
 
+  // Half / double tempo — the woodshed workflow (play full speed,
+  // drop to half to figure out a passage, kick back to full to
+  // verify). Mid-drill so the change applies without a Stop+Start.
+  const scaleBpm = (factor: number) => {
+    const next = Math.max(
+      BPM_MIN,
+      Math.min(BPM_MAX, Math.round(config.bpm * factor)),
+    );
+    if (next === config.bpm) return;
+    config.setBpm(next);
+    metronomeEngine.setBpm(next);
+  };
+
   // Mid-drill jump targets — computed once per render against the live
   // sequence so the button enabled/disabled states stay accurate as the
   // user advances through chord runs.
@@ -437,9 +450,21 @@ export default function PracticeSessionPage() {
               </button>
             </span>
           )}
-          {/* Live tempo nudge — adjusts the metronome and the persisted
-              config in one click; works mid-drill. */}
+          {/* Live tempo controls — all adjust the metronome AND the
+              persisted config in one click; work mid-drill without a
+              Stop+Start. ±5 for fine tuning, ÷2 and ×2 for woodshedding
+              (play full speed → drop to half → kick back to full). */}
           <span className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => scaleBpm(0.5)}
+              disabled={config.bpm <= BPM_MIN}
+              aria-label="Halve tempo"
+              title="Halve tempo (÷2)"
+              className="flex h-5 px-1.5 items-center justify-center rounded-sm border border-border bg-background font-mono text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              &divide;2
+            </button>
             <button
               type="button"
               onClick={() => bumpBpm(-5)}
@@ -460,6 +485,16 @@ export default function PracticeSessionPage() {
               className="flex h-5 w-5 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Plus className="h-3 w-3" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scaleBpm(2)}
+              disabled={config.bpm >= BPM_MAX}
+              aria-label="Double tempo"
+              title="Double tempo (×2)"
+              className="flex h-5 px-1.5 items-center justify-center rounded-sm border border-border bg-background font-mono text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              &times;2
             </button>
           </span>
           <span>

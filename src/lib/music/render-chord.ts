@@ -18,12 +18,20 @@ export const CHORD_NOTATION_STYLES = [
 
 export type ChordNotationStyle = (typeof CHORD_NOTATION_STYLES)[number];
 
+/**
+ * Example chord in each style — chosen so the four styles read
+ * VISIBLY different in the dropdown. Earlier versions used `Am7`
+ * across the board, which renders identically in lowercase-m and
+ * plain-ASCII (they only diverge on unicode flats/sharps and on
+ * major-7 spelling). B♭m7♭5 / Bbm7b5 vs B−7 vs B minor 7 makes the
+ * distinction obvious at a glance.
+ */
 export const NOTATION_STYLE_DISPLAY_NAMES: Record<ChordNotationStyle, string> =
   {
-    "jazz-minus": "Jazz (A−7)",
-    "lowercase-m": "Jazz lowercase-m (Am7)",
-    "plain-ascii": "Plain ASCII (Am7)",
-    "long-form": "Long form (A minor 7)",
+    "jazz-minus": "Jazz (B−7)",
+    "lowercase-m": "Jazz lowercase-m (B♭m7♭5)",
+    "plain-ascii": "Plain ASCII (Bbm7b5)",
+    "long-form": "Long form (B minor 7)",
   };
 
 /** Suffix tables — one row per quality, one column per style. */

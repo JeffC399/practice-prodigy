@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { APP_VERSION, BUILD_SHA_SHORT } from "@/lib/build-info";
+import { FeedbackTrigger } from "./feedback-trigger";
 
 /**
  * Slim persistent footer — one row at the bottom of every screen.
- * Left: build label + tagline. Right: roadmap link + GitHub.
+ * Left: build label + tagline + commit SHA (so a tester reporting a
+ * bug can say "I'm on build 5e10154" and we can trace it precisely).
+ * Right: Feedback / Roadmap / GitHub links.
  *
- * Static (server-rendered). Lives at the bottom of the column layout
- * in app/layout.tsx; the page's <main> uses flex-1 so this lands at
- * the viewport bottom on short pages and below content on long ones.
+ * Static markup; the FeedbackTrigger child opens a client-side modal.
  */
 export function SiteFooter() {
   return (
@@ -14,7 +16,14 @@ export function SiteFooter() {
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-foreground/70">Practice Prodigy</span>
         <span aria-hidden="true">·</span>
-        <span>v0.1 pre-release</span>
+        <span>v{APP_VERSION}</span>
+        <span aria-hidden="true">·</span>
+        <span
+          title={`Build: ${BUILD_SHA_SHORT}`}
+          className="text-muted-foreground/70"
+        >
+          {BUILD_SHA_SHORT}
+        </span>
         <span className="hidden sm:inline" aria-hidden="true">
           ·
         </span>
@@ -23,6 +32,7 @@ export function SiteFooter() {
         </span>
       </div>
       <div className="flex items-center gap-4">
+        <FeedbackTrigger />
         <Link
           href="/roadmap"
           className="hover:text-foreground transition-colors"
