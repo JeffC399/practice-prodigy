@@ -156,6 +156,22 @@ function chordsForRep(
 }
 
 /**
+ * First N play chords the user would see — used by the setup-page
+ * Preview panel so you can sanity-check what's about to play before
+ * pressing Start. For deterministic ordering strategies this is exact;
+ * for random strategies it's a freshly-rolled sample (which means the
+ * preview re-rolls when the user changes any config field — that's the
+ * point: shows that random strategies vary).
+ */
+export function previewPlayChords(
+  config: SequenceConfig,
+  count: number,
+): Chord[] {
+  if (config.pool.length === 0 || count <= 0) return [];
+  return buildPlayChords(config).slice(0, count);
+}
+
+/**
  * Find the next chord that DIFFERS from the chord at the given beat
  * index, used to drive the NEXT preview on the drill screen.
  * Returns null if no different chord remains in the sequence.

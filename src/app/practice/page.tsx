@@ -51,11 +51,13 @@ import {
   isShippedDrill,
   SHIPPED_DRILLS,
 } from "@/lib/data/shipped-drills";
+import { previewPlayChords } from "@/lib/music/sequence";
 import {
   ArrowRight,
   Bookmark,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   GripVertical,
   ListChecks,
@@ -85,7 +87,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Practice setup screen. The user configures the drill here, then proceeds
@@ -401,6 +403,38 @@ export default function PracticeSetupPage() {
 
   const poolSize = config.chordPool.length;
   const isLongForm = config.notationStyle === "long-form";
+
+  // Pre-flight preview — first 4 play chords the user will hear with
+  // the current ordering applied. For deterministic strategies this is
+  // exact; for random it's a freshly-rolled sample (re-rolls on every
+  // config change), with a caption that says actual order will vary.
+  // Lets the user catch "I configured this wrong" before pressing Start.
+  const previewChords =
+    poolSize === 0
+      ? []
+      : previewPlayChords(
+          {
+            pool: config.chordPool,
+            orderingStrategy: config.orderingStrategy,
+            drillMeasures: config.drillMeasures,
+            repetitions: config.repetitions,
+            repeatIndefinitely: config.repeatIndefinitely,
+            timeSignature: config.timeSignature,
+            transitionUnit: config.transitionUnit,
+            transitionCount: config.transitionCount,
+          },
+          4,
+        );
+  const isRandomStrategy = RANDOM_ORDERING_STRATEGIES.has(
+    config.orderingStrategy,
+  );
+  const renderedPreviewChords = previewChords.map((chord) =>
+    renderChord(chord, config.notationStyle),
+  );
+  const totalPlayChords = config.repeatIndefinitely
+    ? Infinity
+    : config.drillMeasures * config.repetitions;
+  const previewHasMore = totalPlayChords > previewChords.length;
 
   // One-line summaries surfaced in the collapsed section headers so the
   // user always sees the current value without expanding.
@@ -1232,6 +1266,67 @@ export default function PracticeSetupPage() {
               )}
             </p>
           </CollapsibleSection>
+
+          {/* Pre-flight preview — shows the first chords the user will
+              actually hear, with the current ordering applied. Catches
+              "I configured this wrong" before drilling 16 measures. */}
+          {previewChords.length > 0 && (
+            <section
+              className="flex flex-col gap-3 rounded-md border border-border bg-background/30 px-4 py-3"
+              aria-label="Drill preview"
+            >
+              <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                Up first
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {renderedPreviewChords.map((label, i) => (
+                  <Fragment key={i}>
+                    {i > 0 && (
+                      <ChevronRight
+                        className="h-3.5 w-3.5 text-muted-foreground/40"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span
+                      className={`inline-flex items-center rounded-md border border-border/60 bg-background/60 px-2.5 py-1 font-mono font-medium text-foreground leading-none ${
+                        isLongForm ? "text-xs" : "text-base"
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  </Fragment>
+                ))}
+                {previewHasMore && (
+                  <>
+                    <ChevronRight
+                      className="h-3.5 w-3.5 text-muted-foreground/40"
+                      aria-hidden="true"
+                    />
+                    <span className="font-mono text-sm text-muted-foreground/70">
+                      …
+                    </span>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {isRandomStrategy ? (
+                  <>
+                    Random ordering —{" "}
+                    <span className="text-foreground">
+                      the actual order will vary
+                    </span>{" "}
+                    each time you press Start. This is one sample roll.
+                  </>
+                ) : (
+                  <>
+                    These are the first {previewChords.length} chord
+                    {previewChords.length === 1 ? "" : "s"} you&rsquo;ll
+                    hear. Re-check before launching.
+                  </>
+                )}
+              </p>
+            </section>
+          )}
 
           {/* Start button */}
           <div className="flex flex-col gap-3">
