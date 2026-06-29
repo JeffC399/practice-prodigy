@@ -325,6 +325,63 @@ class MetronomeEngine {
     Tone.getTransport().bpm.value = bpm;
   }
 
+  /**
+   * Jump the engine's position to a specific 0-indexed beat in the
+   * configured sequence. Used by the mid-drill controls (restart
+   * current chord, skip to next chord, rewind one chord) — lets the
+   * user redo a flubbed chord without restarting the whole drill.
+   *
+   * Internally:
+   *  1. Pre-counts play-vs-transition beats up to the target so the
+   *     play-beat counter ends up in lockstep with the new position.
+   *  2. Sets beatCounter / playBeatCounter such that the NEXT scheduled
+   *     tick reads as the target beat.
+   *  3. Immediately advances the UI state to the target so the user
+   *     gets instant feedback (no perceptible lag waiting for the next
+   *     transport tick to fire).
+   *
+   * Audio note: Tone.js's transport lookahead may have already scheduled
+   * one or two clicks past the current position — those will still
+   * play (audio leakage at the moment of the jump). Acceptable for
+   * v1; the visual + position update are immediate.
+   *
+   * No-op if the engine is idle or the target is out of range.
+   */
+  jumpToBeat(targetBeatIndex: number): void {
+    if (this.state.phase === "idle" || !this.config) return;
+    if (targetBeatIndex < 0) return;
+    if (
+      this.config.totalPlayingBeats !== undefined &&
+      targetBeatIndex >= this.config.totalPlayingBeats
+    ) {
+      return;
+    }
+
+    // Count play beats strictly BEFORE target so playBeatCounter ends
+    // up at the right value once the target beat (if play) is consumed.
+    let playBeatsBeforeTarget = 0;
+    for (let i = 0; i < targetBeatIndex; i++) {
+      const isPrep =
+        (this.config.beatStyles?.[i] ?? "play") === "transition";
+      if (!isPrep) playBeatsBeforeTarget += 1;
+    }
+
+    this.beatCounter = targetBeatIndex - 1;
+    this.playBeatCounter = playBeatsBeforeTarget - 1;
+
+    // Drive immediate UI feedback. Mirror the per-tick logic: pretend
+    // the next tick just fired and call advanceUiState with the
+    // POST-increment counter values.
+    const isTargetPrep =
+      (this.config.beatStyles?.[targetBeatIndex] ?? "play") === "transition";
+    const playBeatAfterTick = isTargetPrep
+      ? playBeatsBeforeTarget - 1
+      : playBeatsBeforeTarget;
+    this.beatCounter = targetBeatIndex;
+    this.playBeatCounter = playBeatAfterTick;
+    this.advanceUiState(targetBeatIndex, playBeatAfterTick);
+  }
+
   stop(): void {
     const transport = Tone.getTransport();
     if (this.scheduledId !== null) {

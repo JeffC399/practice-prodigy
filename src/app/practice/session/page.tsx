@@ -5,8 +5,11 @@ import { useMetronome } from "@/lib/audio/use-metronome";
 import { ARPEGGIO_PATTERN_SHORT_NAMES } from "@/lib/music/arpeggio";
 import { renderChord } from "@/lib/music/render-chord";
 import {
+  currentChordStartIndex,
   findNextDifferentChord,
   generateSequence,
+  nextChordStartIndex,
+  prevChordStartIndex,
   type SequenceBeat,
 } from "@/lib/music/sequence";
 import {
@@ -16,7 +19,16 @@ import {
   usePracticeConfig,
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary } from "@/lib/state/drills-library";
-import { Minus, Play, Plus, Square, Settings2 } from "lucide-react";
+import {
+  Minus,
+  Play,
+  Plus,
+  RotateCcw,
+  Settings2,
+  SkipBack,
+  SkipForward,
+  Square,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -218,6 +230,35 @@ export default function PracticeSessionPage() {
     metronomeEngine.setBpm(next);
   };
 
+  // Mid-drill jump targets — computed once per render against the live
+  // sequence so the button enabled/disabled states stay accurate as the
+  // user advances through chord runs.
+  const currentBeatIndex = isPlaying ? absoluteBeat - 1 : 0;
+  const jumpTargets = useMemo(() => {
+    if (!isPlaying || activeSequence === null) {
+      return { restart: null, skip: null, rewind: null };
+    }
+    return {
+      restart: currentChordStartIndex(activeSequence, currentBeatIndex),
+      skip: nextChordStartIndex(activeSequence, currentBeatIndex),
+      rewind: prevChordStartIndex(activeSequence, currentBeatIndex),
+    };
+  }, [isPlaying, activeSequence, currentBeatIndex]);
+
+  // "Restart" at the very first beat of the very first chord is a no-op,
+  // so we disable it there — otherwise the button is always available
+  // during play, including transition beats (where it restarts the just-
+  // played chord, the user's instinctive recovery move).
+  const canRestart =
+    jumpTargets.restart !== null && jumpTargets.restart < currentBeatIndex;
+  const canSkip = jumpTargets.skip !== null;
+  const canRewind = jumpTargets.rewind !== null;
+
+  const jumpTo = (target: number | null) => {
+    if (target === null) return;
+    metronomeEngine.jumpToBeat(target);
+  };
+
   return (
     <main className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -253,6 +294,43 @@ export default function PracticeSessionPage() {
             <span className="text-primary">
               Prep {config.transitionCount}
               {config.transitionUnit === "measures" ? "m" : "b"}
+            </span>
+          )}
+          {/* Mid-drill jump controls — only visible while playing.
+              Restart/skip/rewind let the user redo a flubbed chord or
+              jump ahead without restarting the whole drill. */}
+          {isPlaying && (
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => jumpTo(jumpTargets.rewind)}
+                disabled={!canRewind}
+                aria-label="Rewind one chord"
+                title="Rewind one chord"
+                className="flex h-6 w-6 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <SkipBack className="h-3 w-3" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => jumpTo(jumpTargets.restart)}
+                disabled={!canRestart}
+                aria-label="Restart current chord"
+                title="Restart current chord"
+                className="flex h-6 w-6 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => jumpTo(jumpTargets.skip)}
+                disabled={!canSkip}
+                aria-label="Skip to next chord"
+                title="Skip to next chord"
+                className="flex h-6 w-6 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <SkipForward className="h-3 w-3" aria-hidden="true" />
+              </button>
             </span>
           )}
           {/* Live tempo nudge — adjusts the metronome and the persisted

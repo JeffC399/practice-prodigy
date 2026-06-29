@@ -172,6 +172,92 @@ export function previewPlayChords(
 }
 
 /**
+ * First beat index of the current chord's run — the chord the user
+ * just played (or is about to play). For play beats this walks back to
+ * the start of the contiguous run of the same play chord. For
+ * transition beats, walks back PAST the transition run to the run of
+ * the just-played chord (transitions show the upcoming chord visually
+ * but the just-played chord is what the user wants to "restart").
+ *
+ * Used by the drill-screen "Restart current chord" control.
+ */
+export function currentChordStartIndex(
+  sequence: SequenceBeat[],
+  beatIndex: number,
+): number {
+  if (sequence.length === 0 || beatIndex < 0) return 0;
+  const safeIndex = Math.min(beatIndex, sequence.length - 1);
+  let i = safeIndex;
+  // If we landed in a transition run, walk back to the last play beat
+  // before it — that's the just-played chord.
+  if (sequence[i].kind === "transition") {
+    while (i >= 0 && sequence[i].kind === "transition") i -= 1;
+    if (i < 0) return 0;
+  }
+  const ref = sequence[i].chord;
+  // Walk back while previous beat is the same chord on a play beat.
+  while (
+    i > 0 &&
+    sequence[i - 1].kind === "play" &&
+    chordsEqual(sequence[i - 1].chord, ref)
+  ) {
+    i -= 1;
+  }
+  return i;
+}
+
+/**
+ * First beat index of the NEXT chord's run after the given position.
+ * For a play beat in the middle of a chord, walks forward past the
+ * rest of the current chord and past any following transition run.
+ * For a transition beat (where the next chord is already on display),
+ * walks forward past the transition to the first play beat of that
+ * upcoming chord. Returns null if there's no next chord in range.
+ *
+ * Used by the drill-screen "Skip to next chord" control.
+ */
+export function nextChordStartIndex(
+  sequence: SequenceBeat[],
+  beatIndex: number,
+): number | null {
+  if (sequence.length === 0 || beatIndex < 0) return null;
+  const safeIndex = Math.min(beatIndex, sequence.length - 1);
+  let i = safeIndex;
+  if (sequence[i].kind === "transition") {
+    while (i < sequence.length && sequence[i].kind === "transition") i += 1;
+    return i < sequence.length ? i : null;
+  }
+  const ref = sequence[i].chord;
+  // Skip past the rest of the current chord's play run.
+  while (
+    i < sequence.length &&
+    sequence[i].kind === "play" &&
+    chordsEqual(sequence[i].chord, ref)
+  ) {
+    i += 1;
+  }
+  // Skip past any transition leading into the next chord.
+  while (i < sequence.length && sequence[i].kind === "transition") i += 1;
+  return i < sequence.length ? i : null;
+}
+
+/**
+ * First beat index of the chord BEFORE the current chord's run — i.e.
+ * one chord further back than currentChordStartIndex. Returns null
+ * when there's no earlier chord (current chord is already first).
+ *
+ * Used by the drill-screen "Rewind one chord" control.
+ */
+export function prevChordStartIndex(
+  sequence: SequenceBeat[],
+  beatIndex: number,
+): number | null {
+  const currentStart = currentChordStartIndex(sequence, beatIndex);
+  if (currentStart <= 0) return null;
+  return currentChordStartIndex(sequence, currentStart - 1);
+}
+
+/**
  * Find the next chord that DIFFERS from the chord at the given beat
  * index, used to drive the NEXT preview on the drill screen.
  * Returns null if no different chord remains in the sequence.
