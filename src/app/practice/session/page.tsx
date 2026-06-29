@@ -616,28 +616,27 @@ export default function PracticeSessionPage() {
           />
 
           {/* Progress bar — peripheral indicator of how far through a
-              fixed-length drill the user is. Hidden during count-in /
-              prep (the chord display does the heavy lifting then) and
-              hidden entirely for indefinite loops (no total to track
-              progress against). Thin and unobtrusive; sits below the
-              PhaseBadge so the eye can glance without leaving the
-              drill area. */}
-          {isPlaying &&
-            !isTransition &&
-            totalPlayMeasures !== null &&
-            totalPlayMeasures > 0 && (
+              fixed-length drill the user is. The wrapper is ALWAYS
+              rendered (with reserved h-1 height) so the chord panels
+              below don't jump when the bar appears/disappears during
+              prep <-> play transitions. Visibility is controlled by
+              opacity, not conditional render. Hidden entirely for
+              indefinite loops since there's no total to track. */}
+          {totalPlayMeasures !== null && totalPlayMeasures > 0 && (
+            <div
+              className={`h-1 w-full max-w-md overflow-hidden rounded-full bg-border/60 transition-opacity duration-300 ${
+                isPlaying && !isTransition ? "opacity-100" : "opacity-0"
+              }`}
+              aria-hidden="true"
+            >
               <div
-                className="h-1 w-full max-w-md overflow-hidden rounded-full bg-border/60"
-                aria-hidden="true"
-              >
-                <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{
-                    width: `${Math.min(100, (state.measureInSession / totalPlayMeasures) * 100)}%`,
-                  }}
-                />
-              </div>
-            )}
+                className="h-full bg-primary transition-all duration-300"
+                style={{
+                  width: `${Math.min(100, (state.measureInSession / totalPlayMeasures) * 100)}%`,
+                }}
+              />
+            </div>
+          )}
 
           {practiceLayout === "two-pane" ? (
             <TwoPaneDisplay
@@ -685,24 +684,42 @@ export default function PracticeSessionPage() {
 
               {/* Big chord — anchored on the most-recently-PLAYED chord.
                   Stays put during prep beats so the visual stays calm; the
-                  audio change (stick-click) is the prep signal. Opacity
-                  dims during count-in (set via inline style so Tailwind
-                  class purging can't silently drop it) to mirror the
-                  aural stick-click distinction. */}
-              <div className="flex flex-col items-center gap-3">
+                  audio change (stick-click) is the prep signal. During
+                  prep a beat-synced pulsing ring + amber glow wraps the
+                  chord block, mirroring the two-pane Now panel treatment.
+                  Opacity dims to 0.5 during prep (same scale as two-pane).
+              */}
+              <div className="relative flex flex-col items-center gap-3 px-8 py-6 rounded-xl">
+                {isPreparing && (
+                  <motion.span
+                    // Re-keying on each beat re-mounts the span,
+                    // restarting the initial → animate transition.
+                    // The ring flash lands ON each audio click.
+                    key={beatTick}
+                    initial={{ opacity: 1 }}
+                    animate={{ opacity: 0.25 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -inset-1 rounded-xl ring-4 ring-primary"
+                    style={{
+                      boxShadow:
+                        "0 0 18px 2px rgba(245, 158, 11, 0.7)",
+                    }}
+                  />
+                )}
                 <div
-                  className={`font-mono font-semibold leading-none tracking-tight transition-opacity duration-300 text-center text-foreground ${
+                  className={`relative z-10 font-mono font-semibold leading-none tracking-tight transition-opacity duration-300 text-center text-foreground ${
                     isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
                   }`}
                   style={{
-                    opacity: isIdle ? 0.4 : isPreparing ? 0.6 : 1,
+                    opacity: isIdle ? 0.35 : isPreparing ? 0.5 : 1,
                   }}
                   aria-live="polite"
                 >
                   {currentLabel}
                 </div>
                 {!isIdle && (
-                  <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                  <span className="relative z-10 font-mono text-xs uppercase tracking-wider text-muted-foreground">
                     {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
                   </span>
                 )}
