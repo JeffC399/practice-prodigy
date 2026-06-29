@@ -112,6 +112,12 @@ export type UserPrefs = {
   notationDefault: ChordNotationStyle;
   /** How the arpeggio pattern label renders on the drill screen. */
   patternDisplay: PatternDisplay;
+  /**
+   * Has the user dismissed the first-visit onboarding hint on
+   * /practice? Defaults false — the welcome card shows once until the
+   * user clicks the "Got it" / X dismiss action, then never again.
+   */
+  hasSeenOnboarding: boolean;
 };
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
@@ -120,6 +126,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   accent: "amber",
   notationDefault: "jazz-minus",
   patternDisplay: "name",
+  hasSeenOnboarding: false,
 };
 
 type UserPrefsStore = UserPrefs & {
@@ -128,6 +135,8 @@ type UserPrefsStore = UserPrefs & {
   setAccent: (accent: AccentPalette) => void;
   setNotationDefault: (style: ChordNotationStyle) => void;
   setPatternDisplay: (display: PatternDisplay) => void;
+  /** Mark the first-visit onboarding hint as dismissed. */
+  dismissOnboarding: () => void;
   /** Reset all prefs to defaults. Used by the future Settings reset action. */
   resetAll: () => void;
 };
@@ -141,6 +150,7 @@ export const useUserPrefs = create<UserPrefsStore>()(
       setAccent: (accent) => set({ accent }),
       setNotationDefault: (notationDefault) => set({ notationDefault }),
       setPatternDisplay: (patternDisplay) => set({ patternDisplay }),
+      dismissOnboarding: () => set({ hasSeenOnboarding: true }),
       resetAll: () => set(DEFAULT_USER_PREFS),
     }),
     {

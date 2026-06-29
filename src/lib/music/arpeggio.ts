@@ -94,7 +94,7 @@ const BUILT_IN_DEFS: Record<BuiltInPattern, BuiltInPatternDef> = {
     displayName: "7th Chords ascending (1-3-5-7)",
     shortName: "7th Chords ↑",
     description:
-      "Adapts to each chord — plays 1-3-5-7 of whatever's up. Maj7 plays the major-7th sound, m7 plays minor-7th, dim7 plays diminished-7th, etc. Triads fall back to 1-3-5-octave. Even quarters.",
+      "The foundational jazz arpeggio. Drills the four chord tones in order so each chord quality (maj7, m7, dom7, dim7) lands in your fingers as a distinct shape. Master this first.",
     notes: [
       { kind: "chordTone", index: 0, octaveShift: 0, duration: "quarter" },
       { kind: "chordTone", index: 1, octaveShift: 0, duration: "quarter" },
@@ -109,7 +109,7 @@ const BUILT_IN_DEFS: Record<BuiltInPattern, BuiltInPatternDef> = {
     displayName: "7th Chords descending (8-7-5-3)",
     shortName: "7th Chords ↓",
     description:
-      "Mirror of 7th Chords ascending — plays octave-7-5-3 top-down. Ear-training and fingerboard fluency for descending lines. Triads' 7th falls back to the octave for consistency.",
+      "Builds fluency for descending lines — the direction most bassists are weakest in. Trains your ear to hear chord quality from the top down, which is how voice-leading actually moves.",
     notes: [
       // Octave-up root, then 7, 5, 3 descending.
       { kind: "chordTone", index: 0, octaveShift: 1, duration: "quarter" },
@@ -125,7 +125,7 @@ const BUILT_IN_DEFS: Record<BuiltInPattern, BuiltInPatternDef> = {
     displayName: "Triads ascending (1-3-5)",
     shortName: "Triads ↑",
     description:
-      "Adapts to each chord — plays 1-3-5 of whatever's up. Each triad is 8th + 8th + quarter (half a 4/4 measure), so the pattern plays twice per measure in 4/4. Maj plays major triad, min plays minor triad, etc.",
+      "The harmonic skeleton without the 7th — internalizes the basic chord shape in a rhythmic pattern (eighth + eighth + quarter, twice per 4/4 bar). Great for warming up or drilling new chord changes.",
     notes: [
       { kind: "chordTone", index: 0, octaveShift: 0, duration: "8th" },
       { kind: "chordTone", index: 1, octaveShift: 0, duration: "8th" },
@@ -142,7 +142,7 @@ const BUILT_IN_DEFS: Record<BuiltInPattern, BuiltInPatternDef> = {
     displayName: "Triads descending (5-3-1)",
     shortName: "Triads ↓",
     description:
-      "Mirror of Triads ascending — plays 5-3-1 top-down with 8th + 8th + quarter, twice per measure in 4/4. Useful for internalizing the triad shape in both directions.",
+      "Triad shape from the top — 5-3-1 with eighth + eighth + quarter, twice per bar. Pair with ascending Triads for a complete grip on the chord shape in both directions.",
     notes: [
       { kind: "chordTone", index: 2, octaveShift: 0, duration: "8th" },
       { kind: "chordTone", index: 1, octaveShift: 0, duration: "8th" },
