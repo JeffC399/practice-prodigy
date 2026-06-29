@@ -34,6 +34,12 @@ export function SiteFooter() {
       <div className="flex items-center gap-4">
         <FeedbackTrigger />
         <Link
+          href="/settings"
+          className="hover:text-foreground transition-colors"
+        >
+          settings
+        </Link>
+        <Link
           href="/roadmap"
           className="hover:text-foreground transition-colors"
         >

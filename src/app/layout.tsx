@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import { ServiceWorkerRegister } from "@/components/shell/service-worker-register";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
+import { ThemeApplicator } from "@/components/shell/theme-applicator";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -56,6 +57,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <ThemeApplicator />
         <SiteHeader />
         {children}
         <SiteFooter />
