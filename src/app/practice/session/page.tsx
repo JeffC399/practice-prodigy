@@ -3,12 +3,13 @@
 import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import {
-  ARPEGGIO_PATTERN_DEGREES,
-  ARPEGGIO_PATTERN_NOTE_COUNT,
-  ARPEGGIO_PATTERN_SHORT_NAMES,
+  getPatternDegrees,
+  getPatternNoteCount,
+  getPatternShortName,
   parsePatternDegrees,
   type ArpeggioPattern,
 } from "@/lib/music/arpeggio";
+import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
 import { renderChord } from "@/lib/music/render-chord";
 import {
   buildPatternsForSession,
@@ -213,10 +214,13 @@ export default function PracticeSessionPage() {
   /** Compact pattern-pool summary for the drill-screen header. Uses
    *  the name-form regardless of patternDisplay (so the header is
    *  always identifiable even when subtitles are degrees/hidden). */
+  // Subscribe to the custom-patterns library so the labels live-update
+  // when a custom pattern is renamed/deleted while the drill is open.
+  useCustomPatternsLibrary((s) => s.patterns);
   const headerPatternLabel =
     config.patternPool.length <= 1
-      ? ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern]
-      : `${ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern]} +${config.patternPool.length - 1}`;
+      ? getPatternShortName(currentPattern)
+      : `${getPatternShortName(currentPattern)} +${config.patternPool.length - 1}`;
 
   // Lit-up scale-degree tracking — for the "degrees" pattern-display
   // mode, the digits in the current chord's subtitle pulse in time
@@ -241,7 +245,12 @@ export default function PracticeSessionPage() {
       return;
     }
 
-    const noteCount = ARPEGGIO_PATTERN_NOTE_COUNT[currentPattern];
+    const noteCount = getPatternNoteCount(currentPattern);
+    if (noteCount === 0) {
+      // Custom pattern was deleted, or empty pattern — nothing to highlight.
+      setActiveNoteIdx(-1);
+      return;
+    }
     const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
     const notesPerBeat = noteCount / beatsPerMeasure;
     const beat = state.beatInMeasure; // 1-indexed
@@ -1065,14 +1074,14 @@ function PatternSubtitle({
       : "font-mono text-[11px] uppercase tracking-wider text-muted-foreground";
 
   if (mode === "name") {
-    return <span className={baseClass}>{ARPEGGIO_PATTERN_SHORT_NAMES[pattern]}</span>;
+    return <span className={baseClass}>{getPatternShortName(pattern)}</span>;
   }
   // degrees mode — per-digit rendering
   const segments = parsePatternDegrees(pattern);
   return (
     <span
       className={baseClass}
-      aria-label={`Scale degrees: ${ARPEGGIO_PATTERN_DEGREES[pattern]}`}
+      aria-label={`Scale degrees: ${getPatternDegrees(pattern)}`}
     >
       {segments.map((seg, i) => {
         const isActive = activeNoteIdx === seg.idx;

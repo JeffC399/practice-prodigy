@@ -7,10 +7,14 @@ import {
   ARPEGGIO_PATTERNS,
   ARPEGGIO_PATTERN_DESCRIPTIONS,
   ARPEGGIO_PATTERN_DISPLAY_NAMES,
-  ARPEGGIO_PATTERN_SHORT_NAMES,
   generateArpeggio,
+  getPatternDisplayName,
+  getPatternShortName,
   type ArpeggioPattern,
 } from "@/lib/music/arpeggio";
+import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
+import { CustomPatternEditor } from "@/components/practice/custom-pattern-editor";
+import { notesToDegreeString } from "@/lib/music/custom-patterns";
 import {
   CHORD_QUALITIES,
   PITCH_CLASSES,
@@ -154,6 +158,15 @@ export default function PracticeSetupPage() {
   // writes to the per-drill override (setPatternDisplay from
   // the config store, destructured above), NOT here.
   const globalPatternDisplay = useUserPrefs((s) => s.patternDisplay);
+  // Custom patterns library (Phase 13). Subscribed so the pattern grid
+  // re-renders when patterns are created / renamed / deleted.
+  const customPatterns = useCustomPatternsLibrary((s) => s.patterns);
+  // Custom-pattern editor modal state. `editingId` is null for the
+  // "+ New custom pattern" flow, or the existing pattern's id for edit.
+  const [editorState, setEditorState] = useState<{
+    open: boolean;
+    editingId: string | null;
+  }>({ open: false, editingId: null });
   const resume = useResumeSession();
   const resumable = isResumable(resume.active);
   const handleResumeClick = async () => {
@@ -550,8 +563,8 @@ export default function PracticeSetupPage() {
   const patternPoolCount = config.patternPool.length;
   const patternSummary =
     patternPoolCount <= 1
-      ? ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]
-      : `${patternPoolCount} patterns · ${ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}+`;
+      ? getPatternShortName(config.arpeggioPattern)
+      : `${patternPoolCount} patterns · ${getPatternShortName(config.arpeggioPattern)}+`;
   const tempoMeterSummary = `♩ = ${config.bpm} · ${config.timeSignature.beatsPerMeasure}/${config.timeSignature.beatUnit}`;
   const prepSummary =
     config.transitionCount > 0
@@ -1199,7 +1212,9 @@ export default function PracticeSetupPage() {
               {/* Multi-select pattern pool. Each checkbox toggles a
                   pattern in/out of the pool. The first pattern in the
                   pool is the "primary" — used for the Preview button
-                  and as the legacy arpeggioPattern fallback. */}
+                  and as the legacy arpeggioPattern fallback. Built-ins
+                  are listed first; user-authored custom patterns
+                  follow with an inline Edit affordance. */}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {ARPEGGIO_PATTERNS.map((p) => {
                   const inPool = config.patternPool.includes(p);
@@ -1239,12 +1254,75 @@ export default function PracticeSetupPage() {
                     </label>
                   );
                 })}
+                {customPatterns.map((cp) => {
+                  const inPool = config.patternPool.includes(cp.id);
+                  const isOnlyPattern =
+                    inPool && config.patternPool.length === 1;
+                  const degreeStr = notesToDegreeString(cp.notes);
+                  return (
+                    <div
+                      key={cp.id}
+                      className={`group relative flex items-start gap-2 rounded-md border px-3 py-2 transition-colors ${
+                        inPool
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border bg-background hover:border-primary/40"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={inPool}
+                        disabled={isOnlyPattern}
+                        onChange={() => togglePatternInPool(cp.id)}
+                        className="mt-0.5 h-4 w-4 accent-primary cursor-pointer disabled:cursor-not-allowed"
+                        aria-label={`Toggle ${cp.name} in pool`}
+                      />
+                      <div className="flex flex-1 flex-col gap-0.5 pr-7">
+                        <span
+                          className={`text-sm font-medium ${
+                            inPool ? "text-primary" : "text-foreground"
+                          }`}
+                        >
+                          {cp.name}{" "}
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-normal">
+                            · custom
+                          </span>
+                        </span>
+                        <span className="font-mono text-[11px] text-muted-foreground leading-snug">
+                          {degreeStr}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setEditorState({ open: true, editingId: cp.id });
+                        }}
+                        className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-secondary transition-all"
+                        aria-label={`Edit ${cp.name}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Tick one pattern for a single-pattern drill (the v1
-                default) or multiple to cycle through them. The drill
-                always keeps at least one pattern.
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Tick one pattern for a single-pattern drill (the v1
+                  default) or multiple to cycle through them. The drill
+                  always keeps at least one pattern.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditorState({ open: true, editingId: null })
+                  }
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/15 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New custom pattern
+                </button>
+              </div>
 
               {/* Ordering picker — only relevant when pool has 2+
                   patterns. Custom (cycles through in checkbox order) is
@@ -1298,7 +1376,7 @@ export default function PracticeSetupPage() {
                   >
                     {config.patternPool.map((p) => (
                       <option key={p} value={p}>
-                        {ARPEGGIO_PATTERN_DISPLAY_NAMES[p]}
+                        {getPatternDisplayName(p)}
                       </option>
                     ))}
                   </Select>
@@ -1327,7 +1405,7 @@ export default function PracticeSetupPage() {
                   ) : (
                     <>
                       <Play className="h-4 w-4" aria-hidden="true" />
-                      Preview {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+                      Preview {getPatternShortName(config.arpeggioPattern)}
                     </>
                   )}
                 </button>
@@ -1951,6 +2029,23 @@ export default function PracticeSetupPage() {
           </div>
         </div>
       </div>
+      {editorState.open && (
+        <CustomPatternEditor
+          editingId={editorState.editingId}
+          onClose={() =>
+            setEditorState({ open: false, editingId: null })
+          }
+          onSaved={(newId) => {
+            // Auto-toggle the just-saved pattern into the pool, but
+            // only on Create (edits leave pool membership alone).
+            if (!editorState.editingId) {
+              if (!config.patternPool.includes(newId)) {
+                togglePatternInPool(newId);
+              }
+            }
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -2010,7 +2105,7 @@ function DrillCard({
         </div>
         <div className="mt-1.5 truncate font-mono text-xs text-muted-foreground">
           {c.chordPool.length} chord{c.chordPool.length === 1 ? "" : "s"} ·{" "}
-          {ARPEGGIO_PATTERN_SHORT_NAMES[c.arpeggioPattern]} · ♩={c.bpm} ·{" "}
+          {getPatternShortName(c.arpeggioPattern)} · ♩={c.bpm} ·{" "}
           {c.timeSignature.beatsPerMeasure}/{c.timeSignature.beatUnit}
         </div>
         <div className="truncate text-xs text-muted-foreground">

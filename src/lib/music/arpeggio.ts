@@ -5,42 +5,73 @@ import {
   SCALE_INTERVALS,
   semitoneToMidi,
 } from "./intervals";
+import {
+  isCustomPatternId,
+  notesToDegreeString,
+  SEMITONE_LABELS,
+  type CustomPattern,
+} from "./custom-patterns";
+import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
 
 /**
  * Arpeggio pattern generation.
  *
- * Each pattern produces an ordered list of MIDI note numbers to play for
- * a given chord. The four v1 patterns come from PROJECT-DESIGN.md §4.3.
- * Octave/register is auto-selected to keep notes in a comfortable middle
- * bass range (root anchored at octave 2 → typical notes around E2–C4).
+ * Phase 13 widened `ArpeggioPattern` from a closed union of built-in
+ * IDs to plain `string` so user-authored custom patterns (id prefix
+ * `custom_`) flow through every code path that touched the old union.
+ * The four built-ins are still listed in `BUILT_IN_PATTERNS` for the
+ * checkbox grid and lookup tables; the helper functions below resolve
+ * either built-in or custom IDs at call time.
+ *
+ * Octave/register is auto-selected to keep notes in a comfortable
+ * middle bass range (root anchored at octave 2 → typical notes around
+ * E2–C4).
  */
 
-export const ARPEGGIO_PATTERNS = [
+export const BUILT_IN_PATTERNS = [
   "scale-tones",
   "arp-7ths",
   "triads-with-lt",
   "descending",
 ] as const;
 
-export type ArpeggioPattern = (typeof ARPEGGIO_PATTERNS)[number];
+export type BuiltInPattern = (typeof BUILT_IN_PATTERNS)[number];
 
-export const ARPEGGIO_PATTERN_DISPLAY_NAMES: Record<ArpeggioPattern, string> =
-  {
-    "scale-tones": "Scale Tones (1–2–3–4–5–6–7–8)",
-    "arp-7ths": "Arpeggiated 7ths (1–3–5–7)",
-    "triads-with-lt": "Triads with Leading Tones (1–3–5–LT)",
-    descending: "Descending (8–7–5–3)",
-  };
+/**
+ * Backwards-compatible alias. Pre-Phase-13 callers iterated over
+ * `ARPEGGIO_PATTERNS` to render the built-in checkbox row — that
+ * surface still wants only built-ins, so this constant stays scoped
+ * to the four built-ins. Use the custom-patterns library to enumerate
+ * user patterns separately.
+ */
+export const ARPEGGIO_PATTERNS = BUILT_IN_PATTERNS;
 
-/** Short labels for compact UI surfaces like the drill-screen header. */
-export const ARPEGGIO_PATTERN_SHORT_NAMES: Record<ArpeggioPattern, string> = {
+/**
+ * A pattern id — either one of the four built-ins or a custom-pattern
+ * id (which lives in the custom-patterns Zustand store). Resolvers
+ * below take any string and dispatch.
+ */
+export type ArpeggioPattern = string;
+
+export function isBuiltInPattern(id: string): id is BuiltInPattern {
+  return (BUILT_IN_PATTERNS as readonly string[]).includes(id);
+}
+
+const BUILT_IN_DISPLAY_NAMES: Record<BuiltInPattern, string> = {
+  "scale-tones": "Scale Tones (1–2–3–4–5–6–7–8)",
+  "arp-7ths": "Arpeggiated 7ths (1–3–5–7)",
+  "triads-with-lt": "Triads with Leading Tones (1–3–5–LT)",
+  descending: "Descending (8–7–5–3)",
+};
+
+const BUILT_IN_SHORT_NAMES: Record<BuiltInPattern, string> = {
   "scale-tones": "Scale Tones",
   "arp-7ths": "Arp 7ths",
   "triads-with-lt": "Triads + LT",
   descending: "Descending",
 };
 
-export const ARPEGGIO_PATTERN_DESCRIPTIONS: Record<ArpeggioPattern, string> = {
+const BUILT_IN_DESCRIPTIONS: Record<BuiltInPattern, string> = {
   "scale-tones":
     "Eight notes ascending one octave through the chord's scale.",
   "arp-7ths":
@@ -51,26 +82,14 @@ export const ARPEGGIO_PATTERN_DESCRIPTIONS: Record<ArpeggioPattern, string> = {
     "Four notes descending: octave, scale's 7th, chord's 5th, chord's 3rd.",
 };
 
-/**
- * Compact scale-degree representation of each pattern. Surfaced as the
- * pattern subtitle on the drill screen when the user picks the
- * "degrees" pattern-display mode in Settings. Arabic numerals only —
- * standard arpeggio convention.
- */
-export const ARPEGGIO_PATTERN_DEGREES: Record<ArpeggioPattern, string> = {
+const BUILT_IN_DEGREES: Record<BuiltInPattern, string> = {
   "scale-tones": "1-2-3-4-5-6-7-8",
   "arp-7ths": "1-3-5-7",
   "triads-with-lt": "1-3-5-LT",
   descending: "8-7-5-3",
 };
 
-/**
- * Number of NOTES (not characters) in each pattern. Used by the lit-up
- * degrees display to calculate sub-beat timing — notes per measure
- * divided by beats-per-measure gives notes-per-beat. Multi-character
- * "notes" like LT count as 1 note.
- */
-export const ARPEGGIO_PATTERN_NOTE_COUNT: Record<ArpeggioPattern, number> = {
+const BUILT_IN_NOTE_COUNT: Record<BuiltInPattern, number> = {
   "scale-tones": 8,
   "arp-7ths": 4,
   "triads-with-lt": 4,
@@ -78,24 +97,85 @@ export const ARPEGGIO_PATTERN_NOTE_COUNT: Record<ArpeggioPattern, number> = {
 };
 
 /**
- * Split the degrees string of a pattern into per-note segments. The
- * "1-3-5-7" string becomes [{ idx: 0, label: "1" }, { idx: 1, label:
- * "3" }, ...]. Used by the drill screen's lit-up degrees display to
- * render each digit independently so we can highlight just the
- * currently-playing note.
+ * Look up a custom pattern from the persisted store. Returns undefined
+ * if the id doesn't resolve — caller should treat as a missing-pattern
+ * sentinel (deleted custom pattern that's still referenced by a saved
+ * drill). Non-React safe: uses Zustand's `getState()`.
+ */
+function lookupCustom(id: string): CustomPattern | undefined {
+  if (!isCustomPatternId(id)) return undefined;
+  return useCustomPatternsLibrary.getState().getById(id);
+}
+
+/**
+ * Long display name for a pattern. Built-ins return the full
+ * parenthesized degree-string form; customs return the user-chosen
+ * name followed by their interval-string in parentheses.
+ */
+export function getPatternDisplayName(pattern: ArpeggioPattern): string {
+  if (isBuiltInPattern(pattern)) return BUILT_IN_DISPLAY_NAMES[pattern];
+  const cp = lookupCustom(pattern);
+  if (!cp) return "Deleted pattern";
+  return `${cp.name} (${notesToDegreeString(cp.notes)})`;
+}
+
+/** Short label for dense surfaces (drill header, Quick-Start card meta). */
+export function getPatternShortName(pattern: ArpeggioPattern): string {
+  if (isBuiltInPattern(pattern)) return BUILT_IN_SHORT_NAMES[pattern];
+  const cp = lookupCustom(pattern);
+  return cp?.name ?? "Deleted";
+}
+
+/** Tooltip / description copy. Customs synthesize one from their interval list. */
+export function getPatternDescription(pattern: ArpeggioPattern): string {
+  if (isBuiltInPattern(pattern)) return BUILT_IN_DESCRIPTIONS[pattern];
+  const cp = lookupCustom(pattern);
+  if (!cp) return "This custom pattern has been deleted.";
+  return `Custom pattern: ${notesToDegreeString(cp.notes)}.`;
+}
+
+/** Degree-string subtitle (e.g. "1-3-5-7"). */
+export function getPatternDegrees(pattern: ArpeggioPattern): string {
+  if (isBuiltInPattern(pattern)) return BUILT_IN_DEGREES[pattern];
+  const cp = lookupCustom(pattern);
+  return cp ? notesToDegreeString(cp.notes) : "—";
+}
+
+/**
+ * Note count — drives sub-beat highlight timing on the drill screen
+ * (notes-per-measure / beats-per-measure = notes-per-beat).
+ */
+export function getPatternNoteCount(pattern: ArpeggioPattern): number {
+  if (isBuiltInPattern(pattern)) return BUILT_IN_NOTE_COUNT[pattern];
+  const cp = lookupCustom(pattern);
+  return cp?.notes.length ?? 0;
+}
+
+/**
+ * Split a pattern's degree string into per-note segments — used by the
+ * drill-screen subtitle to render each digit independently for the
+ * lit-up animation. Multi-character "notes" like `LT` count as 1
+ * segment; the dashes between segments are not included in the result.
  *
- * The dashes between digits ARE NOT included in the result — the
- * caller can interleave them at render time if it wants the visual
- * separator. (Phase 12 renders without dashes since the highlight
- * itself provides spacing cues; dashes were a quirk of the static
- * label form.)
+ * Custom patterns split on their internal notes array (one segment per
+ * PatternNote), so each label can be highlighted with full precision —
+ * no parsing ambiguity from glyphs like `♭3` (which would otherwise
+ * confuse a naive string split).
  */
 export function parsePatternDegrees(
   pattern: ArpeggioPattern,
 ): Array<{ idx: number; label: string }> {
-  return ARPEGGIO_PATTERN_DEGREES[pattern]
-    .split("-")
-    .map((label, idx) => ({ idx, label }));
+  if (isBuiltInPattern(pattern)) {
+    return BUILT_IN_DEGREES[pattern]
+      .split("-")
+      .map((label, idx) => ({ idx, label }));
+  }
+  const cp = lookupCustom(pattern);
+  if (!cp) return [];
+  return cp.notes.map((n, idx) => ({
+    idx,
+    label: SEMITONE_LABELS[n.semitones] ?? "?",
+  }));
 }
 
 /**
@@ -107,16 +187,29 @@ const ANCHOR_OCTAVE = 2;
 
 /**
  * Generate the MIDI note sequence for a chord + pattern combination.
+ * Built-ins use their hard-coded interval math; customs play exactly
+ * the semitone offsets the user picked, regardless of chord quality.
  */
 export function generateArpeggio(
   chord: Chord,
   pattern: ArpeggioPattern,
 ): number[] {
+  // Custom path first — short-circuits the chord/scale lookups since
+  // custom patterns use absolute semitones, not scale-relative degrees.
+  if (isCustomPatternId(pattern)) {
+    const cp = lookupCustom(pattern);
+    if (!cp) return [];
+    return cp.notes.map((n) =>
+      semitoneToMidi(chord.root, ANCHOR_OCTAVE, n.semitones),
+    );
+  }
+
+  const builtIn = pattern as BuiltInPattern;
   const chordTones = CHORD_INTERVALS[chord.quality];
   const scaleName = CHORD_DEFAULT_SCALE[chord.quality];
   const scaleTones = SCALE_INTERVALS[scaleName];
 
-  switch (pattern) {
+  switch (builtIn) {
     case "scale-tones": {
       // 1, 2, 3, 4, 5, 6, 7, 8(=octave). Take the 7 scale tones, append 12.
       const offsets = [...scaleTones, 12];
@@ -158,4 +251,20 @@ export function generateArpeggio(
       );
     }
   }
+  return [];
 }
+
+/* ---------------------------------------------------------------------- */
+/* Back-compat record-style exports                                        */
+/* ---------------------------------------------------------------------- */
+/* Old code used `ARPEGGIO_PATTERN_DISPLAY_NAMES[p]` (record indexing) for
+ * built-ins. Those callsites are getting migrated to the resolver
+ * functions above, but until every site is updated these aliases keep
+ * the old shape working for built-in IDs. Custom IDs go via the
+ * resolver functions only — record indexing on a custom id is
+ * intentionally undefined here. */
+export const ARPEGGIO_PATTERN_DISPLAY_NAMES = BUILT_IN_DISPLAY_NAMES;
+export const ARPEGGIO_PATTERN_SHORT_NAMES = BUILT_IN_SHORT_NAMES;
+export const ARPEGGIO_PATTERN_DESCRIPTIONS = BUILT_IN_DESCRIPTIONS;
+export const ARPEGGIO_PATTERN_DEGREES = BUILT_IN_DEGREES;
+export const ARPEGGIO_PATTERN_NOTE_COUNT = BUILT_IN_NOTE_COUNT;
