@@ -12,6 +12,9 @@ import {
   ACCENT_PALETTE_DISPLAY_NAMES,
   ACCENT_PALETTE_SWATCHES,
   ACCENT_PALETTES,
+  PATTERN_DISPLAYS,
+  PATTERN_DISPLAY_DESCRIPTIONS,
+  PATTERN_DISPLAY_LABELS,
   PRACTICE_LAYOUT_DESCRIPTIONS,
   PRACTICE_LAYOUT_DISPLAY_NAMES,
   PRACTICE_LAYOUTS,
@@ -49,6 +52,8 @@ export default function SettingsPage() {
   const setPracticeLayout = useUserPrefs((s) => s.setPracticeLayout);
   const notationDefault = useUserPrefs((s) => s.notationDefault);
   const setNotationDefault = useUserPrefs((s) => s.setNotationDefault);
+  const patternDisplay = useUserPrefs((s) => s.patternDisplay);
+  const setPatternDisplay = useUserPrefs((s) => s.setPatternDisplay);
   const drillsLib = useDrillsLibrary();
 
   // Gate render until after mount so persisted-store hydration doesn't
@@ -190,6 +195,45 @@ export default function SettingsPage() {
                 </option>
               ))}
             </select>
+          </SettingsField>
+        </SettingsSection>
+
+        {/* PATTERN DISPLAY — how the per-measure arpeggio pattern
+            renders below each chord on the drill screen. Independent
+            of which pattern is being drilled — just visual style. */}
+        <SettingsSection
+          title="Pattern display"
+          description="How the arpeggio pattern shows under each chord during a drill."
+        >
+          <SettingsField label="Pattern subtitle">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {PATTERN_DISPLAYS.map((mode) => {
+                const isSelected = patternDisplay === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setPatternDisplay(mode)}
+                    className={`flex flex-col gap-1 rounded-md border px-3 py-2 text-left transition-colors ${
+                      isSelected
+                        ? "border-primary/50 bg-primary/10"
+                        : "border-border bg-background hover:border-primary/40"
+                    }`}
+                  >
+                    <span
+                      className={`text-sm font-medium ${
+                        isSelected ? "text-primary" : "text-foreground"
+                      }`}
+                    >
+                      {PATTERN_DISPLAY_LABELS[mode]}
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-relaxed">
+                      {PATTERN_DISPLAY_DESCRIPTIONS[mode]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </SettingsField>
         </SettingsSection>
 

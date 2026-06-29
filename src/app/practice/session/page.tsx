@@ -3,6 +3,7 @@
 import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import {
+  ARPEGGIO_PATTERN_DEGREES,
   ARPEGGIO_PATTERN_SHORT_NAMES,
   type ArpeggioPattern,
 } from "@/lib/music/arpeggio";
@@ -66,6 +67,7 @@ export default function PracticeSessionPage() {
   const config = usePracticeConfig();
   const drillsLib = useDrillsLibrary();
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
+  const patternDisplay = useUserPrefs((s) => s.patternDisplay);
   const { state, start, stop } = useMetronome();
 
   // When the user launched this session from a Quick Start card, anchor
@@ -92,21 +94,20 @@ export default function PracticeSessionPage() {
   const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
   const countInBeats = config.countInMeasures * beatsPerMeasure;
 
-  // Idle preview: deterministic walk through the pool. For random
-  // strategies we fall back to "custom" so the preview shows the
-  // user's pool in the order they added it — no point pre-randomizing
-  // a preview the user is going to re-randomize at Start anyway.
-  // Transitions are also off here for a cleaner preview.
-  const previewStrategy = RANDOM_ORDERING_STRATEGIES.has(
-    config.orderingStrategy,
-  )
-    ? ("custom" as const)
-    : config.orderingStrategy;
+  // Idle preview: ALWAYS uses the chord pool in raw order (the same
+  // order shown in the Sequence box on /practice). User reported it
+  // was jarring that deterministic-sort strategies (chromatic asc/desc,
+  // cycle of 5ths/4ths) made the drill screen open with a different
+  // first chord than the Sequence box -- the eye landed on chord X
+  // in setup and chord Y when it navigated to the drill. Now both
+  // surfaces show the same first chord. Once the user presses Start,
+  // the actual ordering strategy kicks in. Transitions are also off
+  // here for a cleaner pre-Start preview.
   const idlePreviewSequence = useMemo(
     () =>
       generateSequence({
         pool: config.chordPool,
-        orderingStrategy: previewStrategy,
+        orderingStrategy: "custom",
         drillMeasures: config.drillMeasures,
         repetitions: config.repetitions,
         repeatIndefinitely: false,
@@ -116,7 +117,6 @@ export default function PracticeSessionPage() {
       }),
     [
       config.chordPool,
-      previewStrategy,
       config.drillMeasures,
       config.repetitions,
       config.timeSignature,
@@ -200,13 +200,28 @@ export default function PracticeSessionPage() {
     activePatterns?.[currentMeasureIdx] ?? fallbackPattern;
   const nextPattern =
     activePatterns?.[nextMeasureIdx] ?? currentPattern;
-  const currentPatternLabel = ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern];
-  const nextPatternLabel = ARPEGGIO_PATTERN_SHORT_NAMES[nextPattern];
-  /** Compact pattern-pool summary for the drill-screen header. */
+  // Pattern subtitle format follows the user's Settings preference.
+  // "name" -> "Arp 7ths" (default), "degrees" -> "1-3-5-7",
+  // "hidden" -> empty string (rendering code skips empty labels).
+  const renderPatternLabel = (p: ArpeggioPattern): string => {
+    switch (patternDisplay) {
+      case "name":
+        return ARPEGGIO_PATTERN_SHORT_NAMES[p];
+      case "degrees":
+        return ARPEGGIO_PATTERN_DEGREES[p];
+      case "hidden":
+        return "";
+    }
+  };
+  const currentPatternLabel = renderPatternLabel(currentPattern);
+  const nextPatternLabel = renderPatternLabel(nextPattern);
+  /** Compact pattern-pool summary for the drill-screen header. Uses
+   *  the name-form regardless of patternDisplay (so the header is
+   *  always identifiable even when subtitles are degrees/hidden). */
   const headerPatternLabel =
     config.patternPool.length <= 1
-      ? currentPatternLabel
-      : `${currentPatternLabel} +${config.patternPool.length - 1}`;
+      ? ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern]
+      : `${ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern]} +${config.patternPool.length - 1}`;
 
   // Monotonic per-beat key used by the prep ring's pulse animation —
   // changes on every beat tick regardless of phase. During count-in,
@@ -751,9 +766,11 @@ export default function PracticeSessionPage() {
                   >
                     {nextLabel}
                   </span>
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-                    {nextPatternLabel}
-                  </span>
+                  {nextPatternLabel && (
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                      {nextPatternLabel}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div className="h-6" aria-hidden="true" />
@@ -795,7 +812,7 @@ export default function PracticeSessionPage() {
                 >
                   {currentLabel}
                 </div>
-                {!isIdle && (
+                {!isIdle && currentPatternLabel && (
                   <span className="relative z-10 font-mono text-xs uppercase tracking-wider text-muted-foreground">
                     {currentPatternLabel}
                   </span>
@@ -1169,9 +1186,11 @@ function TwoPaneDisplay({
             >
               {currentLabel}
             </span>
-            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-              {currentPatternLabel}
-            </span>
+            {currentPatternLabel && (
+              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                {currentPatternLabel}
+              </span>
+            )}
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
@@ -1205,9 +1224,11 @@ function TwoPaneDisplay({
             >
               {nextLabel ?? "—"}
             </span>
-            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-              {nextLabel ? nextPatternLabel : " "}
-            </span>
+            {nextLabel && nextPatternLabel && (
+              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                {nextPatternLabel}
+              </span>
+            )}
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>

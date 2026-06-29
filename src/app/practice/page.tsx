@@ -321,6 +321,10 @@ export default function PracticeSetupPage() {
   // Controlled-open state for the Chord pool section, so a click on a
   // chip in the Sequence preview can force it open before scrolling.
   const [chordPoolOpen, setChordPoolOpen] = useState(false);
+  // Hide the Sequence-preview chord chips for users with huge pools
+  // who want a quieter setup screen. Header + Notation row stay visible
+  // even when chips are hidden. User-toggle; not persisted (per session).
+  const [chipsVisible, setChipsVisible] = useState(true);
   const poolRowRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   // Drag-to-reorder (chord pool, Custom order only). PointerSensor for
@@ -822,12 +826,27 @@ export default function PracticeSetupPage() {
           </CollapsibleSection>
 
           {/* Sequence preview. Min-height keeps the card stable across
-              notation styles even when the pool has just one chord. */}
-          <section className="flex min-h-72 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-10">
-            <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              notation styles even when the pool has just one chord.
+              Chip visibility is user-toggleable so large pools (Quick
+              Build wizard can produce 48+ chord pools) can be hidden
+              behind a one-click affordance. */}
+          <section
+            className={`flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-6 ${
+              chipsVisible ? "min-h-72" : ""
+            }`}
+          >
+            <div className="flex flex-wrap items-center gap-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
               <span>
                 Sequence · {poolSize} chord{poolSize === 1 ? "" : "s"}
               </span>
+              <button
+                type="button"
+                onClick={() => setChipsVisible((v) => !v)}
+                aria-pressed={chipsVisible}
+                className="rounded-sm border border-border bg-background px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              >
+                {chipsVisible ? "Hide chords" : "Show chords"}
+              </button>
               {poolSize > 1 && (
                 <button
                   type="button"
@@ -838,38 +857,40 @@ export default function PracticeSetupPage() {
                 </button>
               )}
             </div>
-            <div
-              className="flex flex-wrap items-center justify-center gap-2"
-              aria-live="polite"
-            >
-              {renderedChords.map((label, i) => (
-                <span
-                  key={i}
-                  className={`inline-flex items-center gap-2 rounded-md border border-border/50 bg-background/40 py-1.5 pl-1.5 pr-1.5 font-mono font-semibold text-foreground leading-none tracking-tight ${chipTextClass(
-                    poolSize,
-                    isLongForm,
-                  )}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSequenceChipClick(i)}
-                    aria-label={`Edit ${label} in chord pool`}
-                    className="rounded-sm px-1.5 hover:text-primary transition-colors"
+            {chipsVisible && (
+              <div
+                className="flex flex-wrap items-center justify-center gap-2"
+                aria-live="polite"
+              >
+                {renderedChords.map((label, i) => (
+                  <span
+                    key={i}
+                    className={`inline-flex items-center gap-2 rounded-md border border-border/50 bg-background/40 py-1.5 pl-1.5 pr-1.5 font-mono font-semibold text-foreground leading-none tracking-tight ${chipTextClass(
+                      poolSize,
+                      isLongForm,
+                    )}`}
                   >
-                    {label}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeChordAt(i)}
-                    disabled={poolSize <= 1}
-                    aria-label={`Remove ${label} from pool`}
-                    className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/60 hover:bg-border/60 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </span>
-              ))}
-            </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSequenceChipClick(i)}
+                      aria-label={`Edit ${label} in chord pool`}
+                      className="rounded-sm px-1.5 hover:text-primary transition-colors"
+                    >
+                      {label}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeChordAt(i)}
+                      disabled={poolSize <= 1}
+                      aria-label={`Remove ${label} from pool`}
+                      className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/60 hover:bg-border/60 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-2 pt-2">
               <label
                 htmlFor="notation-style"

@@ -52,6 +52,19 @@ export const ARPEGGIO_PATTERN_DESCRIPTIONS: Record<ArpeggioPattern, string> = {
 };
 
 /**
+ * Compact scale-degree representation of each pattern. Surfaced as the
+ * pattern subtitle on the drill screen when the user picks the
+ * "degrees" pattern-display mode in Settings. Arabic numerals only —
+ * standard arpeggio convention.
+ */
+export const ARPEGGIO_PATTERN_DEGREES: Record<ArpeggioPattern, string> = {
+  "scale-tones": "1-2-3-4-5-6-7-8",
+  "arp-7ths": "1-3-5-7",
+  "triads-with-lt": "1-3-5-LT",
+  descending: "8-7-5-3",
+};
+
+/**
  * Anchor the chord's root at octave 2 — sits comfortably in the middle
  * of a 4-string bass's range (E1–G4, with E2–C4 being the meat). Pattern
  * notes ascend or descend from there per the pattern definition.

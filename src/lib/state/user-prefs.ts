@@ -71,6 +71,35 @@ export const ACCENT_PALETTE_SWATCHES: Record<AccentPalette, string> = {
   rose: "#f43f5e",
 };
 
+/**
+ * How the arpeggio pattern label is shown on the drill screen, below
+ * each displayed chord. Independent of which pattern is being drilled
+ * — purely a visual preference.
+ */
+export type PatternDisplay =
+  /** Pattern name: "Arp 7ths", "Scale Tones", etc. v1 default. */
+  | "name"
+  /** Scale degrees: "1-3-5-7", "8-7-5-3", etc. */
+  | "degrees"
+  /** Don't show the subtitle at all. Maximum focus on the chord. */
+  | "hidden";
+
+export const PATTERN_DISPLAYS = ["name", "degrees", "hidden"] as const;
+
+export const PATTERN_DISPLAY_LABELS: Record<PatternDisplay, string> = {
+  name: "Pattern name",
+  degrees: "Scale degrees",
+  hidden: "Hidden",
+};
+
+export const PATTERN_DISPLAY_DESCRIPTIONS: Record<PatternDisplay, string> = {
+  name: "Shows the pattern name (Arp 7ths, Scale Tones, etc.). Best for jazz-style pedagogy.",
+  degrees:
+    "Shows the chord-tone positions (1-3-5-7, 8-7-5-3, etc.). Best for theory-first practice.",
+  hidden:
+    "No pattern subtitle. Maximum focus on the chord display.",
+};
+
 export type UserPrefs = {
   practiceLayout: PracticeLayout;
   theme: ThemeMode;
@@ -81,6 +110,8 @@ export type UserPrefs = {
    * is the value the picker falls back to for new drills.
    */
   notationDefault: ChordNotationStyle;
+  /** How the arpeggio pattern label renders on the drill screen. */
+  patternDisplay: PatternDisplay;
 };
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
@@ -88,6 +119,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   theme: "dark",
   accent: "amber",
   notationDefault: "jazz-minus",
+  patternDisplay: "name",
 };
 
 type UserPrefsStore = UserPrefs & {
@@ -95,6 +127,7 @@ type UserPrefsStore = UserPrefs & {
   setTheme: (theme: ThemeMode) => void;
   setAccent: (accent: AccentPalette) => void;
   setNotationDefault: (style: ChordNotationStyle) => void;
+  setPatternDisplay: (display: PatternDisplay) => void;
   /** Reset all prefs to defaults. Used by the future Settings reset action. */
   resetAll: () => void;
 };
@@ -107,6 +140,7 @@ export const useUserPrefs = create<UserPrefsStore>()(
       setTheme: (theme) => set({ theme }),
       setAccent: (accent) => set({ accent }),
       setNotationDefault: (notationDefault) => set({ notationDefault }),
+      setPatternDisplay: (patternDisplay) => set({ patternDisplay }),
       resetAll: () => set(DEFAULT_USER_PREFS),
     }),
     {
