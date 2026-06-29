@@ -17,33 +17,28 @@ import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
 /**
  * Arpeggio pattern generation.
  *
- * Phase 14 collapsed the four chord-shape patterns (Scale Tones, Arp
- * 7ths, Triads-with-LT, Descending) down to two chord-adaptive patterns
- * with explicit per-note rhythms:
+ * Phase 15: added descending built-ins + the "Start from" modifier.
  *
- *   - "7th Chords" — 1-3-5-7 of whatever chord is up, even quarters.
- *     Triads (no 7th in their chord tones) fall back to 1-3-5-octave.
- *   - "Triads"     — 1-3-5 of whatever chord is up, 8th+8th+quarter.
- *                    Each triad takes half a 4/4 measure, so the
- *                    pattern plays twice through a 4/4 bar.
+ * Built-in patterns are modeled as a list of chord-tone references
+ * (one of 1/3/5/7 of whichever chord is current). Each reference can
+ * carry an `octaveShift` so a pattern can encode both intra-octave
+ * shapes (ascending 1-3-5-7) and crossing-octave shapes (descending
+ * 8-7-5-3, where the "8" is root + 12 semitones).
  *
- * The dropped patterns ("Scale Tones" lives in the future Scales module;
- * Triads-with-LT and Descending become user-creatable custom patterns
- * now that the editor supports rhythm).
- *
- * Each built-in is internally represented as a `BuiltInPatternDef` —
- * the same `PatternNote[]` shape custom patterns use, just labeled
- * `kind: "chordTone"` instead of `"note"` so the engine can pull the
- * right interval from the current chord at play time. This keeps the
- * subtitle / engine / scheduling pipeline symmetric for built-ins vs.
- * customs (one path to maintain instead of two).
- *
- * Custom patterns and built-ins share the `ArpeggioPattern = string`
- * type. Built-in IDs live in `BUILT_IN_PATTERNS`; custom IDs are
- * prefixed `custom_` (see custom-patterns.ts).
+ * The Start-from modifier (root/3rd/5th/7th/random) rotates the chord-
+ * tone array so the chosen tone lands on beat 1. Wrapped notes get an
+ * octave shift to keep the pattern moving in its direction (+1 for
+ * ascending, -1 for descending). The lit-up subtitle just shows the
+ * chord-tone number; direction is communicated via audio + lit-up
+ * timing.
  */
 
-export const BUILT_IN_PATTERNS = ["7th-chords", "triads"] as const;
+export const BUILT_IN_PATTERNS = [
+  "7th-chords",
+  "triads",
+  "7th-chords-desc",
+  "triads-desc",
+] as const;
 export type BuiltInPattern = (typeof BUILT_IN_PATTERNS)[number];
 
 /** Back-compat alias — old callsites iterate this to render the */
@@ -67,9 +62,18 @@ type ChordToneIndex = 0 | 1 | 2 | 3;
 
 /** Built-in note position — either a chord-tone reference or a rest. */
 type BuiltInNote =
-  | { kind: "chordTone"; index: ChordToneIndex; duration: NoteDuration }
-  | { kind: "octave"; duration: NoteDuration }
+  | {
+      kind: "chordTone";
+      index: ChordToneIndex;
+      /** Octave shift from the chord's root octave. 0 = same octave; */
+      /* +1 = up an octave; -1 = down an octave. Lets a pattern encode */
+      /* "8" (root+octave) for descending shapes that start above the root. */
+      octaveShift: number;
+      duration: NoteDuration;
+    }
   | { kind: "rest"; duration: NoteDuration };
+
+type PatternDirection = "asc" | "desc";
 
 type BuiltInPatternDef = {
   displayName: string;
@@ -77,36 +81,79 @@ type BuiltInPatternDef = {
   description: string;
   notes: BuiltInNote[];
   lengthInMeasures: number;
+  /** Used by the Start-from rotation to keep wrapped notes in the */
+  /* pattern's pitch direction. */
+  direction: PatternDirection;
+  /** Number of distinct chord-tone slots this pattern offers for */
+  /* Start-from rotation. 4 for 7th-Chord patterns, 3 for Triads. */
+  rotationCount: 3 | 4;
 };
 
 const BUILT_IN_DEFS: Record<BuiltInPattern, BuiltInPatternDef> = {
   "7th-chords": {
-    displayName: "7th Chords (1-3-5-7)",
-    shortName: "7th Chords",
+    displayName: "7th Chords ascending (1-3-5-7)",
+    shortName: "7th Chords ↑",
     description:
       "Adapts to each chord — plays 1-3-5-7 of whatever's up. Maj7 plays the major-7th sound, m7 plays minor-7th, dim7 plays diminished-7th, etc. Triads fall back to 1-3-5-octave. Even quarters.",
     notes: [
-      { kind: "chordTone", index: 0, duration: "quarter" },
-      { kind: "chordTone", index: 1, duration: "quarter" },
-      { kind: "chordTone", index: 2, duration: "quarter" },
-      { kind: "chordTone", index: 3, duration: "quarter" },
+      { kind: "chordTone", index: 0, octaveShift: 0, duration: "quarter" },
+      { kind: "chordTone", index: 1, octaveShift: 0, duration: "quarter" },
+      { kind: "chordTone", index: 2, octaveShift: 0, duration: "quarter" },
+      { kind: "chordTone", index: 3, octaveShift: 0, duration: "quarter" },
     ],
     lengthInMeasures: 1,
+    direction: "asc",
+    rotationCount: 4,
+  },
+  "7th-chords-desc": {
+    displayName: "7th Chords descending (8-7-5-3)",
+    shortName: "7th Chords ↓",
+    description:
+      "Mirror of 7th Chords ascending — plays octave-7-5-3 top-down. Ear-training and fingerboard fluency for descending lines. Triads' 7th falls back to the octave for consistency.",
+    notes: [
+      // Octave-up root, then 7, 5, 3 descending.
+      { kind: "chordTone", index: 0, octaveShift: 1, duration: "quarter" },
+      { kind: "chordTone", index: 3, octaveShift: 0, duration: "quarter" },
+      { kind: "chordTone", index: 2, octaveShift: 0, duration: "quarter" },
+      { kind: "chordTone", index: 1, octaveShift: 0, duration: "quarter" },
+    ],
+    lengthInMeasures: 1,
+    direction: "desc",
+    rotationCount: 4,
   },
   triads: {
-    displayName: "Triads (1-3-5, 8-8-qtr × 2)",
-    shortName: "Triads",
+    displayName: "Triads ascending (1-3-5)",
+    shortName: "Triads ↑",
     description:
       "Adapts to each chord — plays 1-3-5 of whatever's up. Each triad is 8th + 8th + quarter (half a 4/4 measure), so the pattern plays twice per measure in 4/4. Maj plays major triad, min plays minor triad, etc.",
     notes: [
-      { kind: "chordTone", index: 0, duration: "8th" },
-      { kind: "chordTone", index: 1, duration: "8th" },
-      { kind: "chordTone", index: 2, duration: "quarter" },
-      { kind: "chordTone", index: 0, duration: "8th" },
-      { kind: "chordTone", index: 1, duration: "8th" },
-      { kind: "chordTone", index: 2, duration: "quarter" },
+      { kind: "chordTone", index: 0, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 1, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 2, octaveShift: 0, duration: "quarter" },
+      { kind: "chordTone", index: 0, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 1, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 2, octaveShift: 0, duration: "quarter" },
     ],
     lengthInMeasures: 1,
+    direction: "asc",
+    rotationCount: 3,
+  },
+  "triads-desc": {
+    displayName: "Triads descending (5-3-1)",
+    shortName: "Triads ↓",
+    description:
+      "Mirror of Triads ascending — plays 5-3-1 top-down with 8th + 8th + quarter, twice per measure in 4/4. Useful for internalizing the triad shape in both directions.",
+    notes: [
+      { kind: "chordTone", index: 2, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 1, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 0, octaveShift: 0, duration: "quarter" },
+      { kind: "chordTone", index: 2, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 1, octaveShift: 0, duration: "8th" },
+      { kind: "chordTone", index: 0, octaveShift: 0, duration: "quarter" },
+    ],
+    lengthInMeasures: 1,
+    direction: "desc",
+    rotationCount: 3,
   },
 };
 
@@ -121,14 +168,131 @@ function builtInNoteToSemitones(
   chord: Chord,
 ): number | null {
   if (note.kind === "rest") return null;
-  if (note.kind === "octave") return 12;
-  // chordTone path
   const tones = CHORD_INTERVALS[chord.quality];
-  if (note.index < tones.length) return tones[note.index];
-  // Chord doesn't have that tone (e.g. triad asked for a 7th). Fall
-  // back to the octave — keeps the pattern playable without surprise
-  // dissonance.
-  return 12;
+  const base = note.index < tones.length ? tones[note.index] : 12;
+  return base + note.octaveShift * 12;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Start-from modifier                                                    */
+/* ---------------------------------------------------------------------- */
+
+export const PATTERN_START_FROM_OPTIONS = [
+  "root",
+  "3rd",
+  "5th",
+  "7th",
+  "random",
+] as const;
+export type PatternStartFrom = (typeof PATTERN_START_FROM_OPTIONS)[number];
+
+export const PATTERN_START_FROM_LABELS: Record<PatternStartFrom, string> = {
+  root: "Root",
+  "3rd": "3rd",
+  "5th": "5th",
+  "7th": "7th",
+  random: "Random",
+};
+
+/** Map a Start-from value to its chord-tone index (root → 0, 3rd → 1, etc). */
+function startFromToChordToneIndex(s: Exclude<PatternStartFrom, "random">): ChordToneIndex {
+  switch (s) {
+    case "root":
+      return 0;
+    case "3rd":
+      return 1;
+    case "5th":
+      return 2;
+    case "7th":
+      return 3;
+  }
+}
+
+const CONCRETE_START_FROMS = ["root", "3rd", "5th", "7th"] as const;
+type ConcreteStartFrom = (typeof CONCRETE_START_FROMS)[number];
+
+/**
+ * Pre-roll a per-measure Start-from sequence for the session. Non-
+ * random returns the same value every measure; "random" rolls a new
+ * value at the start of each measure (clamped to the pattern's
+ * rotationCount when measure-by-measure pattern membership changes).
+ *
+ * If `lockFirstMeasureToRoot` is true and start-from is "random", the
+ * FIRST measure of each chord-run starts on root and only subsequent
+ * measures randomize. We approximate "first measure of each chord"
+ * here by looking at the chordSequence's measure→chord mapping. v1
+ * keeps this simple: chord-run boundaries aren't passed in, so the
+ * "lock first" sub-option is reserved for a follow-up that wires
+ * chord-run starts through. For now the option ships disabled in the
+ * UI; the field exists in the config for forward-compatibility.
+ */
+export function buildStartFromForSession(
+  startFrom: PatternStartFrom,
+  totalMeasures: number,
+): ConcreteStartFrom[] {
+  if (startFrom !== "random") {
+    return Array.from({ length: totalMeasures }, () => startFrom);
+  }
+  // Random: roll one of root/3rd/5th/7th per measure. Clamping to the
+  // pattern's actual rotation count happens at apply time (so e.g.
+  // Triads ignore "7th" rolls by wrapping back to root).
+  return Array.from(
+    { length: totalMeasures },
+    () =>
+      CONCRETE_START_FROMS[
+        Math.floor(Math.random() * CONCRETE_START_FROMS.length)
+      ],
+  );
+}
+
+/**
+ * Rotate a built-in pattern's notes so the requested chord tone lands
+ * on beat 1. Wrapped notes get an octave shift to keep the pattern
+ * moving in its direction.
+ *
+ * If the pattern doesn't support the requested chord tone (e.g.
+ * Triads asked for the 7th), we wrap the index modulo rotationCount
+ * — so "7th" on Triads silently falls back to "root" (index 3 mod 3 = 0).
+ */
+function rotateBuiltInPattern(
+  def: BuiltInPatternDef,
+  startFromChordTone: ChordToneIndex,
+): BuiltInNote[] {
+  // Clamp the requested chord-tone index to the pattern's rotation count.
+  // Triads (rotationCount = 3) wrap "7th" (index 3) back to root.
+  const effectiveStart = (startFromChordTone %
+    def.rotationCount) as ChordToneIndex;
+  if (effectiveStart === 0) return def.notes; // no rotation
+
+  // Find the first position in the notes array that uses this chord tone.
+  // For built-in defs, each chord-tone index appears with octaveShift=0 at
+  // its canonical position (ascending) or with a known shift (descending).
+  let rotatePoint = -1;
+  for (let i = 0; i < def.notes.length; i++) {
+    const n = def.notes[i];
+    if (n.kind === "chordTone" && n.index === effectiveStart) {
+      rotatePoint = i;
+      break;
+    }
+  }
+  if (rotatePoint <= 0) return def.notes;
+
+  const directionShift = def.direction === "asc" ? 1 : -1;
+  const rotated: BuiltInNote[] = [];
+  for (let i = 0; i < def.notes.length; i++) {
+    const srcIdx = (rotatePoint + i) % def.notes.length;
+    const wrapped = rotatePoint + i >= def.notes.length;
+    const src = def.notes[srcIdx];
+    if (src.kind === "rest") {
+      rotated.push(src);
+      continue;
+    }
+    rotated.push({
+      ...src,
+      octaveShift: src.octaveShift + (wrapped ? directionShift : 0),
+    });
+  }
+  return rotated;
 }
 
 /** ResolvedNote = the per-position output the engine + subtitle consume. */
@@ -147,10 +311,15 @@ export type ResolvedNote =
  * Resolve a pattern (built-in or custom) over a chord into a flat list
  * of per-position notes. Both the audio engine and the subtitle render
  * consume this — single representation, no divergence.
+ *
+ * `startFromIdx` (0..3 mapping to root/3rd/5th/7th) rotates chord-tone
+ * built-ins. Custom patterns ignore the modifier — they use absolute
+ * semitone offsets, so "Start from 3rd" has no clean meaning for them.
  */
 export function resolvePatternForChord(
   pattern: ArpeggioPattern,
   chord: Chord,
+  startFromIdx: ChordToneIndex = 0,
 ): { notes: ResolvedNote[]; lengthInMeasures: number } {
   if (isCustomPatternId(pattern)) {
     const cp = lookupCustom(pattern);
@@ -170,24 +339,33 @@ export function resolvePatternForChord(
   }
   if (isBuiltInPattern(pattern)) {
     const def = BUILT_IN_DEFS[pattern];
-    const notes: ResolvedNote[] = def.notes.map((n): ResolvedNote => {
+    const rotatedNotes = rotateBuiltInPattern(def, startFromIdx);
+    const notes: ResolvedNote[] = rotatedNotes.map((n): ResolvedNote => {
       if (n.kind === "rest") {
         return { kind: "rest", label: REST_LABEL, duration: n.duration };
       }
       const semitones = builtInNoteToSemitones(n, chord) ?? 0;
-      const label =
-        n.kind === "chordTone"
-          ? // Use the chord-tone "1/3/5/7" labels for built-ins (the
-            // pedagogical concept the user is drilling), not the
-            // semitone-offset label (e.g. ♭3) which would expose the
-            // chord-quality math under the hood.
-            BUILT_IN_LABELS[n.index]
-          : SEMITONE_LABELS[semitones] ?? "?";
+      // Built-in labels are just chord-tone numbers ("1/3/5/7"); the
+      // octaveShift renders as "8" only when the label slot is the
+      // root one octave up — keeps the subtitle pedagogical.
+      let label: string;
+      if (n.index === 0 && n.octaveShift > 0) {
+        label = "8";
+      } else {
+        label = BUILT_IN_LABELS[n.index];
+      }
       return { kind: "note", label, semitones, duration: n.duration };
     });
     return { notes, lengthInMeasures: def.lengthInMeasures };
   }
   return { notes: [], lengthInMeasures: 1 };
+}
+
+/** Resolve a Start-from string to its chord-tone index for the engine. */
+export function startFromIndexFor(
+  startFrom: Exclude<PatternStartFrom, "random">,
+): ChordToneIndex {
+  return startFromToChordToneIndex(startFrom);
 }
 
 /** Labels for chord-tone references in built-in patterns. */
@@ -236,12 +414,12 @@ export function getPatternDescription(pattern: ArpeggioPattern): string {
   return `Custom pattern: ${notesToDegreeString(cp.notes)}.`;
 }
 
-/** Degree-string subtitle. */
+/** Degree-string subtitle. Resolved against a sample chord at the */
+/* default startFrom (root). Used for static labels (e.g. setup-screen */
+/* tile subtitles), not for the lit-up drill subtitle which resolves */
+/* dynamically per measure. */
 export function getPatternDegrees(pattern: ArpeggioPattern): string {
   if (isBuiltInPattern(pattern)) {
-    // Use a sample maj7 chord just to get labels — built-in labels are
-    // chord-quality-agnostic ("1", "3", "5", "7"), so the chord here
-    // doesn't actually affect the output.
     const resolved = resolvePatternForChord(pattern, {
       root: "C",
       quality: "maj7",
@@ -252,7 +430,7 @@ export function getPatternDegrees(pattern: ArpeggioPattern): string {
   return cp ? notesToDegreeString(cp.notes) : "—";
 }
 
-/** Note count — used by the subtitle highlight scheduler. */
+/** Note count. */
 export function getPatternNoteCount(pattern: ArpeggioPattern): number {
   if (isBuiltInPattern(pattern)) return BUILT_IN_DEFS[pattern].notes.length;
   const cp = lookupCustom(pattern);
@@ -267,21 +445,28 @@ export function getPatternLengthInMeasures(pattern: ArpeggioPattern): number {
   return cp?.lengthInMeasures ?? 1;
 }
 
+/** True iff the pattern responds to the Start-from modifier (chord-tone built-ins only). */
+export function patternSupportsStartFrom(pattern: ArpeggioPattern): boolean {
+  return isBuiltInPattern(pattern);
+}
+
 /**
  * Split a pattern's degree string into per-note segments — used by the
  * drill-screen subtitle to render each digit independently for the
  * lit-up animation. Each segment carries the duration so the highlight
- * scheduler can step through them in time. Built-ins are resolved
- * against a sample chord (the labels are chord-quality-agnostic for
- * built-ins; for customs the labels are the literal semitone labels).
+ * scheduler can step through them in time.
+ *
+ * `startFromIdx` rotates chord-tone built-ins; customs ignore it.
  */
 export function parsePatternDegrees(
   pattern: ArpeggioPattern,
+  startFromIdx: ChordToneIndex = 0,
 ): Array<{ idx: number; label: string; durationBeats: number }> {
-  const resolved = resolvePatternForChord(pattern, {
-    root: "C",
-    quality: "maj7",
-  });
+  const resolved = resolvePatternForChord(
+    pattern,
+    { root: "C", quality: "maj7" },
+    startFromIdx,
+  );
   return resolved.notes.map((n, idx) => ({
     idx,
     label: n.label,
@@ -291,8 +476,7 @@ export function parsePatternDegrees(
 
 /**
  * Anchor the chord's root at octave 2 — sits comfortably in the middle
- * of a 4-string bass's range (E1–G4, with E2–C4 being the meat). Pattern
- * notes ascend or descend from there per the pattern definition.
+ * of a 4-string bass's range (E1–G4, with E2–C4 being the meat).
  */
 const ANCHOR_OCTAVE = 2;
 
@@ -300,17 +484,13 @@ const ANCHOR_OCTAVE = 2;
  * Generate the MIDI note sequence for a chord + pattern combination.
  * Rests emit no MIDI event (filtered out). Both built-ins and customs
  * funnel through `resolvePatternForChord` so the engine is symmetric.
- *
- * NOTE: For the preview button + audio scheduling, this returns ONLY
- * the pitched notes (rests are filtered). If you need the full
- * rhythmic structure (including rests for visual timing), call
- * `resolvePatternForChord` directly.
  */
 export function generateArpeggio(
   chord: Chord,
   pattern: ArpeggioPattern,
+  startFromIdx: ChordToneIndex = 0,
 ): number[] {
-  const { notes } = resolvePatternForChord(pattern, chord);
+  const { notes } = resolvePatternForChord(chord ? pattern : pattern, chord, startFromIdx);
   return notes
     .filter((n): n is Extract<ResolvedNote, { kind: "note" }> => n.kind === "note")
     .map((n) =>
@@ -321,9 +501,6 @@ export function generateArpeggio(
 /* ---------------------------------------------------------------------- */
 /* Legacy IDs — preserved as references for the practice-config migration. */
 /* ---------------------------------------------------------------------- */
-/* Old built-in IDs that the v10→v11 migration remaps to the new set.    */
-/* Once a few weeks pass and no one's loading pre-Phase-14 drills, these */
-/* can be retired.                                                       */
 export const LEGACY_BUILT_IN_PATTERN_IDS = [
   "scale-tones",
   "arp-7ths",
@@ -332,29 +509,29 @@ export const LEGACY_BUILT_IN_PATTERN_IDS = [
 ] as const;
 
 export function remapLegacyPatternId(id: string): BuiltInPattern {
-  // arp-7ths and triads-with-lt are the closest analogues. Scale-tones
-  // and descending have no equivalent in the new built-in set, so they
-  // also fall back to 7th-chords (closest "warm-up" feel).
   if (id === "triads-with-lt") return "triads";
+  if (id === "descending") return "7th-chords-desc";
   return "7th-chords";
 }
 
 /* ---------------------------------------------------------------------- */
 /* Back-compat record-style exports                                        */
 /* ---------------------------------------------------------------------- */
-/* Old code used `ARPEGGIO_PATTERN_DISPLAY_NAMES[p]` (record indexing).  */
-/* The resolver functions above are the preferred API. These aliases     */
-/* keep old indexing on the new built-in IDs working until callsites     */
-/* migrate.                                                              */
 export const ARPEGGIO_PATTERN_DISPLAY_NAMES: Record<BuiltInPattern, string> = {
   "7th-chords": BUILT_IN_DEFS["7th-chords"].displayName,
   triads: BUILT_IN_DEFS.triads.displayName,
+  "7th-chords-desc": BUILT_IN_DEFS["7th-chords-desc"].displayName,
+  "triads-desc": BUILT_IN_DEFS["triads-desc"].displayName,
 };
 export const ARPEGGIO_PATTERN_SHORT_NAMES: Record<BuiltInPattern, string> = {
   "7th-chords": BUILT_IN_DEFS["7th-chords"].shortName,
   triads: BUILT_IN_DEFS.triads.shortName,
+  "7th-chords-desc": BUILT_IN_DEFS["7th-chords-desc"].shortName,
+  "triads-desc": BUILT_IN_DEFS["triads-desc"].shortName,
 };
 export const ARPEGGIO_PATTERN_DESCRIPTIONS: Record<BuiltInPattern, string> = {
   "7th-chords": BUILT_IN_DEFS["7th-chords"].description,
   triads: BUILT_IN_DEFS.triads.description,
+  "7th-chords-desc": BUILT_IN_DEFS["7th-chords-desc"].description,
+  "triads-desc": BUILT_IN_DEFS["triads-desc"].description,
 };

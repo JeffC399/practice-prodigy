@@ -1,8 +1,12 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { ArpeggioPattern } from "@/lib/music/arpeggio";
+import type {
+  ArpeggioPattern,
+  PatternStartFrom,
+} from "@/lib/music/arpeggio";
 import {
   LEGACY_BUILT_IN_PATTERN_IDS,
+  PATTERN_START_FROM_OPTIONS,
   remapLegacyPatternId,
 } from "@/lib/music/arpeggio";
 import type { Chord, PitchClass, ChordQuality } from "@/lib/music/chord";
@@ -195,6 +199,13 @@ export type PracticeConfig = {
    * might force "degrees" while transcription drills stay on "name").
    */
   patternDisplay: PatternDisplay | null;
+  /**
+   * Start-from modifier (Phase 15) — rotates which chord tone lands
+   * on beat 1 of any chord-tone built-in pattern. "random" re-rolls
+   * per measure. Custom patterns ignore this (no chord-tone semantics).
+   * Default "root" preserves pre-Phase-15 behavior.
+   */
+  patternStartFrom: PatternStartFrom;
 };
 
 export const BPM_MIN = 30;
@@ -245,6 +256,7 @@ export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   // null = follow the user-global pattern-display preference. Drills
   // can pin a specific display mode by setting this explicitly.
   patternDisplay: null,
+  patternStartFrom: "root",
 };
 
 type PracticeConfigStore = PracticeConfig & {
@@ -293,6 +305,8 @@ type PracticeConfigStore = PracticeConfig & {
    * specific value to pin the drill to that display mode.
    */
   setPatternDisplay: (display: PatternDisplay | null) => void;
+  /** Set the Start-from modifier (root/3rd/5th/7th/random). */
+  setPatternStartFrom: (startFrom: PatternStartFrom) => void;
   /** Replace every config field with values from a loaded Drill. */
   loadConfig: (config: PracticeConfig) => void;
   resetToDefaults: () => void;
@@ -439,6 +453,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         }),
       setPatternOrdering: (patternOrdering) => set({ patternOrdering }),
       setPatternDisplay: (patternDisplay) => set({ patternDisplay }),
+      setPatternStartFrom: (patternStartFrom) => set({ patternStartFrom }),
       loadConfig: (config) =>
         // Spread defaults first so a drill saved under an older schema
         // (missing fields added later) still loads with sensible values.
@@ -470,7 +485,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 11,
+      version: 12,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -581,6 +596,20 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
             next.patternPool = (next.patternPool as unknown[]).map((p) =>
               isLegacy(p) ? remapLegacyPatternId(p as string) : p,
             );
+          }
+        }
+
+        // v11 → v12: Phase 15 added the Start-from modifier. Existing
+        // drills default to "root" so they behave identically to pre-
+        // Phase-15 (no rotation, no random).
+        if (version <= 11) {
+          if (
+            typeof next.patternStartFrom !== "string" ||
+            !(PATTERN_START_FROM_OPTIONS as readonly string[]).includes(
+              next.patternStartFrom as string,
+            )
+          ) {
+            next.patternStartFrom = "root";
           }
         }
 

@@ -10,6 +10,9 @@ import {
   generateArpeggio,
   getPatternDisplayName,
   getPatternShortName,
+  patternSupportsStartFrom,
+  PATTERN_START_FROM_LABELS,
+  PATTERN_START_FROM_OPTIONS,
   type ArpeggioPattern,
 } from "@/lib/music/arpeggio";
 import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
@@ -146,6 +149,7 @@ export default function PracticeSetupPage() {
     togglePatternInPool,
     setPatternOrdering,
     setPatternDisplay,
+    setPatternStartFrom,
     loadConfig,
     loadedDrillId,
     setLoadedDrillId,
@@ -561,10 +565,14 @@ export default function PracticeSetupPage() {
     ORDERING_STRATEGY_DISPLAY_NAMES[config.orderingStrategy]
   }`;
   const patternPoolCount = config.patternPool.length;
+  const startFromSuffix =
+    config.patternStartFrom !== "root"
+      ? ` · from ${config.patternStartFrom}`
+      : "";
   const patternSummary =
     patternPoolCount <= 1
-      ? getPatternShortName(config.arpeggioPattern)
-      : `${patternPoolCount} patterns · ${getPatternShortName(config.arpeggioPattern)}+`;
+      ? `${getPatternShortName(config.arpeggioPattern)}${startFromSuffix}`
+      : `${patternPoolCount} patterns · ${getPatternShortName(config.arpeggioPattern)}+${startFromSuffix}`;
   const tempoMeterSummary = `♩ = ${config.bpm} · ${config.timeSignature.beatsPerMeasure}/${config.timeSignature.beatUnit}`;
   const prepSummary =
     config.transitionCount > 0
@@ -1251,6 +1259,11 @@ export default function PracticeSetupPage() {
                           }`}
                         >
                           {getPatternShortName(p)}
+                          {config.patternStartFrom !== "root" && (
+                            <span className="ml-1.5 inline-block rounded-full bg-primary/20 px-1.5 py-0 text-[9px] uppercase tracking-wider font-mono text-primary align-middle">
+                              from {config.patternStartFrom}
+                            </span>
+                          )}
                         </span>
                         <span className="text-[11px] text-muted-foreground leading-snug line-clamp-3">
                           {ARPEGGIO_PATTERN_DESCRIPTIONS[p]}
@@ -1330,6 +1343,67 @@ export default function PracticeSetupPage() {
                 default) or multiple to cycle through them. The drill
                 always keeps at least one pattern.
               </p>
+
+              {/* Start-from modifier (Phase 15). Rotates the chord-tone
+                  built-in patterns so the user can practice inversions
+                  (3rd / 5th / 7th) or have the engine randomize per
+                  measure. Disabled when no chord-tone built-in is in
+                  the pool (customs ignore the modifier). */}
+              {(() => {
+                const anyBuiltIn = config.patternPool.some((p) =>
+                  patternSupportsStartFrom(p),
+                );
+                return (
+                  <div
+                    className={`flex flex-col gap-2 rounded-md border border-border bg-background/30 p-3 ${
+                      anyBuiltIn ? "" : "opacity-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-foreground">
+                        Start from
+                      </span>
+                      {!anyBuiltIn && (
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-mono">
+                          custom-only pool
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PATTERN_START_FROM_OPTIONS.map((opt) => {
+                        const active = config.patternStartFrom === opt;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setPatternStartFrom(opt)}
+                            disabled={!anyBuiltIn}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
+                              active
+                                ? "border-primary bg-primary/15 text-primary"
+                                : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                            }`}
+                            aria-pressed={active}
+                          >
+                            {PATTERN_START_FROM_LABELS[opt]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Rotates which chord tone lands on beat 1 of the
+                      built-in patterns. Pick <span className="font-mono">3rd</span>{" "}
+                      to drill 1st-inversion arpeggios (3-5-7-8),{" "}
+                      <span className="font-mono">5th</span> for 2nd
+                      inversion, etc.{" "}
+                      <span className="font-mono">Random</span> rolls a new
+                      starting tone each measure — the expert-mode drill.
+                      Custom patterns and Triads&rsquo; 7th slot ignore the
+                      modifier (Triads wrap to root).
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Ordering picker — only relevant when pool has 2+
                   patterns. Custom (cycles through in checkbox order) is

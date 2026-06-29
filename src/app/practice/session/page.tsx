@@ -3,9 +3,12 @@
 import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import {
+  buildStartFromForSession,
   getPatternDegrees,
   getPatternShortName,
   parsePatternDegrees,
+  patternSupportsStartFrom,
+  startFromIndexFor,
   type ArpeggioPattern,
 } from "@/lib/music/arpeggio";
 import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
@@ -138,6 +141,12 @@ export default function PracticeSessionPage() {
   const [activePatterns, setActivePatterns] = useState<
     ArpeggioPattern[] | null
   >(null);
+  // Per-measure Start-from sequence (Phase 15). Each entry is one of
+  // root/3rd/5th/7th — pre-rolled at Start so random orderings don't
+  // re-roll on every render. Indexed by 0-based play-measure number.
+  const [activeStartFroms, setActiveStartFroms] = useState<
+    Array<"root" | "3rd" | "5th" | "7th"> | null
+  >(null);
   const sequence = isIdle
     ? idlePreviewSequence
     : (activeSequence ?? idlePreviewSequence);
@@ -205,6 +214,18 @@ export default function PracticeSessionPage() {
     activePatterns?.[currentMeasureIdx] ?? fallbackPattern;
   const nextPattern =
     activePatterns?.[nextMeasureIdx] ?? currentPattern;
+  // Per-measure Start-from rotation (Phase 15). Custom patterns ignore
+  // the modifier — only chord-tone built-ins respond to it.
+  const currentStartFromKey =
+    activeStartFroms?.[currentMeasureIdx] ?? "root";
+  const nextStartFromKey =
+    activeStartFroms?.[nextMeasureIdx] ?? currentStartFromKey;
+  const currentStartFromIdx = patternSupportsStartFrom(currentPattern)
+    ? startFromIndexFor(currentStartFromKey)
+    : 0;
+  const nextStartFromIdx = patternSupportsStartFrom(nextPattern)
+    ? startFromIndexFor(nextStartFromKey)
+    : 0;
   // PatternSubtitle (below) handles the per-position rendering based
   // on patternDisplay mode. Earlier versions pre-computed string
   // labels here; the lit-up-degrees feature (Phase 12) needs to render
@@ -249,7 +270,7 @@ export default function PracticeSessionPage() {
     // beats, find which note is active at the current beat boundary,
     // and schedule setTimeout-based highlights for any notes that
     // start within the current beat window.
-    const segments = parsePatternDegrees(currentPattern);
+    const segments = parsePatternDegrees(currentPattern, currentStartFromIdx);
     if (segments.length === 0) {
       setActiveNoteIdx(-1);
       return;
@@ -298,6 +319,7 @@ export default function PracticeSessionPage() {
     state.beatInMeasure,
     state.measureInSession,
     currentPattern,
+    currentStartFromIdx,
     config.bpm,
   ]);
 
@@ -400,6 +422,9 @@ export default function PracticeSessionPage() {
             playMeasures,
           ),
         );
+        setActiveStartFroms(
+          buildStartFromForSession(config.patternStartFrom, playMeasures),
+        );
         const beatStyles = r.sequence.map((b) => b.kind);
         void start({
           bpm: config.bpm,
@@ -439,6 +464,9 @@ export default function PracticeSessionPage() {
         playMeasureCount,
       );
       setActivePatterns(patterns);
+      setActiveStartFroms(
+        buildStartFromForSession(config.patternStartFrom, playMeasureCount),
+      );
       // Map each beat's kind so the engine can pick the right click
       // synth (transition → stick-click; play → tonal click).
       const beatStyles = fresh.map((b) => b.kind);
@@ -514,6 +542,7 @@ export default function PracticeSessionPage() {
         patternPool: config.patternPool,
         patternOrdering: config.patternOrdering,
         patternDisplay: config.patternDisplay,
+        patternStartFrom: config.patternStartFrom,
       },
       drillName: currentDrill?.name ?? null,
       loadedDrillId: config.loadedDrillId,
@@ -816,6 +845,8 @@ export default function PracticeSessionPage() {
               nextPattern={nextPattern}
               patternDisplay={patternDisplay}
               activeNoteIdx={activeNoteIdx}
+              currentStartFromIdx={currentStartFromIdx}
+              nextStartFromIdx={nextStartFromIdx}
               isLongForm={isLongForm}
               isIdle={isIdle}
               isPreparing={isPreparing}
@@ -852,6 +883,7 @@ export default function PracticeSessionPage() {
                     mode={patternDisplay}
                     activeNoteIdx={-1}
                     tone="secondary"
+                    startFromIdx={nextStartFromIdx}
                   />
                 </div>
               ) : (
@@ -901,6 +933,7 @@ export default function PracticeSessionPage() {
                       mode={patternDisplay}
                       activeNoteIdx={activeNoteIdx}
                       tone="primary"
+                      startFromIdx={currentStartFromIdx}
                     />
                   </span>
                 )}
@@ -1072,6 +1105,7 @@ function PatternSubtitle({
   mode,
   activeNoteIdx,
   tone,
+  startFromIdx = 0,
 }: {
   pattern: ArpeggioPattern;
   mode: "name" | "degrees" | "hidden";
@@ -1079,6 +1113,8 @@ function PatternSubtitle({
   activeNoteIdx: number;
   /** "primary" (Now) gets normal contrast; "secondary" (Next) is dimmer. */
   tone: "primary" | "secondary";
+  /** Chord-tone index to rotate the labels by (0=root, 1=3rd, 2=5th, 3=7th). */
+  startFromIdx?: 0 | 1 | 2 | 3;
 }) {
   if (mode === "hidden") return null;
   const baseClass =
@@ -1090,7 +1126,7 @@ function PatternSubtitle({
     return <span className={baseClass}>{getPatternShortName(pattern)}</span>;
   }
   // degrees mode — per-digit rendering
-  const segments = parsePatternDegrees(pattern);
+  const segments = parsePatternDegrees(pattern, startFromIdx);
   return (
     <span
       className={baseClass}
@@ -1270,6 +1306,8 @@ function TwoPaneDisplay({
   nextPattern,
   patternDisplay,
   activeNoteIdx,
+  currentStartFromIdx,
+  nextStartFromIdx,
   isLongForm,
   isIdle,
   isPreparing,
@@ -1287,6 +1325,9 @@ function TwoPaneDisplay({
   patternDisplay: "name" | "degrees" | "hidden";
   /** Currently playing note index in the current measure (-1 if no highlight). */
   activeNoteIdx: number;
+  /** Start-from chord-tone index for Now / Next subtitles. */
+  currentStartFromIdx: 0 | 1 | 2 | 3;
+  nextStartFromIdx: 0 | 1 | 2 | 3;
   isLongForm: boolean;
   isIdle: boolean;
   /**
@@ -1353,6 +1394,7 @@ function TwoPaneDisplay({
               mode={patternDisplay}
               activeNoteIdx={activeNoteIdx}
               tone="primary"
+              startFromIdx={currentStartFromIdx}
             />
           </motion.div>
         </AnimatePresence>
@@ -1393,6 +1435,7 @@ function TwoPaneDisplay({
                 mode={patternDisplay}
                 activeNoteIdx={-1}
                 tone="secondary"
+                startFromIdx={nextStartFromIdx}
               />
             )}
           </motion.div>
