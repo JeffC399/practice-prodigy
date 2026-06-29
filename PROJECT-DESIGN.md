@@ -283,7 +283,12 @@ Local-to-cloud migration on first sign-in: one screen confirms upload of existin
 Everything in Section 4 above. Web + PWA, deployed on Vercel.
 
 ### v1.1 — Polish + Cloud
-- Supabase Auth + Postgres sync (local-to-cloud migration).
+- **Settings page** — `/settings` surface with Appearance (light/dark theme + accent palette + density), Notation default, Practice defaults, Audio, Accessibility, Data export/import, Account (placeholder until Supabase Auth). The home for the cascading-defaults **User global** layer (§4.8). Once it exists, per-module setup screens get simpler — they show overrides of the global defaults, not full config from scratch.
+- **Light / dark mode** with persisted preference (defaults to system). Ships as part of Settings/Appearance.
+- **Keyboard shortcuts overlay** (`?` opens a cheat sheet) — pro-tool table-stakes.
+- **Onboarding tour** for first-time visitors with no drills + no resume blob.
+- **"What's new" changelog modal** — surfaces last 1-2 user-visible changes after a deploy.
+- Supabase Auth + Postgres sync (local-to-cloud migration). Settings page hosts the sign-in flow.
 - Audible per-change alert (different click on last beat of each chord).
 - Tempo ramping, half/double-speed buttons, BPM presets.
 - Additional practice layouts (Two-pane, Scrolling Timeline, Full-Sequence Chart).
@@ -291,9 +296,6 @@ Everything in Section 4 above. Web + PWA, deployed on Vercel.
 - Pattern bundle export (multi-pattern .json).
 - "Doesn't fit cleanly" rhythm warning.
 - Visual beat-1 pulse + haptic on chord change (mobile).
-- Setup preview ("here's what the first 2 chord changes will look like").
-- Skip / restart-current-chord / rewind-1-chord controls.
-- "Resume session" recovery (browser crash, screen lock).
 
 ### v1.2 — Native Wrappers
 - Capacitor → iOS + Android app stores.
@@ -308,6 +310,8 @@ Everything in Section 4 above. Web + PWA, deployed on Vercel.
 - Modules: Piano, Guitar, Voice, Drums.
 - Fretboard / keyboard rendering with instructive overlays.
 - Full standalone Metronome and Tuner modules.
+- **Rename v1 "Bass Arpeggios" → "Arpeggios"** with an inline instrument selector on the setup screen. Substrate prep: data model adds `instrument` field to Drill; routes evolve to `/practice/bass/arpeggios`, `/practice/guitar/arpeggios`, etc. so individual setups can be bookmarked. Built-in drills get instrument-specific variants. Architecture is already ready (§3.3 + §4.3 are instrument-agnostic save for the bass-like preview timbre). Switcher placement is a setup-screen picker, NOT a persistent header tab strip — instrument is a per-drill decision.
+- **Lead Sheet Builder — Basic Tier** ship (see LEAD-SHEET-DESIGN.md). ~8-12 week build across 8 slices. Pairs with the Theory / Ear Training / Sight Reading modules as their content substrate.
 
 ### v3+ — Audio Analysis
 - Pitch detection (start with monophonic — bass and voice).
