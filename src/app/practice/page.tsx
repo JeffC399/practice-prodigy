@@ -35,6 +35,8 @@ import {
   DRILL_MIN,
   ORDERING_STRATEGIES,
   ORDERING_STRATEGY_DISPLAY_NAMES,
+  PATTERN_ORDERINGS,
+  PATTERN_ORDERING_DISPLAY_NAMES,
   POOL_MAX,
   RANDOM_ORDERING_STRATEGIES,
   REPS_MAX,
@@ -43,6 +45,7 @@ import {
   TRANSITION_MAX,
   TRANSITION_UNIT_OPTIONS,
   type OrderingStrategy,
+  type PatternOrdering,
   type PracticeConfig,
   type TransitionUnit,
   usePracticeConfig,
@@ -133,6 +136,8 @@ export default function PracticeSetupPage() {
     setTransitionCount,
     setNotationStyle,
     setArpeggioPattern,
+    togglePatternInPool,
+    setPatternOrdering,
     loadConfig,
     loadedDrillId,
     setLoadedDrillId,
@@ -526,8 +531,11 @@ export default function PracticeSetupPage() {
   const chordPoolSummary = `${poolSize} chord${poolSize === 1 ? "" : "s"} · ${
     ORDERING_STRATEGY_DISPLAY_NAMES[config.orderingStrategy]
   }`;
+  const patternPoolCount = config.patternPool.length;
   const patternSummary =
-    ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern];
+    patternPoolCount <= 1
+      ? ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]
+      : `${patternPoolCount} patterns · ${ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}+`;
   const tempoMeterSummary = `♩ = ${config.bpm} · ${config.timeSignature.beatsPerMeasure}/${config.timeSignature.beatUnit}`;
   const prepSummary =
     config.transitionCount > 0
@@ -1143,27 +1151,126 @@ export default function PracticeSetupPage() {
 
           {/* Arpeggio pattern */}
           <CollapsibleSection title="Pattern" summary={patternSummary}>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
+              {/* Multi-select pattern pool. Each checkbox toggles a
+                  pattern in/out of the pool. The first pattern in the
+                  pool is the "primary" — used for the Preview button
+                  and as the legacy arpeggioPattern fallback. */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {ARPEGGIO_PATTERNS.map((p) => {
+                  const inPool = config.patternPool.includes(p);
+                  const isOnlyPattern =
+                    inPool && config.patternPool.length === 1;
+                  return (
+                    <label
+                      key={p}
+                      className={`flex items-start gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+                        inPool
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border bg-background hover:border-primary/40"
+                      } ${
+                        isOnlyPattern ? "cursor-not-allowed" : ""
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={inPool}
+                        disabled={isOnlyPattern}
+                        onChange={() => togglePatternInPool(p)}
+                        className="mt-0.5 h-4 w-4 accent-primary cursor-pointer disabled:cursor-not-allowed"
+                        aria-label={`Toggle ${ARPEGGIO_PATTERN_DISPLAY_NAMES[p]} in pool`}
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className={`text-sm font-medium ${
+                            inPool ? "text-primary" : "text-foreground"
+                          }`}
+                        >
+                          {ARPEGGIO_PATTERN_DISPLAY_NAMES[p]}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground leading-snug">
+                          {ARPEGGIO_PATTERN_DESCRIPTIONS[p]}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Tick one pattern for a single-pattern drill (the v1
+                default) or multiple to cycle through them. The drill
+                always keeps at least one pattern.
+              </p>
+
+              {/* Ordering picker — only relevant when pool has 2+
+                  patterns. Custom (cycles through in checkbox order) is
+                  the default; the three random strategies match what
+                  the chord pool offers. */}
+              {patternPoolCount > 1 && (
+                <div className="flex flex-col gap-2 rounded-md border border-border bg-background/30 p-3">
+                  <label
+                    htmlFor="pattern-ordering"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Pattern order
+                  </label>
+                  <Select
+                    id="pattern-ordering"
+                    value={config.patternOrdering}
+                    onChange={(e) =>
+                      setPatternOrdering(e.target.value as PatternOrdering)
+                    }
+                  >
+                    {PATTERN_ORDERINGS.map((o) => (
+                      <option key={o} value={o}>
+                        {PATTERN_ORDERING_DISPLAY_NAMES[o]}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {patternOrderingDescription(config.patternOrdering)}
+                  </p>
+                </div>
+              )}
+
+              {/* Primary-pattern picker (shown only when pool > 1) lets
+                  the user choose which pattern is the Preview target and
+                  the legacy arpeggioPattern. With a single-pattern pool,
+                  the Preview always uses that one pattern. */}
+              {patternPoolCount > 1 && (
+                <div className="flex flex-col gap-2 rounded-md border border-border bg-background/30 p-3">
+                  <label
+                    htmlFor="primary-pattern"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Preview pattern
+                  </label>
+                  <Select
+                    id="primary-pattern"
+                    value={config.arpeggioPattern}
+                    onChange={(e) =>
+                      setArpeggioPattern(e.target.value as ArpeggioPattern)
+                    }
+                  >
+                    {config.patternPool.map((p) => (
+                      <option key={p} value={p}>
+                        {ARPEGGIO_PATTERN_DISPLAY_NAMES[p]}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Which pattern the Preview button auditions over the
+                    first chord. Doesn&rsquo;t affect what plays during
+                    the drill (that&rsquo;s the pool + order).
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-stretch gap-3">
-                <Select
-                  id="arpeggio-pattern"
-                  value={config.arpeggioPattern}
-                  onChange={(e) =>
-                    setArpeggioPattern(e.target.value as ArpeggioPattern)
-                  }
-                  className="flex-1"
-                  aria-label="Arpeggio pattern"
-                >
-                  {ARPEGGIO_PATTERNS.map((p) => (
-                    <option key={p} value={p}>
-                      {ARPEGGIO_PATTERN_DISPLAY_NAMES[p]}
-                    </option>
-                  ))}
-                </Select>
                 <button
                   type="button"
                   onClick={handlePreview}
-                  className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 text-sm font-medium text-primary hover:bg-primary/20 active:scale-[0.98] transition-all"
+                  className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 active:scale-[0.98] transition-all"
                   aria-label={
                     isPreviewing ? "Stop preview" : "Preview arpeggio"
                   }
@@ -1176,21 +1283,11 @@ export default function PracticeSetupPage() {
                   ) : (
                     <>
                       <Play className="h-4 w-4" aria-hidden="true" />
-                      Preview
+                      Preview {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
                     </>
                   )}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {ARPEGGIO_PATTERN_DESCRIPTIONS[config.arpeggioPattern]}
-                {poolSize > 1 && (
-                  <>
-                    {" "}
-                    Preview auditions the pattern over the first chord in
-                    the pool.
-                  </>
-                )}
-              </p>
             </div>
           </CollapsibleSection>
 
@@ -2042,6 +2139,12 @@ function extractPracticeConfig(
     ...(source.arpeggioPattern !== undefined && {
       arpeggioPattern: source.arpeggioPattern,
     }),
+    ...(source.patternPool !== undefined && {
+      patternPool: source.patternPool,
+    }),
+    ...(source.patternOrdering !== undefined && {
+      patternOrdering: source.patternOrdering,
+    }),
     ...(source.transitionUnit !== undefined && {
       transitionUnit: source.transitionUnit,
     }),
@@ -2081,6 +2184,20 @@ function orderingDescription(
       return `Each rep samples ${Math.min(drillMeasures, poolSize)} chord${
         Math.min(drillMeasures, poolSize) === 1 ? "" : "s"
       } at random from your pool of ${poolSize}. Fresh sample every rep.`;
+  }
+}
+
+/** Per-pattern-ordering explanatory text under the Pattern Order dropdown. */
+function patternOrderingDescription(ordering: PatternOrdering): string {
+  switch (ordering) {
+    case "custom":
+      return "Cycles through the selected patterns in the order shown above, wrapping when the list runs out.";
+    case "randomReplace":
+      return "Each measure independently picks a random pattern. Patterns can repeat back-to-back.";
+    case "randomShuffleOnce":
+      return "Pool is shuffled once at the start of the session, then cycles in that order.";
+    case "randomShuffleEachPass":
+      return "Pool is re-shuffled each time it cycles through, so consecutive passes use a different order.";
   }
 }
 

@@ -2,9 +2,13 @@
 
 import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
-import { ARPEGGIO_PATTERN_SHORT_NAMES } from "@/lib/music/arpeggio";
+import {
+  ARPEGGIO_PATTERN_SHORT_NAMES,
+  type ArpeggioPattern,
+} from "@/lib/music/arpeggio";
 import { renderChord } from "@/lib/music/render-chord";
 import {
+  buildPatternsForSession,
   currentChordStartIndex,
   findNextDifferentChord,
   generateSequence,
@@ -123,6 +127,12 @@ export default function PracticeSessionPage() {
   const [activeSequence, setActiveSequence] = useState<
     SequenceBeat[] | null
   >(null);
+  // Per-measure arpeggio pattern lookup, built once at Start (so random
+  // pattern orderings don't re-roll on every render). Indexed by
+  // 0-based play-measure number.
+  const [activePatterns, setActivePatterns] = useState<
+    ArpeggioPattern[] | null
+  >(null);
   const sequence = isIdle
     ? idlePreviewSequence
     : (activeSequence ?? idlePreviewSequence);
@@ -160,6 +170,29 @@ export default function PracticeSessionPage() {
   // badge styling) so they fire whenever the metronome is aurally
   // in stick-click mode, not just at session start.
   const isPreparing = isCountIn || (isPlaying && isTransition);
+
+  // Per-measure pattern labels — drives the small "Arp 7ths" / "Scale
+  // Tones" subtitle under the Now and Next chord displays. For drills
+  // with patternPool length === 1 this is just the constant; for
+  // multi-pattern drills it changes per measure. During count-in or
+  // before Start, falls back to the pool's first entry.
+  const currentMeasureIdx = isPlaying
+    ? Math.max(0, state.measureInSession - 1)
+    : 0;
+  const nextMeasureIdx = currentMeasureIdx + 1;
+  const fallbackPattern: ArpeggioPattern = config.patternPool[0] ?? config.arpeggioPattern;
+  const currentPattern =
+    activePatterns?.[currentMeasureIdx] ?? fallbackPattern;
+  const nextPattern =
+    activePatterns?.[nextMeasureIdx] ?? currentPattern;
+  const currentPatternLabel = ARPEGGIO_PATTERN_SHORT_NAMES[currentPattern];
+  const nextPatternLabel = ARPEGGIO_PATTERN_SHORT_NAMES[nextPattern];
+  /** Compact pattern-pool summary for the drill-screen header. */
+  const headerPatternLabel =
+    config.patternPool.length <= 1
+      ? currentPatternLabel
+      : `${currentPatternLabel} +${config.patternPool.length - 1}`;
+
   // Monotonic per-beat key used by the prep ring's pulse animation —
   // changes on every beat tick regardless of phase. During count-in,
   // countInBeatsRemaining decrements; during play/transition,
@@ -245,6 +278,20 @@ export default function PracticeSessionPage() {
       const r = resume.active;
       if (resumeFromUrl && r) {
         setActiveSequence(r.sequence);
+        // Re-roll patterns on resume — these aren't persisted in the
+        // resume blob (yet), so the resumed drill gets a fresh pattern
+        // sequence. For multi-pattern drills with random ordering this
+        // means a slightly different pattern at the resume position.
+        // Acceptable v1 behavior; can persist patterns alongside the
+        // sequence later if needed.
+        const playMeasures = r.totalMeasures ?? r.sequence.length;
+        setActivePatterns(
+          buildPatternsForSession(
+            config.patternPool,
+            config.patternOrdering,
+            playMeasures,
+          ),
+        );
         const beatStyles = r.sequence.map((b) => b.kind);
         void start({
           bpm: config.bpm,
@@ -272,6 +319,18 @@ export default function PracticeSessionPage() {
         transitionCount: config.transitionCount,
       });
       setActiveSequence(fresh);
+      // Pattern pool sequence — pre-rolled once so random pattern
+      // orderings don't change per render. One pattern per play
+      // measure; indexed by 0-based measure number.
+      const playMeasureCount = config.repeatIndefinitely
+        ? Math.max(config.drillMeasures * 256, 1024)
+        : config.drillMeasures * config.repetitions;
+      const patterns = buildPatternsForSession(
+        config.patternPool,
+        config.patternOrdering,
+        playMeasureCount,
+      );
+      setActivePatterns(patterns);
       // Map each beat's kind so the engine can pick the right click
       // synth (transition → stick-click; play → tonal click).
       const beatStyles = fresh.map((b) => b.kind);
@@ -344,6 +403,8 @@ export default function PracticeSessionPage() {
         countInMeasures: config.countInMeasures,
         notationStyle: config.notationStyle,
         arpeggioPattern: config.arpeggioPattern,
+        patternPool: config.patternPool,
+        patternOrdering: config.patternOrdering,
       },
       drillName: currentDrill?.name ?? null,
       loadedDrillId: config.loadedDrillId,
@@ -492,8 +553,8 @@ export default function PracticeSessionPage() {
           )}
         </div>
         <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          <span className="text-foreground">
-            {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+          <span className="text-foreground" title="Active arpeggio pattern">
+            {headerPatternLabel}
           </span>
           {RANDOM_ORDERING_STRATEGIES.has(config.orderingStrategy) && (
             <span className="text-primary">Random</span>
@@ -642,7 +703,8 @@ export default function PracticeSessionPage() {
             <TwoPaneDisplay
               currentLabel={currentLabel}
               nextLabel={nextLabel}
-              patternLabel={ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+              currentPatternLabel={currentPatternLabel}
+              nextPatternLabel={nextPatternLabel}
               isLongForm={isLongForm}
               isIdle={isIdle}
               isPreparing={isPreparing}
@@ -675,7 +737,7 @@ export default function PracticeSessionPage() {
                     {nextLabel}
                   </span>
                   <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-                    {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+                    {nextPatternLabel}
                   </span>
                 </div>
               ) : (
@@ -720,7 +782,7 @@ export default function PracticeSessionPage() {
                 </div>
                 {!isIdle && (
                   <span className="relative z-10 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                    {ARPEGGIO_PATTERN_SHORT_NAMES[config.arpeggioPattern]}
+                    {currentPatternLabel}
                   </span>
                 )}
               </div>
@@ -1016,7 +1078,8 @@ function BeatDots({
 function TwoPaneDisplay({
   currentLabel,
   nextLabel,
-  patternLabel,
+  currentPatternLabel,
+  nextPatternLabel,
   isLongForm,
   isIdle,
   isPreparing,
@@ -1026,7 +1089,10 @@ function TwoPaneDisplay({
 }: {
   currentLabel: string;
   nextLabel: string | null;
-  patternLabel: string;
+  /** Pattern label shown below the Now chord. May differ from next when patternPool > 1. */
+  currentPatternLabel: string;
+  /** Pattern label shown below the Next chord. */
+  nextPatternLabel: string;
   isLongForm: boolean;
   isIdle: boolean;
   /**
@@ -1089,7 +1155,7 @@ function TwoPaneDisplay({
               {currentLabel}
             </span>
             <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-              {patternLabel}
+              {currentPatternLabel}
             </span>
           </motion.div>
         </AnimatePresence>
@@ -1125,7 +1191,7 @@ function TwoPaneDisplay({
               {nextLabel ?? "—"}
             </span>
             <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-              {nextLabel ? patternLabel : " "}
+              {nextLabel ? nextPatternLabel : " "}
             </span>
           </motion.div>
         </AnimatePresence>

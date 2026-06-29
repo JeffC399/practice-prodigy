@@ -83,6 +83,33 @@ export const RANDOM_ORDERING_STRATEGIES: ReadonlySet<OrderingStrategy> =
     "randomShuffleEachPass",
   ]);
 
+/**
+ * Pattern ordering — narrower than OrderingStrategy because patterns
+ * have no pitch class / cycle position, so the chromatic / cycle
+ * sorting strategies don't apply. Only the strategies that work on
+ * an arbitrary list of items are valid here.
+ */
+export const PATTERN_ORDERINGS = [
+  "custom",
+  "randomReplace",
+  "randomShuffleOnce",
+  "randomShuffleEachPass",
+] as const;
+export type PatternOrdering = (typeof PATTERN_ORDERINGS)[number];
+
+export const PATTERN_ORDERING_DISPLAY_NAMES: Record<PatternOrdering, string> = {
+  custom: "Custom (cycle through)",
+  randomReplace: "Random with replacement",
+  randomShuffleOnce: "Random shuffled (once)",
+  randomShuffleEachPass: "Random shuffled (each rep)",
+};
+
+export const RANDOM_PATTERN_ORDERINGS: ReadonlySet<PatternOrdering> = new Set([
+  "randomReplace",
+  "randomShuffleOnce",
+  "randomShuffleEachPass",
+]);
+
 export type PracticeConfig = {
   chordPool: Chord[];
   /**
@@ -129,7 +156,31 @@ export type PracticeConfig = {
   timeSignature: TimeSignature;
   countInMeasures: number;
   notationStyle: ChordNotationStyle;
+  /**
+   * The PRIMARY arpeggio pattern. Kept for backwards compatibility
+   * with older drill snapshots and as the "fallback" pattern when
+   * patternPool has just one entry (which is the default for drills
+   * that haven't opted into multi-pattern drilling). Most reads of
+   * "what pattern to play right now" should go through the per-
+   * measure picker (patternAtMeasure in sequence.ts), not this field
+   * directly.
+   */
   arpeggioPattern: ArpeggioPattern;
+  /**
+   * Pattern pool — list of arpeggio patterns the drill cycles
+   * through, one per play measure. For backwards compatibility, this
+   * defaults to a single-entry list containing `arpeggioPattern`.
+   * Users who want pattern-mixing drills extend the pool to 2+ entries
+   * via the Pattern section on the setup screen. Pattern ordering
+   * (below) determines how the pool is sequenced across measures.
+   */
+  patternPool: ArpeggioPattern[];
+  /**
+   * How patterns from `patternPool` are sequenced across the drill's
+   * play measures. Pool of size 1 makes this irrelevant. Pool of size
+   * 2+ uses one of the four strategies (see PatternOrdering).
+   */
+  patternOrdering: PatternOrdering;
 };
 
 export const BPM_MIN = 30;
@@ -171,6 +222,12 @@ export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   countInMeasures: 1,
   notationStyle: "jazz-minus",
   arpeggioPattern: "arp-7ths",
+  // Pool defaults to the single arpeggioPattern above, so a fresh
+  // PracticeConfig behaves exactly like pre-Phase-10 — one pattern
+  // drilled across every measure. Users opt into multi-pattern
+  // drilling by extending the pool from the setup screen.
+  patternPool: ["arp-7ths"],
+  patternOrdering: "custom",
 };
 
 type PracticeConfigStore = PracticeConfig & {
@@ -203,6 +260,16 @@ type PracticeConfigStore = PracticeConfig & {
   setTransitionCount: (count: number) => void;
   setNotationStyle: (style: ChordNotationStyle) => void;
   setArpeggioPattern: (pattern: ArpeggioPattern) => void;
+  /**
+   * Toggle a pattern's membership in the pool. Adding the only
+   * pattern leaves the pool empty? — no: setTogglePatternInPool
+   * always keeps at least one entry, refusing to remove the last
+   * pattern. The arpeggioPattern field is kept in sync with the
+   * first pool entry so legacy code paths still work.
+   */
+  togglePatternInPool: (pattern: ArpeggioPattern) => void;
+  /** Set the pattern-pool ordering strategy. */
+  setPatternOrdering: (ordering: PatternOrdering) => void;
   /** Replace every config field with values from a loaded Drill. */
   loadConfig: (config: PracticeConfig) => void;
   resetToDefaults: () => void;
@@ -320,13 +387,42 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           ),
         }),
       setNotationStyle: (notationStyle) => set({ notationStyle }),
-      setArpeggioPattern: (arpeggioPattern) => set({ arpeggioPattern }),
+      setArpeggioPattern: (arpeggioPattern) =>
+        set({
+          arpeggioPattern,
+          // Keep pool in lockstep — single-pattern drills are still
+          // the common case, so the picker on /practice mirrors the
+          // pool head.
+          patternPool: [arpeggioPattern],
+        }),
+      togglePatternInPool: (pattern) =>
+        set((state) => {
+          const isPresent = state.patternPool.includes(pattern);
+          let nextPool: ArpeggioPattern[];
+          if (isPresent) {
+            // Refuse to remove the last pattern — the drill needs
+            // at least one to play.
+            if (state.patternPool.length === 1) return {};
+            nextPool = state.patternPool.filter((p) => p !== pattern);
+          } else {
+            nextPool = [...state.patternPool, pattern];
+          }
+          return {
+            patternPool: nextPool,
+            // arpeggioPattern tracks the first pool entry for backwards
+            // compat with the legacy single-pattern UI + readers.
+            arpeggioPattern: nextPool[0],
+          };
+        }),
+      setPatternOrdering: (patternOrdering) => set({ patternOrdering }),
       loadConfig: (config) =>
         // Spread defaults first so a drill saved under an older schema
         // (missing fields added later) still loads with sensible values.
         // Then ensure chordPoolIds is in lockstep with chordPool — a
         // drill saved before the parallel-id array existed will lack
-        // them; mismatched length means we regenerate fresh.
+        // them; mismatched length means we regenerate fresh. Same idea
+        // for the pattern pool: pre-Phase-10 drills lacked patternPool,
+        // so we synthesize it from the arpeggioPattern.
         set(() => {
           const merged: PracticeConfig = {
             ...DEFAULT_PRACTICE_CONFIG,
@@ -337,6 +433,12 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
               newChordSlotId(),
             );
           }
+          if (
+            !Array.isArray(merged.patternPool) ||
+            merged.patternPool.length === 0
+          ) {
+            merged.patternPool = [merged.arpeggioPattern];
+          }
           return merged;
         }),
       resetToDefaults: () => set(DEFAULT_PRACTICE_CONFIG),
@@ -344,7 +446,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 8,
+      version: 9,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -414,6 +516,18 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
             ? (next.chordPool as Chord[])
             : DEFAULT_PRACTICE_CONFIG.chordPool;
           next.chordPoolIds = pool.map(() => newChordSlotId());
+        }
+
+        // v8 → v9: pattern pool. Old drills had a single arpeggioPattern;
+        // new model has patternPool + patternOrdering. Migrate by
+        // wrapping the existing single pattern into a one-entry pool
+        // with "custom" ordering — behavior identical to pre-v9.
+        if (version <= 8) {
+          const existingPattern =
+            (next.arpeggioPattern as ArpeggioPattern | undefined) ??
+            DEFAULT_PRACTICE_CONFIG.arpeggioPattern;
+          next.patternPool = [existingPattern];
+          next.patternOrdering = DEFAULT_PRACTICE_CONFIG.patternOrdering;
         }
 
         return next;

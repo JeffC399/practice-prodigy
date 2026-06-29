@@ -1,7 +1,9 @@
 import type { Chord, PitchClass } from "./chord";
 import { PITCH_CLASS_TO_SEMITONE } from "./intervals";
+import type { ArpeggioPattern } from "./arpeggio";
 import type {
   OrderingStrategy,
+  PatternOrdering,
   TimeSignature,
   TransitionUnit,
 } from "@/lib/state/practice-config";
@@ -169,6 +171,74 @@ export function previewPlayChords(
 ): Chord[] {
   if (config.pool.length === 0 || count <= 0) return [];
   return buildPlayChords(config).slice(0, count);
+}
+
+/**
+ * Per-measure pattern picker. Returns the ArpeggioPattern that should
+ * be played at a given play-measure index given the pool + ordering.
+ *
+ * Single-entry pools always return that one pattern (the common case
+ * for drills that haven't opted into multi-pattern drilling). Multi-
+ * entry pools use the ordering strategy:
+ *   - custom: cycles through the pool in order, wrapping at the end
+ *   - randomReplace: picks uniformly at random each measure (can
+ *     repeat consecutively)
+ *   - randomShuffleOnce: shuffled once at session start, cycles
+ *     through that order
+ *   - randomShuffleEachPass: re-shuffles the pool at each repetition
+ *     boundary so consecutive reps differ
+ *
+ * Random strategies use a session-stable seed so calling repeatedly
+ * for the same (measure, repIndex) yields the same answer. Without
+ * that, every render of the drill screen would pick a different
+ * pattern.
+ *
+ * Note: this is build-once-per-session like the chord sequence —
+ * the session page should call `buildPatternsForSession` once at
+ * Start and look up by measure index, NOT call this directly per
+ * render (which would re-randomize each call).
+ */
+export function buildPatternsForSession(
+  pool: ArpeggioPattern[],
+  ordering: PatternOrdering,
+  totalPlayMeasures: number,
+): ArpeggioPattern[] {
+  if (pool.length === 0) return [];
+  if (pool.length === 1) {
+    return Array.from({ length: totalPlayMeasures }, () => pool[0]);
+  }
+  switch (ordering) {
+    case "custom":
+      return Array.from(
+        { length: totalPlayMeasures },
+        (_, i) => pool[i % pool.length],
+      );
+    case "randomReplace":
+      return Array.from(
+        { length: totalPlayMeasures },
+        () => pool[Math.floor(Math.random() * pool.length)],
+      );
+    case "randomShuffleOnce": {
+      const shuffled = shuffle(pool);
+      return Array.from(
+        { length: totalPlayMeasures },
+        (_, i) => shuffled[i % shuffled.length],
+      );
+    }
+    case "randomShuffleEachPass": {
+      // Re-shuffle on each pool-length boundary. Same as
+      // randomShuffleOnce except the order changes each "rep" of
+      // the pool, which on a long drill produces visible variety.
+      const out: ArpeggioPattern[] = [];
+      let chunk = shuffle(pool);
+      for (let i = 0; i < totalPlayMeasures; i++) {
+        const inChunk = i % chunk.length;
+        if (inChunk === 0 && i > 0) chunk = shuffle(pool);
+        out.push(chunk[inChunk]);
+      }
+      return out;
+    }
+  }
 }
 
 /**
