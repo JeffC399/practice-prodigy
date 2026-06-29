@@ -856,6 +856,17 @@ function TwoPaneDisplay({
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
+      {/* Next panel — during prep, dims further (on top of the
+          container's 0.5 dim) so the eye is pulled to the Now panel.
+          Net result: Now ~50% bright with pulsing ring, Next ~25%
+          bright with no ring. Information stays available; focus is
+          unambiguous. Hide-entirely would create layout shift; this
+          preserves the chord-after-next info without competing for
+          attention. */}
+      <div
+        style={{ opacity: isPreparing ? 0.5 : 1 }}
+        className="transition-opacity duration-300"
+      >
       <TwoPanePanel label="Next">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -877,6 +888,7 @@ function TwoPaneDisplay({
           </motion.div>
         </AnimatePresence>
       </TwoPanePanel>
+      </div>
     </div>
   );
 }
