@@ -14,7 +14,7 @@ A short message + structured feedback prompt to send to your first round of frie
 >
 > 1. **Open `/practice` and tap a built-in drill** like "ii-V-I in 12 keys" — that auto-starts a real session. Click Stop whenever.
 > 2. **Try the Start-from picker** in the Pattern section — pick `3rd` and play through a measure. The arpeggio rotates so you're drilling the 1st inversion. `Random` re-rolls every measure (expert mode).
-> 3. **Scroll to "Your patterns"** (right under your drills) and hit **+ New custom pattern**. Click some interval buttons (1, ♭3, 5, ♭7), click the duration badge on a chip to change it from `qtr` to `8th`, add a Rest. Hit Preview to audition. Save — your pattern appears in Your patterns, and it's now available as a checkbox in the Pattern section below.
+> 3. **Scroll to "Your patterns"** (right under your drills) and hit **+ New custom pattern**. Click some interval buttons (1, ♭3, 5, ♭7), click the duration badge on a chip to change it from `qtr` to `8th`, add a Rest. Hit Preview to audition. Save — your pattern appears in Your patterns, and it's now available as a checkbox in the **Drill patterns** section below.
 > 4. **Switch to the two-pane layout** in `/settings` → Appearance, then start a drill. Now and Next sit side-by-side. Random chord pools feel different in this layout.
 > 5. **Toggle scale-degree mode** in `/settings` → Pattern display → "Scale degrees." Now during a drill you can watch the digits (1-3-5-7) light up in time with what you're supposed to be playing.
 >

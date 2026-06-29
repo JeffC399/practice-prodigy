@@ -877,19 +877,25 @@ export default function PracticeSetupPage() {
             </div>
           )}
 
-          {/* Quick Start — your own drills are the primary surface; the
-              shipped library tucks into a collapsible below so the page
-              stays compact for repeat users. */}
-          <FormSection title="Your drills">
+          {/* Your drills + Your patterns — the two user-owned libraries,
+              paired at the top so "everything I've saved" reads as one
+              block. Built-in drills tuck into a collapsible below. */}
+          <FormSection
+            title="Your drills"
+            subtitle="Your saved sessions — click a card to launch, pencil to edit."
+          >
             {userDrills.length === 0 ? (
               <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
                 No saved drills yet. Configure one below and click{" "}
                 <span className="font-medium text-foreground">
                   Save as drill
                 </span>{" "}
-                to add it here — or expand the built-in library below to
-                launch one of the 10 drills that ship with Practice
-                Prodigy.
+                to add it here — or expand the{" "}
+                <span className="font-medium text-foreground">
+                  Built-in drills
+                </span>{" "}
+                library below to launch one of the 10 drills that ship
+                with Practice Prodigy.
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -907,58 +913,30 @@ export default function PracticeSetupPage() {
               </div>
             )}
           </FormSection>
-          <CollapsibleSection
-            title="Built-in drills"
-            summary={`${SHIPPED_DRILLS.length} ready to launch · jazz · blues · pop · rock`}
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {SHIPPED_DRILLS.map((drill) => (
-                <DrillCard
-                  key={drill.id}
-                  drill={drill}
-                  isEditing={drill.id === loadedDrillId}
-                  isShipped={true}
-                  onLaunch={handleLoadDrill}
-                  onEdit={handleEditDrill}
-                  onDelete={drillsLib.deleteDrill}
-                />
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Built-in drills ship with Practice Prodigy and can&rsquo;t
-              be deleted. Open one with the pencil to tweak it — the only
-              save path is{" "}
-              <span className="font-medium text-foreground">
-                Save as new drill
-              </span>
-              , so your customized copy lives in{" "}
-              <span className="font-medium text-foreground">
-                Your drills
-              </span>{" "}
-              above.
-            </p>
-          </CollapsibleSection>
 
-          {/* Your patterns — symmetric library home for user-authored
-              custom patterns, parallel to "Your drills" above. Phase
-              18 promoted this from a sub-row of the Pattern section
-              so library management has one canonical home and the
-              Pattern section can be pure configuration. The Pattern
-              section's Custom sub-row still shows these patterns as
-              CHECKBOXES (no edit/delete) — those affordances live
-              here. */}
+          {/* Your patterns — pairs visually with Your drills above so
+              the two user-owned libraries sit together as one "my
+              stuff" block. Phase 19 reordered this from below
+              Built-in drills to here. */}
           <section
             id="your-patterns"
             className="flex flex-col gap-4 scroll-mt-20"
           >
-            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              Your patterns
-              {customPatterns.length > 0 && (
-                <span className="ml-1.5 text-muted-foreground/70 font-normal normal-case tracking-normal">
-                  · {customPatterns.length}
-                </span>
-              )}
-            </h2>
+            <div className="flex flex-col gap-1">
+              <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                Your patterns
+                {customPatterns.length > 0 && (
+                  <span className="ml-1.5 text-muted-foreground/70 font-normal normal-case tracking-normal">
+                    · {customPatterns.length}
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                Your toolkit. Author custom arpeggio shapes here — they
+                become available as checkboxes in any drill&rsquo;s
+                pattern setup below.
+              </p>
+            </div>
             {customPatterns.length === 0 ? (
               <div className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center">
                 <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1016,9 +994,6 @@ export default function PracticeSetupPage() {
                     </div>
                   );
                 })}
-                {/* "+ New" tile sits at the end of the grid, matching
-                    the tile dimensions so the library reads as one
-                    consistent surface. */}
                 <button
                   type="button"
                   onClick={() =>
@@ -1033,6 +1008,38 @@ export default function PracticeSetupPage() {
               </div>
             )}
           </section>
+
+          <CollapsibleSection
+            title="Built-in drills"
+            summary={`${SHIPPED_DRILLS.length} ready to launch · jazz · blues · pop · rock`}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {SHIPPED_DRILLS.map((drill) => (
+                <DrillCard
+                  key={drill.id}
+                  drill={drill}
+                  isEditing={drill.id === loadedDrillId}
+                  isShipped={true}
+                  onLaunch={handleLoadDrill}
+                  onEdit={handleEditDrill}
+                  onDelete={drillsLib.deleteDrill}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Built-in drills ship with Practice Prodigy and can&rsquo;t
+              be deleted. Open one with the pencil to tweak it — the only
+              save path is{" "}
+              <span className="font-medium text-foreground">
+                Save as new drill
+              </span>
+              , so your customized copy lives in{" "}
+              <span className="font-medium text-foreground">
+                Your drills
+              </span>{" "}
+              above.
+            </p>
+          </CollapsibleSection>
 
           {/* Sequence preview. Header is a clickable toggle (with
               chevron) so users can see at a glance that the chips
@@ -1391,8 +1398,24 @@ export default function PracticeSetupPage() {
           </CollapsibleSection>
 
           {/* Arpeggio pattern */}
-          <CollapsibleSection title="Pattern" summary={patternSummary}>
+          <CollapsibleSection title="Drill patterns" summary={patternSummary}>
             <div className="flex flex-col gap-4">
+              {/* Section lead-in (Phase 19). Clarifies scope so the
+                  user knows this is per-drill, not the global library
+                  (which lives in Your patterns at the top of the
+                  page). */}
+              <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                Pick which patterns this drill uses, in what order, and
+                which inversion. Edits here only affect the current
+                drill — to author or rename a custom pattern, head up to{" "}
+                <a
+                  href="#your-patterns"
+                  className="font-medium text-primary hover:underline"
+                >
+                  Your patterns
+                </a>
+                .
+              </p>
               {/* Multi-select pattern pool. Grouped into three labeled
                   sections so the now-4 built-ins + customs read as one
                   organized surface instead of a single long grid:
@@ -2501,16 +2524,31 @@ function DrillCard({
 
 function FormSection({
   title,
+  subtitle,
   children,
 }: {
   title: string;
+  /**
+   * Optional one-line description of the section's role. Sits right
+   * under the title in muted text. Used to differentiate similarly-
+   * named sections (e.g. "Your patterns" library vs "Drill patterns"
+   * config) so the user can tell their roles apart at a glance.
+   */
+  subtitle?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h2>
+      <div className="flex flex-col gap-1">
+        <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            {subtitle}
+          </p>
+        )}
+      </div>
       {children}
     </section>
   );
