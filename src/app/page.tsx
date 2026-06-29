@@ -39,7 +39,11 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Primary CTA + secondary roadmap link */}
+        {/* Primary CTA + secondary roadmap link. Identical box
+            geometry (same padding, text size, icon size) so they
+            read as paired actions; the only visual difference is
+            the background fill — primary amber for the main action,
+            border-only for the secondary. */}
         <div className="flex flex-col gap-3">
           <Link
             href="/practice"
@@ -53,14 +57,14 @@ export default function Home() {
           </Link>
           <Link
             href="/roadmap"
-            className="group flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-6 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            className="group flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-6 py-4 text-base font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
           >
             <span className="flex items-center gap-2">
-              <Map className="h-4 w-4" aria-hidden="true" />
+              <Map className="h-5 w-5" aria-hidden="true" />
               See the 9-module roadmap
             </span>
             <ArrowRight
-              className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+              className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
               aria-hidden="true"
             />
           </Link>

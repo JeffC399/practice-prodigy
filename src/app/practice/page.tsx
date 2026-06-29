@@ -837,27 +837,37 @@ export default function PracticeSetupPage() {
             </p>
           </CollapsibleSection>
 
-          {/* Sequence preview. Min-height keeps the card stable across
-              notation styles even when the pool has just one chord.
-              Chip visibility is user-toggleable so large pools (Quick
-              Build wizard can produce 48+ chord pools) can be hidden
-              behind a one-click affordance. */}
+          {/* Sequence preview. Header is a clickable toggle (with
+              chevron) so users can see at a glance that the chips
+              expand/collapse — same affordance pattern as the
+              CollapsibleSection components below. The "Clear pool"
+              control sits separately to its right so it never
+              accidentally triggers the collapse on a stray click. */}
           <section
-            className={`flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-6 ${
+            className={`flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/40 px-6 py-4 ${
               chipsVisible ? "min-h-72" : ""
             }`}
           >
-            <div className="flex flex-wrap items-center gap-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              <span>
-                Sequence · {poolSize} chord{poolSize === 1 ? "" : "s"}
-              </span>
+            <div className="flex w-full items-center justify-between gap-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
               <button
                 type="button"
                 onClick={() => setChipsVisible((v) => !v)}
-                aria-pressed={chipsVisible}
-                className="rounded-sm border border-border bg-background px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                aria-expanded={chipsVisible}
+                aria-controls="sequence-chips"
+                className="flex items-center gap-2 rounded-sm px-1 py-0.5 hover:text-foreground transition-colors"
               >
-                {chipsVisible ? "Hide chords" : "Show chords"}
+                <ChevronDown
+                  className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
+                    chipsVisible ? "rotate-180" : ""
+                  }`}
+                  aria-hidden="true"
+                />
+                <span>
+                  Sequence · {poolSize} chord{poolSize === 1 ? "" : "s"}
+                </span>
+                <span className="text-[10px] text-muted-foreground/60">
+                  ({chipsVisible ? "click to hide" : "click to show"})
+                </span>
               </button>
               {poolSize > 1 && (
                 <button
@@ -871,6 +881,7 @@ export default function PracticeSetupPage() {
             </div>
             {chipsVisible && (
               <div
+                id="sequence-chips"
                 className="flex flex-wrap items-center justify-center gap-2"
                 aria-live="polite"
               >
