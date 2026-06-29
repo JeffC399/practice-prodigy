@@ -13,6 +13,7 @@ export const CHORD_NOTATION_STYLES = [
   "jazz-minus",
   "lowercase-m",
   "plain-ascii",
+  "shorthand",
   "long-form",
 ] as const;
 
@@ -31,6 +32,7 @@ export const NOTATION_STYLE_DISPLAY_NAMES: Record<ChordNotationStyle, string> =
     "jazz-minus": "Jazz (B−7)",
     "lowercase-m": "Jazz lowercase-m (B♭m7♭5)",
     "plain-ascii": "Plain ASCII (Bbm7b5)",
+    "shorthand": "Shorthand (B min 7)",
     "long-form": "Long form (B minor 7)",
   };
 
@@ -105,6 +107,37 @@ const PLAIN_ASCII_SUFFIX: Record<ChordQuality, string> = {
 };
 
 /**
+ * Shorthand: abbreviated long-form. Reads like spoken English minus
+ * the long words — "C min 7" instead of "C minor 7". Slots between
+ * Lowercase-m (very compact, runs together) and Long form (verbose
+ * full words). The Real Book and many pedagogy texts use this style.
+ * Spaces separate the root from the quality so the reader can scan
+ * "C - min - 7" at a glance.
+ */
+const SHORTHAND_SUFFIX: Record<ChordQuality, string> = {
+  maj: "",
+  min: " min",
+  aug: " aug",
+  dom7: " dom 7",
+  min7: " min 7",
+  maj7: " maj 7",
+  halfDim7: " half-dim 7",
+  dim7: " dim 7",
+  sus2: " sus 2",
+  sus4: " sus 4",
+  "7sus4": " dom 7 sus 4",
+  maj9: " maj 9",
+  min9: " min 9",
+  dom9: " dom 9",
+  dom13: " dom 13",
+  dom7b9: " dom 7♭9",
+  dom7sharp9: " dom 7♯9",
+  dom7alt: " dom 7 alt",
+  dom7b5: " dom 7♭5",
+  dom7sharp5: " dom 7♯5",
+};
+
+/**
  * Long-form: a leading space separates root from quality words (the root
  * renders as "C", not "Cmajor"), but extension digits attach to the
  * preceding word for jazz convention ("major 7", not "major7").
@@ -147,6 +180,8 @@ export function renderChord(chord: Chord, style: ChordNotationStyle): string {
       return `${root}${LOWERCASE_M_SUFFIX[chord.quality]}`;
     case "plain-ascii":
       return `${root}${PLAIN_ASCII_SUFFIX[chord.quality]}`;
+    case "shorthand":
+      return `${root}${SHORTHAND_SUFFIX[chord.quality]}`;
     case "long-form":
       return `${root}${LONG_FORM_SUFFIX[chord.quality]}`;
   }

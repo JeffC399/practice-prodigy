@@ -582,7 +582,7 @@ export default function PracticeSessionPage() {
                     isLongForm ? "text-6xl sm:text-7xl" : "text-[12rem]"
                   }`}
                   style={{
-                    opacity: isIdle ? 0.4 : isCountIn ? 0.5 : 1,
+                    opacity: isIdle ? 0.4 : isCountIn ? 0.8 : 1,
                   }}
                   aria-live="polite"
                 >
@@ -664,11 +664,11 @@ function PhaseBadge({
           isPlaying
             ? "bg-primary"
             : isCountIn
-              ? "bg-primary/60"
+              ? "bg-primary animate-pulse"
               : "bg-muted-foreground/40"
         }`}
       />
-      <span>{label}</span>
+      <span className={isCountIn ? "text-primary" : ""}>{label}</span>
     </div>
   );
 }
@@ -759,14 +759,25 @@ function TwoPaneDisplay({
   // is guaranteed to land regardless of class purging. Count-in gets a
   // deeper dim than the initial "opacity-70 was too subtle to notice"
   // pass — 0.5 reads as unmistakably "this is preparation."
-  const containerOpacity = isIdle ? 0.45 : isCountIn ? 0.5 : 1;
+  // Three distinct states with well-separated opacity values. Earlier
+  // versions had idle (0.45) and count-in (0.5) almost identical, which
+  // made count-in invisible to the user — the only visible transition
+  // was idle → playing on Stop. Now idle = 0.4, count-in = 0.8,
+  // playing = 1.0 — both transitions clearly LIGHT UP the chord.
+  // Combined with the per-panel label swap ("Now" -> "Get ready") and
+  // the pulsing border on the Now panel, count-in is unmissable.
+  const containerOpacity = isIdle ? 0.4 : isCountIn ? 0.8 : 1;
   return (
     <div
       className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 transition-opacity duration-300"
       style={{ opacity: containerOpacity }}
       aria-live="polite"
     >
-      <TwoPanePanel label="Now" emphasized>
+      <TwoPanePanel
+        label={isCountIn ? "Get ready" : "Now"}
+        emphasized
+        pulsing={isCountIn}
+      >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentChordKey}
@@ -815,20 +826,35 @@ function TwoPaneDisplay({
 function TwoPanePanel({
   label,
   emphasized,
+  pulsing,
   children,
 }: {
   label: string;
   emphasized?: boolean;
+  /**
+   * When true, a Tailwind animate-pulse ring overlays the panel
+   * border — used during count-in on the "Now" panel as a visual
+   * mirror of the aural stick-click pulse. The ring is an absolute
+   * positioned overlay so the chord text inside doesn't pulse;
+   * only the border perimeter does.
+   */
+  pulsing?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section
-      className={`flex flex-col items-center justify-center gap-4 rounded-xl border px-6 py-10 min-h-[14rem] ${
+      className={`relative flex flex-col items-center justify-center gap-4 rounded-xl border px-6 py-10 min-h-[14rem] ${
         emphasized
           ? "border-primary/40 bg-primary/5"
           : "border-border bg-card/40"
       }`}
     >
+      {pulsing && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-primary/70 animate-pulse"
+        />
+      )}
       <span
         className={`font-mono text-[11px] uppercase tracking-wider ${
           emphasized ? "text-primary" : "text-muted-foreground"
