@@ -141,6 +141,7 @@ export default function PracticeSetupPage() {
     setArpeggioPattern,
     togglePatternInPool,
     setPatternOrdering,
+    setPatternDisplay,
     loadConfig,
     loadedDrillId,
     setLoadedDrillId,
@@ -148,8 +149,11 @@ export default function PracticeSetupPage() {
   const drillsLib = useDrillsLibrary();
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const setPracticeLayout = useUserPrefs((s) => s.setPracticeLayout);
-  const patternDisplay = useUserPrefs((s) => s.patternDisplay);
-  const setPatternDisplay = useUserPrefs((s) => s.setPatternDisplay);
+  // The global default — used as the fallback when the drill's
+  // own patternDisplay is null. The picker on the setup screen
+  // writes to the per-drill override (setPatternDisplay from
+  // the config store, destructured above), NOT here.
+  const globalPatternDisplay = useUserPrefs((s) => s.patternDisplay);
   const resume = useResumeSession();
   const resumable = isResumable(resume.active);
   const handleResumeClick = async () => {
@@ -326,10 +330,13 @@ export default function PracticeSetupPage() {
   // Controlled-open state for the Chord pool section, so a click on a
   // chip in the Sequence preview can force it open before scrolling.
   const [chordPoolOpen, setChordPoolOpen] = useState(false);
-  // Hide the Sequence-preview chord chips for users with huge pools
-  // who want a quieter setup screen. Header + Notation row stay visible
-  // even when chips are hidden. User-toggle; not persisted (per session).
-  const [chipsVisible, setChipsVisible] = useState(true);
+  // Hide the Sequence-preview chord chips by default — matches the
+  // "all panes closed by default" treatment used by the
+  // CollapsibleSection components. Users with small pools can toggle
+  // them back on; users with huge pools never have to wait for a
+  // 48-chord chip wall to render before they can scroll to the
+  // controls below. Not persisted (per session).
+  const [chipsVisible, setChipsVisible] = useState(false);
   const poolRowRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   // Drag-to-reorder (chord pool, Custom order only). PointerSensor for
@@ -1315,19 +1322,47 @@ export default function PracticeSetupPage() {
                 </button>
               </div>
 
-              {/* Pattern subtitle display — picker for what the
-                  subtitle under each chord shows during the drill.
-                  Mirrors the same setting in /settings (both read
-                  from the same useUserPrefs store). Lives here for
-                  discoverability — users who want pattern + chord
-                  on the drill screen don't have to dig into Settings. */}
+              {/* Pattern subtitle display — PER-DRILL override. Writes
+                  to PracticeConfig.patternDisplay. When null (Follow
+                  global), the drill uses the user-prefs default set
+                  in /settings. When a specific mode is selected here,
+                  the drill is pinned to that mode regardless of the
+                  global default (so e.g. an ear-training drill can
+                  force "degrees" while transcription drills stay on
+                  "name"). */}
               <div className="flex flex-col gap-2 rounded-md border border-border bg-background/30 p-3">
                 <span className="text-sm font-medium text-foreground">
                   Pattern subtitle on drill screen
                 </span>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {/* "Follow global" button — sets the per-drill
+                      patternDisplay to null. */}
+                  <button
+                    type="button"
+                    onClick={() => setPatternDisplay(null)}
+                    className={`flex flex-col gap-1 rounded-md border px-3 py-2 text-left transition-colors ${
+                      config.patternDisplay === null
+                        ? "border-primary/50 bg-primary/10"
+                        : "border-border bg-background hover:border-primary/40"
+                    }`}
+                  >
+                    <span
+                      className={`text-xs font-medium ${
+                        config.patternDisplay === null
+                          ? "text-primary"
+                          : "text-foreground"
+                      }`}
+                    >
+                      Follow global
+                    </span>
+                    <span className="text-[11px] text-muted-foreground leading-relaxed">
+                      Use the default set in Settings (
+                      {PATTERN_DISPLAY_LABELS[globalPatternDisplay].toLowerCase()}
+                      ).
+                    </span>
+                  </button>
                   {PATTERN_DISPLAYS.map((mode) => {
-                    const selected = patternDisplay === mode;
+                    const selected = config.patternDisplay === mode;
                     return (
                       <button
                         key={mode}
@@ -1354,8 +1389,9 @@ export default function PracticeSetupPage() {
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Also configurable from Settings. Affects every drill;
-                  not saved per-drill.
+                  Saved with this drill. Settings has the global
+                  default that applies when this drill is set to
+                  &ldquo;Follow global.&rdquo;
                 </p>
               </div>
             </div>
@@ -2214,6 +2250,9 @@ function extractPracticeConfig(
     }),
     ...(source.patternOrdering !== undefined && {
       patternOrdering: source.patternOrdering,
+    }),
+    ...(source.patternDisplay !== undefined && {
+      patternDisplay: source.patternDisplay,
     }),
     ...(source.transitionUnit !== undefined && {
       transitionUnit: source.transitionUnit,

@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { ArpeggioPattern } from "@/lib/music/arpeggio";
 import type { Chord, PitchClass, ChordQuality } from "@/lib/music/chord";
 import type { ChordNotationStyle } from "@/lib/music/render-chord";
+import type { PatternDisplay } from "./user-prefs";
 
 /**
  * Persistent practice configuration store.
@@ -181,6 +182,15 @@ export type PracticeConfig = {
    * 2+ uses one of the four strategies (see PatternOrdering).
    */
   patternOrdering: PatternOrdering;
+  /**
+   * Per-drill override for the global pattern-display preference.
+   * `null` (the default) means "use the user-global setting" — saved
+   * drills inherit the user's preference at the time they're loaded.
+   * Any non-null value pins the drill to that specific display mode
+   * regardless of the global setting (e.g. an ear-training drill
+   * might force "degrees" while transcription drills stay on "name").
+   */
+  patternDisplay: PatternDisplay | null;
 };
 
 export const BPM_MIN = 30;
@@ -228,6 +238,9 @@ export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   // drilling by extending the pool from the setup screen.
   patternPool: ["arp-7ths"],
   patternOrdering: "custom",
+  // null = follow the user-global pattern-display preference. Drills
+  // can pin a specific display mode by setting this explicitly.
+  patternDisplay: null,
 };
 
 type PracticeConfigStore = PracticeConfig & {
@@ -270,6 +283,12 @@ type PracticeConfigStore = PracticeConfig & {
   togglePatternInPool: (pattern: ArpeggioPattern) => void;
   /** Set the pattern-pool ordering strategy. */
   setPatternOrdering: (ordering: PatternOrdering) => void;
+  /**
+   * Set the per-drill patternDisplay override. Pass null to clear
+   * the override (drill follows user-global setting). Pass a
+   * specific value to pin the drill to that display mode.
+   */
+  setPatternDisplay: (display: PatternDisplay | null) => void;
   /** Replace every config field with values from a loaded Drill. */
   loadConfig: (config: PracticeConfig) => void;
   resetToDefaults: () => void;
@@ -415,6 +434,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
           };
         }),
       setPatternOrdering: (patternOrdering) => set({ patternOrdering }),
+      setPatternDisplay: (patternDisplay) => set({ patternDisplay }),
       loadConfig: (config) =>
         // Spread defaults first so a drill saved under an older schema
         // (missing fields added later) still loads with sensible values.
@@ -446,7 +466,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 9,
+      version: 10,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -528,6 +548,15 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
             DEFAULT_PRACTICE_CONFIG.arpeggioPattern;
           next.patternPool = [existingPattern];
           next.patternOrdering = DEFAULT_PRACTICE_CONFIG.patternOrdering;
+        }
+
+        // v9 → v10: per-drill patternDisplay override (cascade over
+        // the user-global setting). null = "use the global default";
+        // existing drills get null so they continue to follow the
+        // global. Set explicitly via setPatternDisplay on the setup
+        // screen to pin a drill to a specific display mode.
+        if (version <= 9) {
+          next.patternDisplay = null;
         }
 
         return next;

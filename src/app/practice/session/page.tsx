@@ -69,7 +69,10 @@ export default function PracticeSessionPage() {
   const config = usePracticeConfig();
   const drillsLib = useDrillsLibrary();
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
-  const patternDisplay = useUserPrefs((s) => s.patternDisplay);
+  const globalPatternDisplay = useUserPrefs((s) => s.patternDisplay);
+  // Cascade: per-drill override (config.patternDisplay) wins over the
+  // user-global default. null on the drill means "follow global".
+  const patternDisplay = config.patternDisplay ?? globalPatternDisplay;
   const { state, start, stop } = useMetronome();
 
   // When the user launched this session from a Quick Start card, anchor
@@ -488,6 +491,7 @@ export default function PracticeSessionPage() {
         arpeggioPattern: config.arpeggioPattern,
         patternPool: config.patternPool,
         patternOrdering: config.patternOrdering,
+        patternDisplay: config.patternDisplay,
       },
       drillName: currentDrill?.name ?? null,
       loadedDrillId: config.loadedDrillId,

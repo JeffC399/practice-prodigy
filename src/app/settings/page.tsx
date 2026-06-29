@@ -198,12 +198,13 @@ export default function SettingsPage() {
           </SettingsField>
         </SettingsSection>
 
-        {/* PATTERN DISPLAY — how the per-measure arpeggio pattern
-            renders below each chord on the drill screen. Independent
-            of which pattern is being drilled — just visual style. */}
+        {/* PATTERN DISPLAY — GLOBAL DEFAULT. Each drill can override
+            this on the setup screen (Pattern section → Pattern
+            subtitle on drill screen). When a drill is set to "Follow
+            global", THIS is the value it uses. */}
         <SettingsSection
           title="Pattern display"
-          description="How the arpeggio pattern shows under each chord during a drill."
+          description="Global default for the pattern subtitle under each chord during a drill. Drills can override this per-drill on the setup screen."
         >
           <SettingsField label="Pattern subtitle">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
