@@ -61,6 +61,9 @@ import {
   useResumeSession,
 } from "@/lib/state/resume-session";
 import {
+  PATTERN_DISPLAYS,
+  PATTERN_DISPLAY_DESCRIPTIONS,
+  PATTERN_DISPLAY_LABELS,
   PRACTICE_LAYOUTS,
   PRACTICE_LAYOUT_DESCRIPTIONS,
   PRACTICE_LAYOUT_DISPLAY_NAMES,
@@ -145,6 +148,8 @@ export default function PracticeSetupPage() {
   const drillsLib = useDrillsLibrary();
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const setPracticeLayout = useUserPrefs((s) => s.setPracticeLayout);
+  const patternDisplay = useUserPrefs((s) => s.patternDisplay);
+  const setPatternDisplay = useUserPrefs((s) => s.setPatternDisplay);
   const resume = useResumeSession();
   const resumable = isResumable(resume.active);
   const handleResumeClick = async () => {
@@ -1308,6 +1313,50 @@ export default function PracticeSetupPage() {
                     </>
                   )}
                 </button>
+              </div>
+
+              {/* Pattern subtitle display — picker for what the
+                  subtitle under each chord shows during the drill.
+                  Mirrors the same setting in /settings (both read
+                  from the same useUserPrefs store). Lives here for
+                  discoverability — users who want pattern + chord
+                  on the drill screen don't have to dig into Settings. */}
+              <div className="flex flex-col gap-2 rounded-md border border-border bg-background/30 p-3">
+                <span className="text-sm font-medium text-foreground">
+                  Pattern subtitle on drill screen
+                </span>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {PATTERN_DISPLAYS.map((mode) => {
+                    const selected = patternDisplay === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setPatternDisplay(mode)}
+                        className={`flex flex-col gap-1 rounded-md border px-3 py-2 text-left transition-colors ${
+                          selected
+                            ? "border-primary/50 bg-primary/10"
+                            : "border-border bg-background hover:border-primary/40"
+                        }`}
+                      >
+                        <span
+                          className={`text-xs font-medium ${
+                            selected ? "text-primary" : "text-foreground"
+                          }`}
+                        >
+                          {PATTERN_DISPLAY_LABELS[mode]}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground leading-relaxed">
+                          {PATTERN_DISPLAY_DESCRIPTIONS[mode]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Also configurable from Settings. Affects every drill;
+                  not saved per-drill.
+                </p>
               </div>
             </div>
           </CollapsibleSection>
