@@ -1215,6 +1215,11 @@ export default function PracticeSetupPage() {
                   and as the legacy arpeggioPattern fallback. Built-ins
                   are listed first; user-authored custom patterns
                   follow with an inline Edit affordance. */}
+              {/* All tiles share `min-h-[5.5rem]` so built-ins,
+                  customs, and the "+ New" tile line up cleanly in the
+                  grid regardless of which has more text. The two-line
+                  inner layout (name + monospace degree string) keeps
+                  the visual rhythm consistent across tile types. */}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {ARPEGGIO_PATTERNS.map((p) => {
                   const inPool = config.patternPool.includes(p);
@@ -1223,7 +1228,7 @@ export default function PracticeSetupPage() {
                   return (
                     <label
                       key={p}
-                      className={`flex items-start gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+                      className={`flex min-h-[5.5rem] items-start gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${
                         inPool
                           ? "border-primary/40 bg-primary/10"
                           : "border-border bg-background hover:border-primary/40"
@@ -1239,15 +1244,15 @@ export default function PracticeSetupPage() {
                         className="mt-0.5 h-4 w-4 accent-primary cursor-pointer disabled:cursor-not-allowed"
                         aria-label={`Toggle ${ARPEGGIO_PATTERN_DISPLAY_NAMES[p]} in pool`}
                       />
-                      <div className="flex flex-col gap-0.5">
+                      <div className="flex flex-1 flex-col gap-0.5">
                         <span
                           className={`text-sm font-medium ${
                             inPool ? "text-primary" : "text-foreground"
                           }`}
                         >
-                          {ARPEGGIO_PATTERN_DISPLAY_NAMES[p]}
+                          {getPatternShortName(p)}
                         </span>
-                        <span className="text-[11px] text-muted-foreground leading-snug">
+                        <span className="text-[11px] text-muted-foreground leading-snug line-clamp-3">
                           {ARPEGGIO_PATTERN_DESCRIPTIONS[p]}
                         </span>
                       </div>
@@ -1262,7 +1267,7 @@ export default function PracticeSetupPage() {
                   return (
                     <div
                       key={cp.id}
-                      className={`group relative flex items-start gap-2 rounded-md border px-3 py-2 transition-colors ${
+                      className={`group relative flex min-h-[5.5rem] items-start gap-2 rounded-md border px-3 py-2 transition-colors ${
                         inPool
                           ? "border-primary/40 bg-primary/10"
                           : "border-border bg-background hover:border-primary/40"
@@ -1307,16 +1312,13 @@ export default function PracticeSetupPage() {
                 })}
                 {/* "Add" tile — sits inline with the pattern grid as
                     a dashed-border invitation to author a custom
-                    pattern. Reads as "and you can add your own here
-                    too" alongside the built-ins. Matches built-in
-                    tile height via the same py-2 + two-line inner
-                    layout. */}
+                    pattern. Same min-height as the other tiles. */}
                 <button
                   type="button"
                   onClick={() =>
                     setEditorState({ open: true, editingId: null })
                   }
-                  className="group flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/30 px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
+                  className="group flex min-h-[5.5rem] items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/30 px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
                   aria-label="Create a new custom pattern"
                 >
                   <Plus className="h-4 w-4 transition-transform group-hover:scale-110" />

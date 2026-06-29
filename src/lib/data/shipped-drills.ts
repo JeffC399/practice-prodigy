@@ -179,7 +179,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       drillMeasures: 36,
       repetitions: 1,
       bpm: 90,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -194,7 +194,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       drillMeasures: 12,
       repetitions: 4,
       bpm: 90,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -209,7 +209,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       drillMeasures: 12,
       repetitions: 4,
       bpm: 90,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -224,7 +224,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       drillMeasures: 12,
       repetitions: 4,
       bpm: 90,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -243,7 +243,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
         drillMeasures: 12,
         repetitions: 4,
         bpm: 90,
-        arpeggioPattern: "arp-7ths",
+        arpeggioPattern: "7th-chords",
       },
     ),
   },
@@ -260,7 +260,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       drillMeasures: 7,
       repetitions: 4,
       bpm: 90,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -277,7 +277,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       repetitions: 1,
       repeatIndefinitely: true,
       bpm: 90,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -293,7 +293,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       drillMeasures: 12,
       repetitions: 4,
       bpm: 80,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -310,7 +310,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       repetitions: 1,
       repeatIndefinitely: true,
       bpm: 100,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
   {
@@ -327,7 +327,7 @@ export const SHIPPED_DRILLS: ShippedDrill[] = [
       repetitions: 1,
       repeatIndefinitely: true,
       bpm: 120,
-      arpeggioPattern: "arp-7ths",
+      arpeggioPattern: "7th-chords",
     }),
   },
 ];

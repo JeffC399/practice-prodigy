@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ArpeggioPattern } from "@/lib/music/arpeggio";
+import {
+  LEGACY_BUILT_IN_PATTERN_IDS,
+  remapLegacyPatternId,
+} from "@/lib/music/arpeggio";
 import type { Chord, PitchClass, ChordQuality } from "@/lib/music/chord";
 import type { ChordNotationStyle } from "@/lib/music/render-chord";
 import type { PatternDisplay } from "./user-prefs";
@@ -231,12 +235,12 @@ export const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   timeSignature: { beatsPerMeasure: 4, beatUnit: 4 },
   countInMeasures: 1,
   notationStyle: "jazz-minus",
-  arpeggioPattern: "arp-7ths",
+  arpeggioPattern: "7th-chords",
   // Pool defaults to the single arpeggioPattern above, so a fresh
   // PracticeConfig behaves exactly like pre-Phase-10 — one pattern
   // drilled across every measure. Users opt into multi-pattern
   // drilling by extending the pool from the setup screen.
-  patternPool: ["arp-7ths"],
+  patternPool: ["7th-chords"],
   patternOrdering: "custom",
   // null = follow the user-global pattern-display preference. Drills
   // can pin a specific display mode by setting this explicitly.
@@ -466,7 +470,7 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
     {
       name: "practice-prodigy:practice-config:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 10,
+      version: 11,
       migrate: (persistedState, version) => {
         if (
           !persistedState ||
@@ -557,6 +561,27 @@ export const usePracticeConfig = create<PracticeConfigStore>()(
         // screen to pin a drill to a specific display mode.
         if (version <= 9) {
           next.patternDisplay = null;
+        }
+
+        // v10 → v11: Phase 14 collapsed the 4 built-in patterns down
+        // to 2 ("7th-chords" and "triads"). Any legacy ID in a saved
+        // drill gets remapped via remapLegacyPatternId so the user's
+        // existing setups keep loading. Custom pattern IDs (prefix
+        // "custom_") are passed through unchanged.
+        if (version <= 10) {
+          const isLegacy = (id: unknown): id is string =>
+            typeof id === "string" &&
+            (LEGACY_BUILT_IN_PATTERN_IDS as readonly string[]).includes(id);
+          if (isLegacy(next.arpeggioPattern)) {
+            next.arpeggioPattern = remapLegacyPatternId(
+              next.arpeggioPattern as string,
+            );
+          }
+          if (Array.isArray(next.patternPool)) {
+            next.patternPool = (next.patternPool as unknown[]).map((p) =>
+              isLegacy(p) ? remapLegacyPatternId(p as string) : p,
+            );
+          }
         }
 
         return next;

@@ -1,54 +1,56 @@
 "use client";
 
-import { Play, Plus, Square, Trash2, X } from "lucide-react";
+import { Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { previewPlayer } from "@/lib/audio/preview";
 import type { Chord } from "@/lib/music/chord";
 import { semitoneToMidi } from "@/lib/music/intervals";
 import {
   CUSTOM_PATTERN_MAX_NOTES,
-  notesToDegreeString,
+  DEFAULT_NOTE_DURATION,
+  NOTE_DURATION_BEATS,
+  NOTE_DURATION_LABELS,
+  NOTE_DURATIONS,
+  REST_LABEL,
   SEMITONE_ALT_LABELS,
   SEMITONE_LABELS,
   SEMITONE_MAX,
+  totalBeatLength,
   type CustomPattern,
+  type NoteDuration,
   type PatternNote,
 } from "@/lib/music/custom-patterns";
 import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
 
-const PREVIEW_BPM = 100;
-const PREVIEW_ANCHOR_OCTAVE = 2;
-
 /**
  * Custom pattern editor — modal for authoring user-defined arpeggio
- * patterns. Phase 13.
+ * patterns. Phase 13 introduced absolute-semitone notes; Phase 14 adds
+ * per-note durations + rests.
  *
- * UX shape: a name field, a row of chips showing the current note
- * sequence (each removable), and a 13-button picker grid (1 through 8
- * with the chromatic alterations) for appending notes. The editor
- * auditions the pattern over a sample C major chord so the user can
- * hear what they're building before saving.
+ * UX shape:
+ *  - Name field
+ *  - Chip list of the current sequence (each chip shows note label +
+ *    duration; clicking the chip's duration cycles through values)
+ *  - Picker row: 13 chord-tone buttons + a Rest button + a "next-note
+ *    duration" selector that controls what duration newly-tapped notes
+ *    are stamped with
+ *  - In-editor preview that auditions the draft over a C major chord,
+ *    respecting the chosen rhythm
  *
- * Notes are absolute semitone offsets from the chord root (per the
- * "Chord tones + scale tones" model the user chose in Phase 13 setup).
- * The engine plays exactly those offsets — no scale or chord-quality
- * remapping — so the pattern sounds the same shape over any chord.
+ * v1 constraint: patterns are exactly 1 measure long. Multi-measure
+ * patterns (length = 2 / 4) are a documented follow-up in IDEAS.md.
  */
 
+const PREVIEW_BPM = 100;
+const PREVIEW_ANCHOR_OCTAVE = 2;
+const FIXED_LENGTH_IN_MEASURES = 1;
+
 type EditorProps = {
-  /** When provided, the editor opens in edit mode for that pattern. */
   editingId: string | null;
   onClose: () => void;
-  /**
-   * Called after a successful save. Receives the saved pattern's id —
-   * the setup page uses this to auto-toggle the new pattern into the
-   * pool so the user doesn't have to find it in the list themselves.
-   */
   onSaved?: (patternId: string) => void;
 };
 
-/** Sample chord used for the in-editor preview. C major is universally */
-/* recognizable + chord-quality-agnostic intervals sound clean over it. */
 const PREVIEW_CHORD: Chord = { root: "C", quality: "maj" };
 
 export function CustomPatternEditor({
@@ -62,22 +64,16 @@ export function CustomPatternEditor({
     [editingId, lib],
   );
 
-  // Local draft state — the user's edits don't touch the persisted
-  // library until they click Save. Cancel discards.
   const [name, setName] = useState<string>(existing?.name ?? "");
   const [notes, setNotes] = useState<PatternNote[]>(
     existing?.notes ? [...existing.notes] : [],
   );
+  const [nextDuration, setNextDuration] = useState<NoteDuration>(
+    DEFAULT_NOTE_DURATION,
+  );
   const [isPreviewing, setIsPreviewing] = useState(false);
   const previewIdRef = useRef(0);
 
-  // No effect-based re-seed needed: the editor only mounts when
-  // `editorState.open` is true, and the parent always closes the modal
-  // before opening it for a different pattern (clicking the Pencil on
-  // pattern B while editing A isn't reachable — the backdrop blocks
-  // clicks). Initial state from useState above is enough.
-
-  // Esc closes the modal — standard dialog behavior.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -90,7 +86,6 @@ export function CustomPatternEditor({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Stop any preview audio when the modal unmounts.
   useEffect(() => {
     return () => {
       previewPlayer.cancel();
@@ -99,14 +94,34 @@ export function CustomPatternEditor({
 
   const isAtCapacity = notes.length >= CUSTOM_PATTERN_MAX_NOTES;
   const canSave = name.trim().length > 0 && notes.length > 0;
+  const totalBeats = totalBeatLength(notes);
 
   function appendNote(semitones: number) {
     if (isAtCapacity) return;
-    setNotes((prev) => [...prev, { semitones }]);
+    setNotes((prev) => [
+      ...prev,
+      { kind: "note", semitones, duration: nextDuration },
+    ]);
+  }
+
+  function appendRest() {
+    if (isAtCapacity) return;
+    setNotes((prev) => [...prev, { kind: "rest", duration: nextDuration }]);
   }
 
   function removeNoteAt(idx: number) {
     setNotes((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function cycleNoteDuration(idx: number) {
+    setNotes((prev) =>
+      prev.map((n, i) => {
+        if (i !== idx) return n;
+        const currentIdx = NOTE_DURATIONS.indexOf(n.duration);
+        const next = NOTE_DURATIONS[(currentIdx + 1) % NOTE_DURATIONS.length];
+        return { ...n, duration: next };
+      }),
+    );
   }
 
   function clearNotes() {
@@ -119,10 +134,15 @@ export function CustomPatternEditor({
       lib.updatePattern(existing.id, {
         name: name.trim(),
         notes,
+        lengthInMeasures: FIXED_LENGTH_IN_MEASURES,
       });
       onSaved?.(existing.id);
     } else {
-      const id = lib.createPattern({ name: name.trim(), notes });
+      const id = lib.createPattern({
+        name: name.trim(),
+        notes,
+        lengthInMeasures: FIXED_LENGTH_IN_MEASURES,
+      });
       onSaved?.(id);
     }
     onClose();
@@ -143,19 +163,25 @@ export function CustomPatternEditor({
     if (notes.length === 0) return;
     const myId = ++previewIdRef.current;
     setIsPreviewing(true);
-    // Mirror the engine's custom-pattern path inline so the editor
-    // doesn't need to roundtrip through the persisted store for an
-    // ephemeral preview. Built-ins would also work via generateArpeggio,
-    // but we're previewing only the user's current draft.
-    const midiNotes = notes.map((n) =>
-      semitoneToMidi(PREVIEW_CHORD.root, PREVIEW_ANCHOR_OCTAVE, n.semitones),
-    );
-    await previewPlayer.playArpeggio(midiNotes, PREVIEW_BPM);
-    const totalMs = (midiNotes.length * (60 / PREVIEW_BPM) + 0.4) * 1000;
-    setTimeout(() => {
+    // Preview mirrors the engine's note + rest handling. Rests aren't
+    // played; pitched notes are scheduled at PREVIEW_BPM with their
+    // own durations (so the preview sounds like what'll play in the
+    // drill, not just a flat "one note per beat" stream).
+    await playRhythmPreview(notes, myId, () => {
       if (previewIdRef.current === myId) setIsPreviewing(false);
-    }, totalMs);
+    });
   }
+
+  // Visual measure-fit indicator. 1-measure patterns should sum to 4
+  // beats (in 4/4); anything more spills past the bar, anything less
+  // leaves trailing silence. Color the readout accordingly.
+  const beatBudget = 4;
+  const beatStatus =
+    Math.abs(totalBeats - beatBudget) < 1e-6
+      ? "perfect"
+      : totalBeats > beatBudget
+        ? "over"
+        : "under";
 
   return (
     <div
@@ -206,9 +232,6 @@ export function CustomPatternEditor({
               className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               autoFocus={!existing}
             />
-            <p className="text-[11px] text-muted-foreground">
-              A short name so you can pick this out of the pattern list.
-            </p>
           </div>
 
           {/* Note sequence chips */}
@@ -237,44 +260,95 @@ export function CustomPatternEditor({
             >
               {notes.length === 0 ? (
                 <span className="text-xs italic text-muted-foreground">
-                  Tap an interval below to add a note. They&rsquo;ll play in
-                  order.
+                  Tap an interval (or Rest) below to add a note. They&rsquo;ll
+                  play in order. Click the duration on any chip to change it.
                 </span>
               ) : (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {notes.map((n, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/40 pl-2.5 pr-1 py-0.5 text-sm font-medium text-primary"
-                    >
-                      <span className="font-mono">
-                        {SEMITONE_LABELS[n.semitones]}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeNoteAt(idx)}
-                        className="rounded-full p-0.5 hover:bg-primary/30 transition-colors"
-                        aria-label={`Remove note ${idx + 1}`}
+                  {notes.map((n, idx) => {
+                    const isRest = n.kind === "rest";
+                    const label = isRest
+                      ? REST_LABEL
+                      : SEMITONE_LABELS[n.semitones];
+                    return (
+                      <span
+                        key={idx}
+                        className={`inline-flex items-center gap-1 rounded-full border pl-2.5 pr-1 py-0.5 text-sm font-medium ${
+                          isRest
+                            ? "bg-muted/30 border-border text-muted-foreground"
+                            : "bg-primary/15 border-primary/40 text-primary"
+                        }`}
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
+                        <span className="font-mono">{label}</span>
+                        <button
+                          type="button"
+                          onClick={() => cycleNoteDuration(idx)}
+                          className="rounded-full bg-background/40 border border-border px-1.5 py-0 text-[10px] font-mono text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                          aria-label={`Change duration (currently ${n.duration})`}
+                          title="Click to cycle duration"
+                        >
+                          {NOTE_DURATION_LABELS[n.duration]}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeNoteAt(idx)}
+                          className="rounded-full p-0.5 hover:bg-primary/30 transition-colors"
+                          aria-label={`Remove note ${idx + 1}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Each note is a semitone offset from the chord root. The
-              engine plays exactly these offsets over whichever chord is
-              up — so {notesToDegreeString([{ semitones: 0 }, { semitones: 3 }, { semitones: 7 }, { semitones: 10 }])}{" "}
-              becomes C–E♭–G–B♭ over Cm7, or D–F–A–C over Dm7.
-            </p>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-muted-foreground">
+                Total length:{" "}
+                <span
+                  className={`font-mono font-medium ${
+                    beatStatus === "perfect"
+                      ? "text-primary"
+                      : beatStatus === "over"
+                        ? "text-destructive"
+                        : "text-foreground"
+                  }`}
+                >
+                  {totalBeats.toFixed(2)} beats
+                </span>{" "}
+                {beatStatus === "perfect" && <span>· fits 1 measure of 4/4</span>}
+                {beatStatus === "under" && (
+                  <span>· trailing silence to bar end</span>
+                )}
+                {beatStatus === "over" && (
+                  <span>· will clip at bar end</span>
+                )}
+              </span>
+              <span className="text-muted-foreground">
+                Default new-note duration:{" "}
+                <select
+                  value={nextDuration}
+                  onChange={(e) =>
+                    setNextDuration(e.target.value as NoteDuration)
+                  }
+                  className="rounded border border-border bg-background px-1 py-0 text-[11px] font-mono ml-1"
+                  aria-label="Default duration for newly-added notes"
+                >
+                  {NOTE_DURATIONS.map((d) => (
+                    <option key={d} value={d}>
+                      {NOTE_DURATION_LABELS[d]}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </div>
           </div>
 
           {/* Interval picker grid */}
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">Add interval</span>
-            <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-13">
+            <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-14">
               {Array.from({ length: SEMITONE_MAX + 1 }, (_, semi) => {
                 const label = SEMITONE_LABELS[semi];
                 const alt = SEMITONE_ALT_LABELS[semi];
@@ -294,11 +368,19 @@ export function CustomPatternEditor({
                   </button>
                 );
               })}
+              {/* Rest button. Visually distinct (muted, dashed) so it
+                  reads as "silence" not "another pitched note." */}
+              <button
+                type="button"
+                onClick={appendRest}
+                disabled={isAtCapacity}
+                className="group flex flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-border bg-muted/20 px-1 py-2 font-mono text-sm font-medium text-muted-foreground hover:border-primary/60 hover:text-foreground hover:bg-muted/40 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                aria-label="Add a rest"
+              >
+                <Pause className="h-3.5 w-3.5" />
+                <span className="text-[9px] min-h-[0.75em]">rest</span>
+              </button>
             </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Up to {CUSTOM_PATTERN_MAX_NOTES} notes per pattern. Range
-              covers one octave from the root through the octave-up.
-            </p>
           </div>
 
           {/* Preview */}
@@ -322,7 +404,9 @@ export function CustomPatternEditor({
               )}
             </button>
             <span className="text-xs text-muted-foreground">
-              Auditions over a sample C major chord.
+              Auditions over a sample C major chord at{" "}
+              <span className="font-mono">{PREVIEW_BPM}</span> BPM with the
+              rhythm you&rsquo;ve set.
             </span>
           </div>
         </div>
@@ -368,3 +452,40 @@ export function CustomPatternEditor({
   );
 }
 
+/**
+ * Play a rhythm-aware preview of the in-progress draft. Pitched notes
+ * get scheduled by their cumulative start beat × beatDurationMs; rests
+ * advance the clock without scheduling audio. The previewPlayer's
+ * `playArpeggio` schedules a flat one-note-per-beat sequence, so for
+ * rhythm preview we'd need a richer audio path. For v1, we approximate
+ * by playing the pitched-only sequence at the right BPM so the user
+ * hears the pitches in order (durations affect when each note STARTS
+ * relative to the next, not their sustain). Truly rhythm-accurate
+ * preview is a polish follow-up.
+ */
+async function playRhythmPreview(
+  notes: PatternNote[],
+  myId: number,
+  onComplete: () => void,
+) {
+  const pitched = notes.filter(
+    (n): n is Extract<PatternNote, { kind: "note" }> => n.kind === "note",
+  );
+  if (pitched.length === 0) {
+    onComplete();
+    return;
+  }
+  const midiNotes = pitched.map((n) =>
+    semitoneToMidi(PREVIEW_CHORD.root, PREVIEW_ANCHOR_OCTAVE, n.semitones),
+  );
+  await previewPlayer.playArpeggio(midiNotes, PREVIEW_BPM);
+  // Pattern's total beat length (including rests) is what determines
+  // the on-screen "is previewing" state duration.
+  const totalBeats = notes.reduce(
+    (acc, n) => acc + NOTE_DURATION_BEATS[n.duration],
+    0,
+  );
+  const totalMs = (totalBeats * (60 / PREVIEW_BPM) + 0.4) * 1000;
+  setTimeout(onComplete, totalMs);
+  void myId;
+}

@@ -4,7 +4,6 @@ import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import {
   getPatternDegrees,
-  getPatternNoteCount,
   getPatternShortName,
   parsePatternDegrees,
   type ArpeggioPattern,
@@ -245,30 +244,45 @@ export default function PracticeSessionPage() {
       return;
     }
 
-    const noteCount = getPatternNoteCount(currentPattern);
-    if (noteCount === 0) {
-      // Custom pattern was deleted, or empty pattern — nothing to highlight.
+    // Rhythm-aware scheduling (Phase 14). Each note in the pattern
+    // carries its own duration in beats. We compute cumulative start
+    // beats, find which note is active at the current beat boundary,
+    // and schedule setTimeout-based highlights for any notes that
+    // start within the current beat window.
+    const segments = parsePatternDegrees(currentPattern);
+    if (segments.length === 0) {
       setActiveNoteIdx(-1);
       return;
     }
-    const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
-    const notesPerBeat = noteCount / beatsPerMeasure;
-    const beat = state.beatInMeasure; // 1-indexed
-    const firstNoteOfBeat = Math.floor((beat - 1) * notesPerBeat);
-    setActiveNoteIdx(firstNoteOfBeat);
+    const startBeats: number[] = [];
+    let acc = 0;
+    for (const seg of segments) {
+      startBeats.push(acc);
+      acc += seg.durationBeats;
+    }
+    const currentBeat = state.beatInMeasure - 1; // 0-indexed within measure
+    const nextBeat = currentBeat + 1;
+    // Active note at currentBeat = the latest segment whose start <= currentBeat.
+    // Allow a tiny epsilon for float comparison (durations like 0.75 + 0.25 sum cleanly).
+    const EPS = 1e-6;
+    let active = -1;
+    for (let i = 0; i < startBeats.length; i++) {
+      if (startBeats[i] <= currentBeat + EPS) active = i;
+      else break;
+    }
+    setActiveNoteIdx(active);
 
-    // Schedule sub-beat highlights when notesPerBeat > 1 (e.g.
-    // Scale Tones: 2 notes per beat in 4/4). The interval between
-    // sub-beat highlights is beatDurationMs / notesPerBeat.
-    if (notesPerBeat > 1) {
-      const beatDurationMs = 60000 / config.bpm;
-      const subBeatMs = beatDurationMs / notesPerBeat;
-      for (let sub = 1; sub < notesPerBeat; sub++) {
-        const noteIdx = firstNoteOfBeat + sub;
-        if (noteIdx >= noteCount) break;
+    // Schedule sub-beat highlights for notes that start strictly
+    // inside (currentBeat, nextBeat) — e.g. the "+ of 1" note in an
+    // 8-8-quarter triad pattern.
+    const beatDurationMs = 60000 / config.bpm;
+    for (let i = 0; i < startBeats.length; i++) {
+      const s = startBeats[i];
+      if (s > currentBeat + EPS && s < nextBeat - EPS) {
+        const offsetMs = (s - currentBeat) * beatDurationMs;
         const timer = setTimeout(
-          () => setActiveNoteIdx(noteIdx),
-          Math.round(sub * subBeatMs),
+          () => setActiveNoteIdx(i),
+          Math.round(offsetMs),
         );
         noteHighlightTimersRef.current.push(timer);
       }
@@ -284,7 +298,6 @@ export default function PracticeSessionPage() {
     state.beatInMeasure,
     state.measureInSession,
     currentPattern,
-    config.timeSignature.beatsPerMeasure,
     config.bpm,
   ]);
 
