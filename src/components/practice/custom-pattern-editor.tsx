@@ -196,21 +196,29 @@ export function CustomPatternEditor({
         aria-label={existing ? "Edit custom pattern" : "New custom pattern"}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-lg font-semibold">
-            {existing ? "Edit custom pattern" : "New custom pattern"}
-          </h2>
-          <button
-            type="button"
-            onClick={() => {
-              previewPlayer.cancel();
-              onClose();
-            }}
-            className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
-            aria-label="Close editor"
-          >
-            <X className="h-5 w-5" />
-          </button>
+        <div className="flex flex-col gap-1 border-b border-border px-5 py-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              {existing ? "Edit custom pattern" : "New custom pattern"}
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                previewPlayer.cancel();
+                onClose();
+              }}
+              className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
+              aria-label="Close editor"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {existing && (
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Edits apply globally — every drill that uses this pattern
+              gets the new version.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-5 px-5 py-5">

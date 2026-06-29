@@ -939,6 +939,101 @@ export default function PracticeSetupPage() {
             </p>
           </CollapsibleSection>
 
+          {/* Your patterns — symmetric library home for user-authored
+              custom patterns, parallel to "Your drills" above. Phase
+              18 promoted this from a sub-row of the Pattern section
+              so library management has one canonical home and the
+              Pattern section can be pure configuration. The Pattern
+              section's Custom sub-row still shows these patterns as
+              CHECKBOXES (no edit/delete) — those affordances live
+              here. */}
+          <section
+            id="your-patterns"
+            className="flex flex-col gap-4 scroll-mt-20"
+          >
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Your patterns
+              {customPatterns.length > 0 && (
+                <span className="ml-1.5 text-muted-foreground/70 font-normal normal-case tracking-normal">
+                  · {customPatterns.length}
+                </span>
+              )}
+            </h2>
+            {customPatterns.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  No custom patterns yet. Author your own arpeggio
+                  shape — pick the intervals, set durations, even add
+                  rests.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditorState({ open: true, editingId: null })
+                  }
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  New custom pattern
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {customPatterns.map((cp) => {
+                  const degreeStr = notesToDegreeString(cp.notes);
+                  return (
+                    <div
+                      key={cp.id}
+                      className="group relative rounded-xl border border-border bg-card/40 px-4 py-3 hover:border-primary/40 transition-colors"
+                    >
+                      <div className="flex flex-col gap-1 pr-16">
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {cp.name}
+                        </span>
+                        <span className="font-mono text-xs text-muted-foreground truncate">
+                          {degreeStr}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground/70">
+                          {cp.notes.length} note
+                          {cp.notes.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <div className="absolute right-2 top-2 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditorState({
+                              open: true,
+                              editingId: cp.id,
+                            })
+                          }
+                          className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          aria-label={`Edit ${cp.name}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* "+ New" tile sits at the end of the grid, matching
+                    the tile dimensions so the library reads as one
+                    consistent surface. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditorState({ open: true, editingId: null })
+                  }
+                  className="group flex min-h-[5.5rem] items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background/30 px-4 py-3 text-sm font-medium text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
+                  aria-label="Create a new custom pattern"
+                >
+                  <Plus className="h-4 w-4 transition-transform group-hover:scale-110" />
+                  New custom pattern
+                </button>
+              </div>
+            )}
+          </section>
+
           {/* Sequence preview. Header is a clickable toggle (with
               chevron) so users can see at a glance that the chips
               expand/collapse — same affordance pattern as the
@@ -1376,87 +1471,90 @@ export default function PracticeSetupPage() {
                         {descending.map(renderBuiltInTile)}
                       </div>
                     </section>
+                    {/* Custom sub-row (Phase 18): config-only.
+                        Library management — create / edit / delete —
+                        lives in the "Your patterns" section at the
+                        top of the page. This row only surfaces the
+                        existing custom patterns as ticking checkboxes
+                        so the user can add them to the current drill's
+                        pool. */}
                     <section className="flex flex-col gap-2">
-                      <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                        Custom{" "}
-                        {customPatterns.length > 0 && (
-                          <span className="text-muted-foreground/70 font-normal normal-case tracking-normal">
-                            · {customPatterns.length}
-                          </span>
-                        )}
-                      </h4>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {customPatterns.map((cp) => {
-                          const inPool = config.patternPool.includes(cp.id);
-                          const isOnlyPattern =
-                            inPool && config.patternPool.length === 1;
-                          const degreeStr = notesToDegreeString(cp.notes);
-                          return (
-                            <div
-                              key={cp.id}
-                              className={`group relative flex min-h-[5.5rem] items-start gap-2 rounded-md border px-3 py-2 transition-colors ${
-                                inPool
-                                  ? "border-primary/40 bg-primary/10"
-                                  : "border-border bg-background hover:border-primary/40"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={inPool}
-                                disabled={isOnlyPattern}
-                                onChange={() => togglePatternInPool(cp.id)}
-                                className="mt-0.5 h-4 w-4 accent-primary cursor-pointer disabled:cursor-not-allowed"
-                                aria-label={`Toggle ${cp.name} in pool`}
-                              />
-                              <div className="flex flex-1 flex-col gap-0.5 pr-7">
-                                <span
-                                  className={`text-sm font-medium ${
-                                    inPool
-                                      ? "text-primary"
-                                      : "text-foreground"
-                                  }`}
-                                >
-                                  {cp.name}
-                                </span>
-                                <span className="font-mono text-[11px] text-muted-foreground leading-snug">
-                                  {degreeStr}
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setEditorState({
-                                    open: true,
-                                    editingId: cp.id,
-                                  });
-                                }}
-                                className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-secondary transition-all"
-                                aria-label={`Edit ${cp.name}`}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                        {/* "Add" tile inline at the end of the Custom
-                            row so authoring sits visually adjacent to
-                            the existing customs. */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditorState({
-                              open: true,
-                              editingId: null,
-                            })
-                          }
-                          className="group flex min-h-[5.5rem] items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background/30 px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
-                          aria-label="Create a new custom pattern"
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Custom{" "}
+                          {customPatterns.length > 0 && (
+                            <span className="text-muted-foreground/70 font-normal normal-case tracking-normal">
+                              · {customPatterns.length}
+                            </span>
+                          )}
+                        </h4>
+                        <a
+                          href="#your-patterns"
+                          className="text-[10px] uppercase tracking-wider text-muted-foreground/70 hover:text-primary transition-colors"
                         >
-                          <Plus className="h-4 w-4 transition-transform group-hover:scale-110" />
-                          New custom pattern
-                        </button>
+                          Manage patterns ↑
+                        </a>
                       </div>
+                      {customPatterns.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground italic leading-relaxed">
+                          No custom patterns yet. Create one in{" "}
+                          <a
+                            href="#your-patterns"
+                            className="font-medium text-primary hover:underline"
+                          >
+                            Your patterns
+                          </a>{" "}
+                          above to add to this pool.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {customPatterns.map((cp) => {
+                            const inPool = config.patternPool.includes(
+                              cp.id,
+                            );
+                            const isOnlyPattern =
+                              inPool && config.patternPool.length === 1;
+                            const degreeStr = notesToDegreeString(cp.notes);
+                            return (
+                              <label
+                                key={cp.id}
+                                className={`flex min-h-[5.5rem] items-start gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+                                  inPool
+                                    ? "border-primary/40 bg-primary/10"
+                                    : "border-border bg-background hover:border-primary/40"
+                                } ${
+                                  isOnlyPattern ? "cursor-not-allowed" : ""
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={inPool}
+                                  disabled={isOnlyPattern}
+                                  onChange={() =>
+                                    togglePatternInPool(cp.id)
+                                  }
+                                  className="mt-0.5 h-4 w-4 accent-primary cursor-pointer disabled:cursor-not-allowed"
+                                  aria-label={`Toggle ${cp.name} in pool`}
+                                />
+                                <div className="flex flex-1 flex-col gap-0.5">
+                                  <span
+                                    className={`text-sm font-medium ${
+                                      inPool
+                                        ? "text-primary"
+                                        : "text-foreground"
+                                    }`}
+                                  >
+                                    {cp.name}
+                                  </span>
+                                  <span className="font-mono text-[11px] text-muted-foreground leading-snug">
+                                    {degreeStr}
+                                  </span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
                     </section>
                   </div>
                 );
