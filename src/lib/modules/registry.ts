@@ -91,11 +91,13 @@ export const MODULES: ModuleEntry[] = [
     id: "tuner",
     name: "Tuner",
     shortName: "Tuner",
-    status: "designed",
-    bucket: "next",
+    status: "live",
+    bucket: "now",
+    route: "/tuner",
     description:
-      "Chromatic tuner via microphone input. Pairs with the future bass-profile setting.",
+      "Chromatic tuner via microphone input. Real-time pitch detection (autocorrelation), big note display, cents needle, configurable A4 reference (415–466 Hz for baroque / 432 / standard / 442 / 444). Works for any monophonic instrument: bass, guitar, voice.",
     icon: Mic,
+    routeMatch: (p) => p.startsWith("/tuner"),
   },
   {
     id: "scales",

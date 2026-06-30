@@ -71,12 +71,26 @@ export type MetronomeRoutineItem = RoutineItemBase & {
 };
 
 /**
+ * Tuner RoutineItem — a tuning check step. Typically very short
+ * (30–60 seconds) at the start of a routine to confirm the
+ * instrument is in tune before playing.
+ */
+export type TunerRoutineItem = RoutineItemBase & {
+  type: "tuner";
+  /** Optional A4 reference Hz to load (defaults to user's last setting). */
+  referenceA4?: number;
+};
+
+/**
  * The full discriminated union. Add new module variants here as they
  * ship. Adding a variant is a non-breaking change — existing code
  * paths that switch on `type` get a TypeScript exhaustiveness warning
  * to remind the author.
  */
-export type RoutineItem = DrillRoutineItem | MetronomeRoutineItem;
+export type RoutineItem =
+  | DrillRoutineItem
+  | MetronomeRoutineItem
+  | TunerRoutineItem;
 
 /** Type guard for narrowing. */
 export function isMetronomeItem(item: RoutineItem): item is MetronomeRoutineItem {
@@ -85,6 +99,10 @@ export function isMetronomeItem(item: RoutineItem): item is MetronomeRoutineItem
 
 export function isDrillItem(item: RoutineItem): item is DrillRoutineItem {
   return item.type === "drill";
+}
+
+export function isTunerItem(item: RoutineItem): item is TunerRoutineItem {
+  return item.type === "tuner";
 }
 
 /**
