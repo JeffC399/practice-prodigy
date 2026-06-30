@@ -418,56 +418,75 @@ function makeSoundVoices(
       };
     }
     case "stick": {
-      // Two-voice stick / rim:
-      //   STICK (normal beat) = bright filtered-noise click — short,
-      //   dry, sharp. Sounds like a stick hit on a drum head.
-      //   RIM (accent beat)   = lower-filtered noise burst PLUS a
-      //   short pitched "tock" — a quick sine burst at 900 Hz with
-      //   ultra-short envelope (decay 0.015s) so the pitched
-      //   element decays completely before the next beat lands.
-      //   The previous MetalSynth had a 170ms tail that bled into
-      //   beat 2 and colored it differently from beats 3 + 4.
-      //   SUB-BEAT            = very bright, very short noise burst —
-      //   spitty / quiet so it doesn't compete with the main beats.
-      const filter = new Tone.Filter(3000, "highpass").connect(destination);
-      const noise = new Tone.NoiseSynth({
+      // Two ENTIRELY DIFFERENT voices — previous attempts only varied
+      // the filter frequency on a single noise source, which was too
+      // subtle for the user to hear the accent vs normal contrast.
+      // Now each role gets its own synth chain so the timbres are
+      // unmistakable:
+      //
+      //   STICK (normal beat) = thin highpass-filtered noise click —
+      //     dry, hi-hat-tap character with no body. Filtered at
+      //     4000 Hz so only the bright transient passes through.
+      //
+      //   RIM (accent beat)   = a fundamentally different sound —
+      //     LOWPASS-filtered noise (fat body) layered with a
+      //     MembraneSynth tom-hit at G3. Sounds like a snare rim
+      //     shot. Completely separate signal chain from the stick
+      //     voice so the timbre difference is dramatic.
+      //
+      //   SUB-BEAT            = very thin, spitty noise — same
+      //     chain as stick but at an even higher filter frequency
+      //     and much shorter envelope.
+      const stickFilter = new Tone.Filter(4000, "highpass").connect(destination);
+      const stickNoise = new Tone.NoiseSynth({
         noise: { type: "white" },
-        envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
+        envelope: { attack: 0.001, decay: 0.025, sustain: 0 },
         volume: SOUND_VOLUME_DB.stick,
-      }).connect(filter);
-      // Pitched "tock" for rim-shot accents — extremely short
-      // envelope so the next beat starts on a clean slate.
-      const tock = new Tone.Synth({
-        oscillator: { type: "sine" },
+      }).connect(stickFilter);
+
+      const rimFilter = new Tone.Filter(1200, "lowpass").connect(destination);
+      const rimNoise = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0 },
+        volume: SOUND_VOLUME_DB.stick + 4,
+      }).connect(rimFilter);
+      // Short MembraneSynth hit for the pitched body of the rim.
+      // Decay 30ms + release 10ms = 40ms total tail, well clear of
+      // the next beat even at 200+ BPM.
+      const rimDrum = new Tone.MembraneSynth({
+        pitchDecay: 0.008,
+        octaves: 3,
         envelope: {
-          attack: 0.0005,
-          decay: 0.015,
+          attack: 0.001,
+          decay: 0.03,
           sustain: 0,
           release: 0.01,
         },
-        volume: SOUND_VOLUME_DB.stick - 2,
+        volume: SOUND_VOLUME_DB.stick + 2,
       }).connect(destination);
+
       return {
         trigger: (time, intensity) => {
           if (intensity === "accent") {
-            // RIM: low-mid filtered noise + quick pitched tock
-            filter.frequency.value = 1500;
-            noise.triggerAttackRelease("16n", time);
-            tock.triggerAttackRelease("A4", "64n", time, 1.0);
+            // RIM: fat lowpassed noise + pitched drum body
+            rimNoise.triggerAttackRelease("16n", time);
+            rimDrum.triggerAttackRelease("G3", "32n", time);
           } else if (intensity === "sub") {
-            // SUB: thin, spitty
-            filter.frequency.value = 5000;
-            noise.triggerAttackRelease("64n", time);
+            // SUB: very thin, very short
+            stickFilter.frequency.value = 6000;
+            stickNoise.triggerAttackRelease("64n", time);
           } else {
-            // STICK: bright, dry, mid-range click — no pitched element
-            filter.frequency.value = 3500;
-            noise.triggerAttackRelease("32n", time);
+            // STICK: thin highpass click
+            stickFilter.frequency.value = 4000;
+            stickNoise.triggerAttackRelease("32n", time);
           }
         },
         dispose: () => {
-          noise.dispose();
-          filter.dispose();
-          tock.dispose();
+          stickNoise.dispose();
+          stickFilter.dispose();
+          rimNoise.dispose();
+          rimFilter.dispose();
+          rimDrum.dispose();
         },
       };
     }
