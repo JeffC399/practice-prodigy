@@ -315,24 +315,15 @@ type SoundVoices = {
 };
 
 /**
- * Per-sound loudness trim in dB. Calibrated by ear so each preset
- * sounds roughly the same perceived loudness at the same master
- * volume.
- *
- * Reference: ELECTRONIC at -4 dB is the target loudness — pure sine
- * with simple envelope, no boost needed. The other three sources sit
- * within a couple dB of that target. Previous calibration over-cut
- * them all so they were noticeably quieter than electronic; this pass
- * brings them up to match.
- *
- * Tune these values if a particular sound still pokes out — they're
- * the single tuning knob for loudness normalization.
+ * Per-sound loudness trim in dB. Calibrated by ear. Electronic is
+ * the only sound that was at the right level after the previous
+ * pass; the others got further boosts so they match.
  */
 const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
-  tonal: -4, // Triangle wave, moderate harmonic content
-  wood: -6, // MembraneSynth + narrow bandpass — slight trim
-  electronic: -4, // Reference target
-  stick: -8, // Filtered noise — small trim to tame the harshness
+  tonal: 2, // Bumped from -4 → +2 (6 dB louder)
+  wood: 0, // Bumped from -6 → 0 (6 dB louder)
+  electronic: -4, // Reference, unchanged
+  stick: -2, // Bumped from -8 → -2 (6 dB louder)
 };
 
 /**
@@ -415,28 +406,51 @@ function makeSoundVoices(
       };
     }
     case "stick": {
-      // Stick / rim click — filtered noise burst (matches the drill
-      // engine's count-in click flavor so the two engines feel related).
+      // Two-voice stick / rim:
+      //   STICK (normal beat) = bright filtered-noise click — short,
+      //   dry, sharp. Sounds like a stick hit on a drum head.
+      //   RIM (accent beat)   = the same noise burst PLUS a layered
+      //   metallic "ping" from a short MetalSynth burst — sounds
+      //   like a wood-on-rim shot. The pitched ping is what makes
+      //   the rim shot audibly distinct from a plain stick hit.
+      //   SUB-BEAT            = very bright, very short noise burst —
+      //   spitty / quiet so it doesn't compete with the main beats.
       const filter = new Tone.Filter(3000, "highpass").connect(destination);
       const noise = new Tone.NoiseSynth({
         noise: { type: "white" },
         envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
         volume: SOUND_VOLUME_DB.stick,
       }).connect(filter);
+      // Metallic ping for rim-shot accents.
+      const ping = new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.12, release: 0.05 },
+        harmonicity: 8.5,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5,
+        volume: SOUND_VOLUME_DB.stick - 8,
+      }).connect(destination);
       return {
         trigger: (time, intensity) => {
           if (intensity === "accent") {
-            filter.frequency.value = 2000;
+            // RIM: low-mid filtered noise + metallic ping
+            filter.frequency.value = 1500;
+            noise.triggerAttackRelease("16n", time);
+            ping.triggerAttackRelease("C5", "32n", time);
           } else if (intensity === "sub") {
-            filter.frequency.value = 4500;
+            // SUB: thin, spitty
+            filter.frequency.value = 5000;
+            noise.triggerAttackRelease("64n", time);
           } else {
-            filter.frequency.value = 3000;
+            // STICK: bright, dry, mid-range click — no metallic ping
+            filter.frequency.value = 3500;
+            noise.triggerAttackRelease("32n", time);
           }
-          noise.triggerAttackRelease("32n", time);
         },
         dispose: () => {
           noise.dispose();
           filter.dispose();
+          ping.dispose();
         },
       };
     }

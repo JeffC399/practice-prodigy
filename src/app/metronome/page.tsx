@@ -406,13 +406,16 @@ export default function MetronomePage() {
                   )}
                 </select>
               </div>
-              {/* Add-custom inline form */}
+              {/* Add-custom inline form. Two-row stack: inputs above,
+                  buttons below right-aligned. Prevents the previous
+                  single-row layout from busting out of the container
+                  when the parent gets narrow. */}
               {addingCustom ? (
-                <div className="flex flex-col gap-1.5 rounded-md border border-primary/30 bg-primary/5 p-2">
+                <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 p-3">
                   <span className="text-[11px] font-medium text-primary">
                     New custom time signature
                   </span>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <input
                       type="number"
                       min={1}
@@ -429,7 +432,7 @@ export default function MetronomePage() {
                           ),
                         )
                       }
-                      className="w-14 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+                      className="w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
                       aria-label="Numerator"
                     />
                     <span className="text-muted-foreground">/</span>
@@ -447,6 +450,15 @@ export default function MetronomePage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddingCustom(false)}
+                      className="rounded-md border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -459,16 +471,9 @@ export default function MetronomePage() {
                         setBeatUnit(customDenominator);
                         setAddingCustom(false);
                       }}
-                      className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                      className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
                     >
                       Save & use
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAddingCustom(false)}
-                      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Cancel
                     </button>
                   </div>
                 </div>
