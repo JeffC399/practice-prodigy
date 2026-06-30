@@ -345,7 +345,9 @@ export default function SheetEditorPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-8">
-      <div className="flex w-full max-w-3xl flex-col gap-8">
+      {/* Phase 24c.2: max-w bumped 3xl → 4xl to fit US Letter
+          (816px) sheet preview without horizontal scroll. */}
+      <div className="flex w-full max-w-4xl flex-col gap-8">
         {/* Header: back link + view-mode link */}
         <div className="flex items-center justify-between">
           <Link
@@ -609,10 +611,12 @@ export default function SheetEditorPage() {
               </div>
             </div>
           )}
-          <div className="relative" style={{ width: 720 }}>
+          {/* Phase 24c.2: dropped fixed width override — SheetSurface
+              defaults to Letter dimensions (816px) so the editor
+              preview matches the printed output 1:1. */}
+          <div className="relative" style={{ width: 816 }}>
             <SheetSurface
               sheet={sheet}
-              width={720}
               onLayout={
                 editorMode !== "none" ? handleLayout : undefined
               }

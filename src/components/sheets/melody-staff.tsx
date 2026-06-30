@@ -219,7 +219,15 @@ export function MelodyStaff({
         mn.lyric.continuation === "hyphen"
           ? `${mn.lyric.text}-`
           : mn.lyric.text;
-      const w = displayText.length * 7.2;
+      // Phase 24c.2: real measureText for accurate widths, with a
+      // conservative per-char fallback.
+      const measured = context.measureText
+        ? context.measureText(displayText)
+        : null;
+      const w =
+        measured && typeof measured.width === "number"
+          ? measured.width
+          : displayText.length * 7.5;
       syllables.push({
         noteIdx: idx,
         text: displayText,
@@ -228,8 +236,8 @@ export function MelodyStaff({
         continuation: mn.lyric.continuation,
       });
     });
-    // Phase 24c.1.3: bumped 3 → 8 to match SheetSurface.
-    const MIN_LYRIC_GAP = 8;
+    // Phase 24c.2: matches SheetSurface — 12px visible breathing room.
+    const MIN_LYRIC_GAP = 12;
     let prevRight = -Infinity;
     syllables.forEach((s) => {
       const leftEdge = s.centerX - s.width / 2;

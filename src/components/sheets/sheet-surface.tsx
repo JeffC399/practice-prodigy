@@ -105,8 +105,24 @@ export type SheetSurfaceProps = {
   onLayout?: (layout: SheetSurfaceLayout) => void;
 };
 
-const PAPER_PADDING_X = 64;
-const PAPER_PADDING_Y = 48;
+/**
+ * Phase 24c.2: standardized US Letter paper dimensions for WYSIWYG —
+ * what renders on screen matches what prints. CSS pixels are defined
+ * as 1/96 of an inch, so:
+ *   - Letter page: 8.5" × 11" = 816 × 1056 px
+ *   - Margins: 0.75" each side = 72 px
+ *   - Content area: 7" × 9.5" = 672 × 912 px
+ *
+ * SheetSurface defaults to PAPER_WIDTH_LETTER (callers can override
+ * for A4 etc. in a future phase). The paper div is forced to these
+ * dimensions regardless of content height so the user always sees
+ * "the whole page" while authoring.
+ */
+const PAPER_WIDTH_LETTER = 816;
+const PAPER_HEIGHT_LETTER = 1056;
+const PAGE_MARGIN = 72;
+const PAPER_PADDING_X = PAGE_MARGIN;
+const PAPER_PADDING_Y = PAGE_MARGIN;
 const LINE_GAP = 14;
 /**
  * Phase 24c.1: chord band shrunk from 22 → 18 (chord text + measure
@@ -354,7 +370,7 @@ function collectTies(
 
 export function SheetSurface({
   sheet,
-  width = 880,
+  width = PAPER_WIDTH_LETTER,
   measuresPerLine = 4,
   onLayout,
 }: SheetSurfaceProps) {
@@ -565,6 +581,10 @@ export function SheetSurface({
           continuation: "none" | "hyphen" | "underscore";
         };
         // Pass 1: collect syllable positions + widths.
+        // Phase 24c.2: use VexFlow's measureText() for actual rendered
+        // width instead of a per-char approximation — gets us
+        // pixel-accurate widths so the collision pass below produces
+        // the right spacing even for wide letters like 'w' / 'm'.
         const syllables: SyllableLayout[] = [];
         melody.forEach((mn, noteIdxInMeasure) => {
           if (mn.kind !== "note") return;
@@ -573,12 +593,16 @@ export function SheetSurface({
             mn.lyric.continuation === "hyphen"
               ? `${mn.lyric.text}-`
               : mn.lyric.text;
-          // Width approximation tuned to Georgia 11pt serif.
-          // Phase 24c.1.3: bumped 6.8 → 7.2 to bias slightly
-          // conservative (wide letters like 'w' run ~10px, so the
-          // approximation needs headroom to avoid under-shifting in
-          // the collision pass below).
-          const width = displayText.length * 7.2;
+          // measureText is provided by VexFlow's SVG context with the
+          // currently-set font. Fall back to a conservative per-char
+          // approximation if the runtime doesn't expose it.
+          const measured = ctx.measureText
+            ? ctx.measureText(displayText)
+            : null;
+          const width =
+            measured && typeof measured.width === "number"
+              ? measured.width
+              : displayText.length * 7.5;
           syllables.push({
             noteIdx: noteIdxInMeasure,
             text: displayText,
@@ -591,10 +615,8 @@ export function SheetSurface({
         // collide with the previous syllable's right edge, shift this
         // one right. Engraving convention: lyrics CAN drift off their
         // note when the notes are too close, in service of readability.
-        // Phase 24c.1.3: 3 → 8 (a 3px gap renders as "barely a hair"
-        // at typical screen resolution; 8px gives visible breathing
-        // room without pushing syllables aggressively off-note).
-        const MIN_LYRIC_GAP = 8;
+        // Phase 24c.2: 8 → 12 (clearly visible breathing room).
+        const MIN_LYRIC_GAP = 12;
         let prevRight = -Infinity;
         syllables.forEach((s) => {
           const leftEdge = s.centerX - s.width / 2;
@@ -688,6 +710,11 @@ export function SheetSurface({
         background: "#fbfaf5",
         color: "#1a1a1a",
         width,
+        // Phase 24c.2: lock to Letter paper height so the user always
+        // sees the full page bounds while authoring. Content that
+        // overflows extends past the lock (multi-page rendering is a
+        // future polish slice).
+        minHeight: PAPER_HEIGHT_LETTER,
       }}
     >
       <div

@@ -162,3 +162,29 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/*
+ * Phase 24c.2 — Lead Sheet print page setup.
+ *
+ * Forces US Letter page size with zero browser-added margins so the
+ * SheetSurface paper div (which already has 0.75" internal margins via
+ * its own padding) prints at 1:1 with the on-screen rendering. The
+ * result: WYSIWYG — what the user sees in the editor / view is exactly
+ * what comes out of the printer. CSS pixels are defined as 1/96 of an
+ * inch by the spec, so the SheetSurface's 816 × 1056 px paper renders
+ * as 8.5" × 11" on the page.
+ */
+@page {
+  size: letter;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: white;
+    margin: 0;
+    padding: 0;
+  }
+}
+
