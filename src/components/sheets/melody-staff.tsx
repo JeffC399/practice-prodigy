@@ -219,7 +219,7 @@ export function MelodyStaff({
         mn.lyric.continuation === "hyphen"
           ? `${mn.lyric.text}-`
           : mn.lyric.text;
-      const w = displayText.length * 6.8;
+      const w = displayText.length * 7.2;
       syllables.push({
         noteIdx: idx,
         text: displayText,
@@ -228,7 +228,8 @@ export function MelodyStaff({
         continuation: mn.lyric.continuation,
       });
     });
-    const MIN_LYRIC_GAP = 3;
+    // Phase 24c.1.3: bumped 3 → 8 to match SheetSurface.
+    const MIN_LYRIC_GAP = 8;
     let prevRight = -Infinity;
     syllables.forEach((s) => {
       const leftEdge = s.centerX - s.width / 2;

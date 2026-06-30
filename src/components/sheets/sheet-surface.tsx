@@ -573,10 +573,12 @@ export function SheetSurface({
             mn.lyric.continuation === "hyphen"
               ? `${mn.lyric.text}-`
               : mn.lyric.text;
-          // Width approximation tuned to Georgia 11pt serif. 6.8px/char
-          // is closer to the real avg than the previous 6.2 — and the
-          // collision pass below catches any remaining underestimate.
-          const width = displayText.length * 6.8;
+          // Width approximation tuned to Georgia 11pt serif.
+          // Phase 24c.1.3: bumped 6.8 → 7.2 to bias slightly
+          // conservative (wide letters like 'w' run ~10px, so the
+          // approximation needs headroom to avoid under-shifting in
+          // the collision pass below).
+          const width = displayText.length * 7.2;
           syllables.push({
             noteIdx: noteIdxInMeasure,
             text: displayText,
@@ -589,7 +591,10 @@ export function SheetSurface({
         // collide with the previous syllable's right edge, shift this
         // one right. Engraving convention: lyrics CAN drift off their
         // note when the notes are too close, in service of readability.
-        const MIN_LYRIC_GAP = 3;
+        // Phase 24c.1.3: 3 → 8 (a 3px gap renders as "barely a hair"
+        // at typical screen resolution; 8px gives visible breathing
+        // room without pushing syllables aggressively off-note).
+        const MIN_LYRIC_GAP = 8;
         let prevRight = -Infinity;
         syllables.forEach((s) => {
           const leftEdge = s.centerX - s.width / 2;
