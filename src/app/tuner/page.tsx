@@ -22,8 +22,12 @@ import {
  * denied state if the user blocks.
  */
 
+// Range spans every real-world tuning convention: baroque (415) at
+// the low end, "sharp orchestral" (444-450) at the high end. Anything
+// above ~450 isn't a real convention -- you'd transpose instead --
+// so capping at 450 keeps the slider honest.
 const A4_REFERENCE_MIN = 415;
-const A4_REFERENCE_MAX = 466;
+const A4_REFERENCE_MAX = 450;
 const A4_PRESETS = [415, 432, 440, 442, 444] as const;
 /**
  * One-word context for each A4 preset. 444 has no widely-accepted
