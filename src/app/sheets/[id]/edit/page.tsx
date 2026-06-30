@@ -6,8 +6,10 @@ import {
   Music,
   MousePointerClick,
   Plus,
+  Redo2,
   Trash2,
   Type,
+  Undo2,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -97,6 +99,14 @@ export default function SheetEditorPage() {
   const sheet = useSheetsLibrary((s) => s.sheets.find((x) => x.id === id));
   const updateSheet = useSheetsLibrary((s) => s.updateSheet);
   const markSheetOpened = useSheetsLibrary((s) => s.markSheetOpened);
+  const undoSheet = useSheetsLibrary((s) => s.undo);
+  const redoSheet = useSheetsLibrary((s) => s.redo);
+  const canUndo = useSheetsLibrary(
+    (s) => (s.undoStacks[id]?.length ?? 0) > 0,
+  );
+  const canRedo = useSheetsLibrary(
+    (s) => (s.redoStacks[id]?.length ?? 0) > 0,
+  );
   const notationStyle = useUserPrefs((s) => s.notationDefault);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -168,6 +178,47 @@ export default function SheetEditorPage() {
       return true;
     });
   }, [surfaceLayout, sheet]);
+
+  /**
+   * Phase 26 — Global undo / redo keyboard shortcuts. Active whenever
+   * the editor is mounted (independent of editorMode) so a misclick
+   * during ANY authoring flow can be undone.
+   *
+   *   Cmd/Ctrl+Z          → undo
+   *   Cmd/Ctrl+Shift+Z    → redo (Mac convention)
+   *   Cmd/Ctrl+Y          → redo (Windows convention)
+   *
+   * Skipped when focus is in an INPUT / TEXTAREA / contenteditable so
+   * users can still use native text-field undo/redo while editing the
+   * title, composer, or chord-entry text input.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const isUndo = e.key === "z" && !e.shiftKey;
+      const isRedo =
+        (e.key === "z" && e.shiftKey) || e.key === "y";
+      if (isRedo) {
+        e.preventDefault();
+        useSheetsLibrary.getState().redo(id);
+      } else if (isUndo) {
+        e.preventDefault();
+        useSheetsLibrary.getState().undo(id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [id]);
 
   /**
    * Phase 25.1 — Keyboard handler bound to window while click-entry
@@ -752,6 +803,28 @@ export default function SheetEditorPage() {
             All sheets
           </Link>
           <div className="flex items-center gap-2">
+            {/* Phase 26 — Undo / Redo. Keyboard: Cmd/Ctrl+Z (undo),
+                Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y (redo). */}
+            <button
+              type="button"
+              onClick={() => undoSheet(id)}
+              disabled={!canUndo}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Undo (Cmd/Ctrl+Z)"
+              aria-label="Undo"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => redoSheet(id)}
+              disabled={!canRedo}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Redo (Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y)"
+              aria-label="Redo"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
             <Link
               href={`/sheets/${id}`}
               className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:border-primary/40 transition-colors"
