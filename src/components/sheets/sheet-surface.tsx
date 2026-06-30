@@ -99,8 +99,11 @@ const STAVE_HEIGHT = 78;
  * Phase 24c.1: lyric band bumped 22 → 34 so syllables clear the bottom
  * of note glyphs + stems extending below the staff. Pairs with the
  * larger LYRIC_BASELINE_OFFSET below.
+ * Phase 24c.1.1: further bumped 34 → 42 after a residual collision
+ * between low-pitch eighth notes' stem flags and the top of lyric
+ * letters showed up in production.
  */
-const LYRIC_BAND_HEIGHT = 34;
+const LYRIC_BAND_HEIGHT = 42;
 const LINE_HEIGHT =
   CHORD_BAND_HEIGHT + STAVE_GAP_TOP + STAVE_HEIGHT + LYRIC_BAND_HEIGHT;
 
@@ -117,8 +120,10 @@ const MIN_MEASURE_NOTE_WIDTH = 110;
  * Phase 24c.1: 16 → 26 (the 16px offset was being eaten by stems
  * extending below the staff and ledger lines on low notes, causing
  * lyric collisions with the note glyphs).
+ * Phase 24c.1.1: 26 → 34 after a residual stem-flag collision on
+ * low-pitch eighth notes survived the first bump.
  */
-const LYRIC_BASELINE_OFFSET = 26;
+const LYRIC_BASELINE_OFFSET = 34;
 /** Vertical extra padding for the click region below the staff. */
 const NOTE_HIT_REGION_HEIGHT = 44;
 /**

@@ -56,11 +56,15 @@ export type MelodyStaffProps = {
 
 /** Standard per-measure width when not overridden. */
 const DEFAULT_WIDTH = 180;
-const DEFAULT_HEIGHT = 130;
+const DEFAULT_HEIGHT = 138;
 const STAVE_TOP_PAD = 10;
 const STAVE_VISUAL_HEIGHT = 40;
-/** Phase 24c.1: bumped 26 → 36 to match SheetSurface lyric offset. */
-const LYRIC_OFFSET_BELOW_STAFF = 36;
+/**
+ * Phase 24c.1: bumped 26 → 36 to match SheetSurface lyric offset.
+ * Phase 24c.1.1: bumped 36 → 44 to match the bumped SheetSurface
+ * offset (residual stem-flag collisions).
+ */
+const LYRIC_OFFSET_BELOW_STAFF = 44;
 
 export function MelodyStaff({
   melody,
