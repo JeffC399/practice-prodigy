@@ -320,7 +320,7 @@ type SoundVoices = {
  * pass; the others got further boosts so they match.
  */
 const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
-  tonal: 14, // Bumped +8 → +14; also swapped MonoSynth → Synth to drop the filter chain
+  tonal: 10, // Trimmed +14 → +10 — was just slightly hot
   wood: 12,
   electronic: -4, // Reference, unchanged
   stick: -2,
@@ -418,75 +418,58 @@ function makeSoundVoices(
       };
     }
     case "stick": {
-      // Two ENTIRELY DIFFERENT voices — previous attempts only varied
-      // the filter frequency on a single noise source, which was too
-      // subtle for the user to hear the accent vs normal contrast.
-      // Now each role gets its own synth chain so the timbres are
-      // unmistakable:
-      //
-      //   STICK (normal beat) = thin highpass-filtered noise click —
-      //     dry, hi-hat-tap character with no body. Filtered at
-      //     4000 Hz so only the bright transient passes through.
-      //
-      //   RIM (accent beat)   = a fundamentally different sound —
-      //     LOWPASS-filtered noise (fat body) layered with a
-      //     MembraneSynth tom-hit at G3. Sounds like a snare rim
-      //     shot. Completely separate signal chain from the stick
-      //     voice so the timbre difference is dramatic.
-      //
-      //   SUB-BEAT            = very thin, spitty noise — same
-      //     chain as stick but at an even higher filter frequency
-      //     and much shorter envelope.
-      const stickFilter = new Tone.Filter(4000, "highpass").connect(destination);
-      const stickNoise = new Tone.NoiseSynth({
+      // ADDITIVE rim shot — instead of swapping to a different voice
+      // on accents (which previously sounded too similar to the
+      // stick because both were filtered noise), accents play BOTH
+      // the regular stick click AND a loud low kick-drum thump.
+      // Result:
+      //   - Normal beats: just the stick click
+      //   - Accent beat:  stick click + deep THUMP
+      // The thump is unmissable because:
+      //   - It uses a totally different synth (MembraneSynth, not noise)
+      //   - It's pitched LOW (C2 = ~65 Hz, true kick-drum register)
+      //   - It's hit hard (full velocity 1.0)
+      //   - It's louder than the stick (+8 dB on top of the boost)
+      //   - It has body — 60ms total envelope vs the stick's 25ms
+      const filter = new Tone.Filter(4000, "highpass").connect(destination);
+      const click = new Tone.NoiseSynth({
         noise: { type: "white" },
         envelope: { attack: 0.001, decay: 0.025, sustain: 0 },
         volume: SOUND_VOLUME_DB.stick,
-      }).connect(stickFilter);
-
-      const rimFilter = new Tone.Filter(1200, "lowpass").connect(destination);
-      const rimNoise = new Tone.NoiseSynth({
-        noise: { type: "white" },
-        envelope: { attack: 0.001, decay: 0.05, sustain: 0 },
-        volume: SOUND_VOLUME_DB.stick + 4,
-      }).connect(rimFilter);
-      // Short MembraneSynth hit for the pitched body of the rim.
-      // Decay 30ms + release 10ms = 40ms total tail, well clear of
-      // the next beat even at 200+ BPM.
-      const rimDrum = new Tone.MembraneSynth({
-        pitchDecay: 0.008,
-        octaves: 3,
+      }).connect(filter);
+      // The kick layer that ONLY fires on accents.
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.04,
+        octaves: 5,
         envelope: {
           attack: 0.001,
-          decay: 0.03,
+          decay: 0.05,
           sustain: 0,
           release: 0.01,
         },
-        volume: SOUND_VOLUME_DB.stick + 2,
+        volume: SOUND_VOLUME_DB.stick + 8,
       }).connect(destination);
-
       return {
         trigger: (time, intensity) => {
           if (intensity === "accent") {
-            // RIM: fat lowpassed noise + pitched drum body
-            rimNoise.triggerAttackRelease("16n", time);
-            rimDrum.triggerAttackRelease("G3", "32n", time);
+            // Stick click + deep kick thump
+            filter.frequency.value = 4000;
+            click.triggerAttackRelease("32n", time);
+            kick.triggerAttackRelease("C2", "16n", time, 1.0);
           } else if (intensity === "sub") {
-            // SUB: very thin, very short
-            stickFilter.frequency.value = 6000;
-            stickNoise.triggerAttackRelease("64n", time);
+            // Sub: thin highpass click only
+            filter.frequency.value = 6000;
+            click.triggerAttackRelease("64n", time);
           } else {
-            // STICK: thin highpass click
-            stickFilter.frequency.value = 4000;
-            stickNoise.triggerAttackRelease("32n", time);
+            // Normal stick: just the click
+            filter.frequency.value = 4000;
+            click.triggerAttackRelease("32n", time);
           }
         },
         dispose: () => {
-          stickNoise.dispose();
-          stickFilter.dispose();
-          rimNoise.dispose();
-          rimFilter.dispose();
-          rimDrum.dispose();
+          click.dispose();
+          filter.dispose();
+          kick.dispose();
         },
       };
     }
