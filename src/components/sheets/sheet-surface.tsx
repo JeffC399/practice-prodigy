@@ -87,11 +87,20 @@ export type SheetSurfaceProps = {
 const PAPER_PADDING_X = 64;
 const PAPER_PADDING_Y = 48;
 const LINE_GAP = 14;
-const CHORD_BAND_HEIGHT = 22;
+/**
+ * Phase 24c.1: chord band shrunk from 22 → 18 (chord text + measure
+ * number fits in less vertical space; less empty whitespace between
+ * chord row and staff).
+ */
+const CHORD_BAND_HEIGHT = 18;
 const STAVE_GAP_TOP = 6;
 const STAVE_HEIGHT = 78;
-/** Phase 24c: extra vertical space below each staff for lyrics. */
-const LYRIC_BAND_HEIGHT = 22;
+/**
+ * Phase 24c.1: lyric band bumped 22 → 34 so syllables clear the bottom
+ * of note glyphs + stems extending below the staff. Pairs with the
+ * larger LYRIC_BASELINE_OFFSET below.
+ */
+const LYRIC_BAND_HEIGHT = 34;
 const LINE_HEIGHT =
   CHORD_BAND_HEIGHT + STAVE_GAP_TOP + STAVE_HEIGHT + LYRIC_BAND_HEIGHT;
 
@@ -103,10 +112,27 @@ const KEY_SIG_PX_PER_ACCIDENTAL = 9;
 const TIME_SIG_PX = 28;
 const MIN_MEASURE_NOTE_WIDTH = 110;
 
-/** Vertical offset from staff bottom to lyric text baseline. */
-const LYRIC_BASELINE_OFFSET = 16;
+/**
+ * Vertical offset from staff bottom to lyric text baseline.
+ * Phase 24c.1: 16 → 26 (the 16px offset was being eaten by stems
+ * extending below the staff and ledger lines on low notes, causing
+ * lyric collisions with the note glyphs).
+ */
+const LYRIC_BASELINE_OFFSET = 26;
 /** Vertical extra padding for the click region below the staff. */
 const NOTE_HIT_REGION_HEIGHT = 44;
+/**
+ * Right-side canvas padding so the END barline glyph (double-bar) at
+ * the very end of the last measure of the last line doesn't get
+ * clipped by the SVG canvas right edge. Phase 24c.1 fix.
+ */
+const CANVAS_RIGHT_PADDING = 16;
+/**
+ * Approximate baseline-to-baseline distance for one staff step (one
+ * line or one space). VexFlow's staff lines are 10px apart, so one
+ * step (line-to-space or space-to-line) is 5px.
+ */
+const STAFF_STEP_PX = 5;
 
 const KEY_SPEC_MAJOR: Record<PitchClass, string> = {
   C: "C",
@@ -222,6 +248,61 @@ function collectTuplets(
   return tuplets;
 }
 
+/**
+ * VexFlow pitch ("c/4", "f#/5", "bb/3", …) → staff steps above the top
+ * staff line of treble clef (F5 = step 0). Each integer step = one
+ * half of a staff space = 5px of vertical staff travel.
+ *
+ *   F5 → 0 (top line)
+ *   G5 → 1 (space above)
+ *   A5 → 2 (1st ledger line above)
+ *   B5 → 3
+ *   C6 → 4 (2nd ledger line above)
+ *   D6 → 5
+ *   E6 → 6 (3rd ledger line above)
+ *
+ * Negative for pitches on or below the top line.
+ */
+function pitchStepsAboveTopLine(pitch: string): number {
+  const slash = pitch.indexOf("/");
+  if (slash < 0) return 0;
+  const letter = pitch[0]?.toLowerCase();
+  const octave = parseInt(pitch.slice(slash + 1), 10);
+  if (!letter || Number.isNaN(octave)) return 0;
+  const letterIdx = "cdefgab".indexOf(letter);
+  if (letterIdx < 0) return 0;
+  // C4 → 0, D4 → 1, …, B4 → 6, C5 → 7, …
+  const totalStepsFromC4 = (octave - 4) * 7 + letterIdx;
+  // F5 → (5-4)*7 + 3 = 10
+  return totalStepsFromC4 - 10;
+}
+
+/**
+ * Phase 24c.1: ledger-line-aware chord-Y push-up.
+ *
+ * Walks every pitched note in the given measures (one line's worth)
+ * and finds the highest pitch above the top staff line. Returns the
+ * extra vertical pixels to push chord symbols UP across the whole
+ * line so they don't collide with high notes / ledger lines.
+ *
+ * Per-line (not per-measure) so the chord row stays visually aligned
+ * across the line — standard engraving convention.
+ */
+function chordPushUpForLine(measures: SheetMeasure[]): number {
+  let maxSteps = 0;
+  for (const m of measures) {
+    for (const n of m.melody ?? []) {
+      if (n.kind !== "note") continue;
+      const steps = pitchStepsAboveTopLine(n.pitch);
+      if (steps > maxSteps) maxSteps = steps;
+    }
+  }
+  if (maxSteps <= 0) return 0;
+  // Each step above the top line = 5px of vertical staff travel. Add
+  // 6px headroom so the chord clears note heads / ledger glyphs.
+  return maxSteps * STAFF_STEP_PX + 6;
+}
+
 function collectTies(
   melody: MelodyNote[],
   staveNotes: StaveNote[],
@@ -270,16 +351,32 @@ export function SheetSurface({
     if (lines.length === 0) return;
 
     const contentWidth = width - PAPER_PADDING_X * 2;
+
+    // Phase 24c.1: per-line chord-pushup means lines can have variable
+    // heights. Pre-compute pushups + lineYs so the renderer + total
+    // height stay in sync.
+    const linePushUps = lines.map(chordPushUpForLine);
+    const lineYs: number[] = [];
+    {
+      let y = 0;
+      for (let i = 0; i < lines.length; i++) {
+        lineYs.push(y);
+        y += LINE_HEIGHT + linePushUps[i] + LINE_GAP;
+      }
+    }
     const totalHeight =
-      lines.length * LINE_HEIGHT +
-      (lines.length - 1) * LINE_GAP +
+      (lineYs[lineYs.length - 1] ?? 0) +
+      LINE_HEIGHT +
+      (linePushUps[linePushUps.length - 1] ?? 0) +
       24;
 
     const renderer = new Renderer(
       musicRef.current,
       Renderer.Backends.SVG,
     );
-    renderer.resize(contentWidth, totalHeight);
+    // Phase 24c.1: add right-side canvas padding so the END barline's
+    // outer line glyph isn't clipped by the SVG canvas edge.
+    renderer.resize(contentWidth + CANVAS_RIGHT_PADDING, totalHeight);
     const ctx = renderer.getContext();
 
     /** Local pixel positions in the music-ref coord space — translated
@@ -291,8 +388,12 @@ export function SheetSurface({
     lines.forEach((lineMeasures, lineIdx) => {
       const showTimeSig = lineIdx === 0;
       const isLastLine = lineIdx === lines.length - 1;
-      const lineY = lineIdx * (LINE_HEIGHT + LINE_GAP);
-      const staveY = lineY + CHORD_BAND_HEIGHT + STAVE_GAP_TOP;
+      const lineY = lineYs[lineIdx];
+      // Phase 24c.1: push the staff down by the line's chord-pushup so
+      // the chord row gets extra headroom above ledger-line notes.
+      const chordPushUp = linePushUps[lineIdx];
+      const staveY =
+        lineY + CHORD_BAND_HEIGHT + STAVE_GAP_TOP + chordPushUp;
       const staffBottomY = staveY + STAVE_HEIGHT * 0.55; // approx 5-line bottom
 
       const lineOverhead =
@@ -335,7 +436,9 @@ export function SheetSurface({
 
         const noteStartX = stave.getNoteStartX();
         const noteEndX = stave.getX() + stave.getWidth();
-        const chordY = staveY - 6;
+        // Phase 24c.1: chord baseline tightened from -6 to -3 above
+        // staff top so chord symbols sit closer to the staff.
+        const chordY = staveY - 3;
 
         if (measure.chords.length > 0) {
           ctx.save();
@@ -347,14 +450,23 @@ export function SheetSurface({
               chordY,
             );
           } else {
-            const slot = (noteEndX - noteStartX) / measure.chords.length;
-            measure.chords.forEach((chord, ci) => {
-              ctx.fillText(
-                renderChord(chord, notationStyle),
-                noteStartX + ci * slot,
-                chordY,
-              );
-            });
+            // Phase 24c.1: two-chord measure. First chord on the
+            // downbeat (noteStartX), second past the half-bar (55% of
+            // measure width). The naive slot/2 placement was rendering
+            // the 2nd chord at exactly the midpoint, which left the
+            // 1st chord's tail crashing into it for typical chord
+            // widths (Dmaj7 ≈ 50px).
+            ctx.fillText(
+              renderChord(measure.chords[0], notationStyle),
+              noteStartX,
+              chordY,
+            );
+            const halfX = noteStartX + (noteEndX - noteStartX) * 0.55;
+            ctx.fillText(
+              renderChord(measure.chords[1], notationStyle),
+              halfX,
+              chordY,
+            );
           }
           ctx.restore();
         }

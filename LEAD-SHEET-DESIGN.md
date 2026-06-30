@@ -257,7 +257,7 @@ Three candidates were considered:
 
 ---
 
-## 8. Build Slices (~8–12 weeks)
+## 8. Build Slices — Original (pre-build) plan
 
 | Slice | Scope | Estimate |
 |---|---|---|
@@ -270,7 +270,44 @@ Three candidates were considered:
 | 7 | Share path: URL encoding (base64+gzip) + JSON download + share modal. | 1 week |
 | 8 | Polish: library search / filter, thumbnail rendering, mobile tab-strip layout, accessibility pass. | 1 week |
 
-Each slice ships independently. A user could in theory start using the library + meta after slice 1 and grow into the editor as later slices land. Same incremental-ship philosophy as the v1 Bass Arpeggios buildout.
+> **Note (2026-06-30):** the original slice plan has been superseded by the live phased roadmap in §8.5 below. The slice numbers here are kept for historical context; the actual build is now tracked by Phase numbers.
+
+---
+
+## 8.5 Phased Roadmap — live (2026-06-30)
+
+This roadmap is the source of truth for what ships next. Each phase is independently shippable; later phases assume earlier phases are in.
+
+**Shipped:**
+
+| Phase | Date | Scope |
+|---|---|---|
+| 24a | 2026-06-30 | Chord-chart MVP (library + editor + view + print). |
+| 24b | 2026-06-30 | Melody via VexFlow (notes + rests, full duration vocab, dotted modifier). |
+| 24b.2 | 2026-06-30 | Triplets + intra-measure ties. |
+| 24b.3 | 2026-06-30 | Professional engraving rework (continuous multi-measure paper surface, chord symbols, key sig on every line, end barline, serif title block, auto-beamed eighths/sixteenths). |
+| 24c | 2026-06-30 | Lyrics via inline Sibelius-style click-on-staff typing (syllables + hyphen continuation + melisma line). |
+
+**In flight / queued:**
+
+| Phase | Scope | Est. | Why here |
+|---|---|---|---|
+| **24c.1** | **Engraving polish:** chord band height, chord collision fix, end-barline clipping fix, lyric baseline offset fix, ledger-line-aware chord Y. | 1 session | Hard prerequisite. Compounding new rendering on broken rendering is a trap. |
+| 25 | **Click-on-staff melody entry** — Dorico-style sequential snap-entry. Persistent caret marks "next note position." Click staff → places note at caret + advances. Keyboard pitch entry (A-G + accidental + octave). Arrow keys nudge pitch / move cursor. Side panel: rhythm value, dotted, accidentals (♯ ♮ ♭ 𝄪 𝄫), articulations (staccato, accent, fermata, slur). Modal entry stays as "Advanced edit" until 25 proves itself. | 2-3 sessions | The big architectural rewrite. Closes the loop on "the staff IS the workspace." |
+| 26 | **Undo / redo at sheet level** — action-log pattern, bounded ~100 actions. Per LEAD-SHEET-DESIGN §10 open question. | 1 session | Becomes mandatory the moment click-entry lands — a misclick on a 32-bar sheet is currently irrecoverable. |
+| 27 | **Live audio playback** — chord comping + melody playback. Uses existing Tone.js plumbing from Bass Arpeggios. | 1-2 sessions | Highest single-feature tester impact. Closes the authoring loop. |
+| 28 | **Form markings** — repeats 𝄆 𝄇, first / second endings, D.C. al Fine, D.S. al Coda, Coda, Segno, To Coda, Fine. Section labels (A / B / Intro / Verse / Chorus / Bridge / Outro). | 2 sessions | Real songs need these. Was originally Phase 24d. |
+| 29 | **Cross-measure ties + slurs.** Multi-line render coordinator that knows about the previous line's last note. | 1-2 sessions | Engraving completeness. Was originally Phase 24b.4. |
+| 30 | **MIDI input** for melody entry via the Web MIDI API. Plug in keyboard → notes appear at the caret. | 1-2 sessions | Power-user differentiator — makes serious musicians take the tool seriously. |
+| 31 | **Selection model** — drag-select multiple notes, then delete / transpose / copy / paste. | 1-2 sessions | Indispensable for revising. Currently no multi-note operations exist. |
+| 32 | **Pickup measure (anacrusis)** + **bars-per-line toggle** (4 / 6 / 8). Both in §2 / §7 of this design doc, both unshipped. | 1 session | Real songs start with anacruses; serious chart authoring wants bars-per-line control. |
+| 33 | **Share via URL** — base64+gzip-encoded JSON in `?d=` query + JSON file download fallback. | 1 session | Was originally Phase 24e. |
+| 34 | **Print polish** — page numbers, copyright footer line, page-break controls for multi-page sheets. | 0.5 session | Final professional touches before pro engraving is fully done. |
+| 35 | **Library polish** — search / filter, live-rendered thumbnails on cards, mobile / touch tab-strip layout, accessibility pass. | 1 session | Was originally Slice 8. |
+
+Total remaining: ~16 sessions to complete the LSB Basic Tier as a Dorico-class authoring tool. Phases may re-prioritize based on tester feedback once the build is in user hands.
+
+The Advanced Tier (mid-piece key/time changes, multi-voice, MusicXML import/export, multi-page layout with manual page breaks, real-time collab, audio playback of full chart with comping) stays in `bucket: "later"` until the Basic Tier is shipped and in production use.
 
 ---
 
