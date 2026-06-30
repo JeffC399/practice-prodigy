@@ -55,6 +55,15 @@ import {
   buildPitchedNote,
   buildRestNote,
 } from "@/lib/sheets/melody-entry";
+import {
+  advanceCaret,
+  caretAtEndOfMeasure,
+  durationToBeats,
+  letterToPitch,
+  nudgeLastNoteInMeasure,
+  retreatCaret,
+  type MelodyCaret,
+} from "@/lib/sheets/melody-caret";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -118,19 +127,11 @@ export default function SheetEditorPage() {
   const [entryDuration, setEntryDuration] = useState<MelodyDuration>("q");
   const [entryDotted, setEntryDotted] = useState(false);
   const [entryRest, setEntryRest] = useState(false);
-  // Phase 25.0 — Window-level Escape handler for click-entry mode. The
-  // overlay div doesn't auto-focus, so a window listener catches Esc.
-  useEffect(() => {
-    if (editorMode !== "click-entry") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setEditorMode("none");
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [editorMode]);
+  // Phase 25.1 — Caret state. Null when click-entry is off or no
+  // measure has been selected yet. The visible caret line in the
+  // overlay reads from this; keyboard handlers advance / retreat /
+  // place notes at this position.
+  const [caret, setCaret] = useState<MelodyCaret | null>(null);
   // Phase 24c — Lyric overlay click positions: pitched notes that are
   // NOT tied followers. Computed here (above the early returns) so the
   // useMemo hook order stays stable across renders.
@@ -154,6 +155,136 @@ export default function SheetEditorPage() {
       return true;
     });
   }, [surfaceLayout, sheet]);
+
+  /**
+   * Phase 25.1 — Keyboard handler bound to window while click-entry
+   * mode is active. Covers the Dorico-style shortcuts:
+   *   - A–G: place note at caret pitch + advance
+   *   - R:   place rest at caret + advance
+   *   - ↑/↓: nudge LAST placed note pitch by one staff step
+   *   - ←/→: retreat / advance caret by current rhythm value
+   *   - 1/2/3/4/5: change rhythm value (whole/half/quarter/8th/16th)
+   *   - .:   toggle dotted
+   *   - Esc: exit click-entry mode
+   *
+   * Ignores keys when focus is in an input / textarea so the meta
+   * field text inputs don't lose their typing. Reads sheet state via
+   * the store's getState() inside the handler so the closure stays
+   * current without forcing a re-bind on every keystroke.
+   */
+  useEffect(() => {
+    if (editorMode !== "click-entry") return;
+    if (!sheet) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const fresh = useSheetsLibrary
+        .getState()
+        .sheets.find((s) => s.id === id);
+      if (!fresh) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setEditorMode("none");
+        setCaret(null);
+        return;
+      }
+      if (/^[a-gA-G]$/.test(e.key)) {
+        e.preventDefault();
+        if (!caret) return;
+        const pitch = letterToPitch(e.key.toLowerCase(), caret.octave);
+        const note = entryRest
+          ? buildRestNote(entryDuration, entryDotted)
+          : buildPitchedNote(pitch, entryDuration, entryDotted);
+        const measures = appendMelodyNote(
+          fresh,
+          caret.measureIdx,
+          note,
+        );
+        updateSheet(id, { measures });
+        const beats = durationToBeats(entryDuration, entryDotted);
+        const fresher = useSheetsLibrary
+          .getState()
+          .sheets.find((s) => s.id === id);
+        if (fresher) setCaret(advanceCaret(caret, beats, fresher));
+        return;
+      }
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        if (!caret) return;
+        const restNote = buildRestNote(entryDuration, entryDotted);
+        const measures = appendMelodyNote(
+          fresh,
+          caret.measureIdx,
+          restNote,
+        );
+        updateSheet(id, { measures });
+        const beats = durationToBeats(entryDuration, entryDotted);
+        const fresher = useSheetsLibrary
+          .getState()
+          .sheets.find((s) => s.id === id);
+        if (fresher) setCaret(advanceCaret(caret, beats, fresher));
+        return;
+      }
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        if (!caret) return;
+        const dir = e.key === "ArrowUp" ? 1 : -1;
+        const measures = nudgeLastNoteInMeasure(
+          fresh,
+          caret.measureIdx,
+          dir,
+        );
+        if (measures) updateSheet(id, { measures });
+        return;
+      }
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        if (!caret) return;
+        const beats = durationToBeats(entryDuration, entryDotted);
+        setCaret(
+          e.key === "ArrowRight"
+            ? advanceCaret(caret, beats, fresh)
+            : retreatCaret(caret, beats, fresh),
+        );
+        return;
+      }
+      const rhythmMap: Record<string, MelodyDuration> = {
+        "1": "w",
+        "2": "h",
+        "3": "q",
+        "4": "8",
+        "5": "16",
+      };
+      if (rhythmMap[e.key]) {
+        e.preventDefault();
+        setEntryDuration(rhythmMap[e.key]);
+        return;
+      }
+      if (e.key === ".") {
+        e.preventDefault();
+        setEntryDotted((d) => !d);
+        return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    editorMode,
+    caret,
+    entryDuration,
+    entryDotted,
+    entryRest,
+    sheet,
+    id,
+    updateSheet,
+  ]);
 
   if (!mounted) {
     return (
@@ -286,19 +417,56 @@ export default function SheetEditorPage() {
     setLyricDraft("");
   };
 
-  // Phase 25.0 — Click-on-staff melody entry handlers.
+  // Phase 25.0 / 25.1 — Click-on-staff + keyboard melody entry handlers.
   const enterClickEntryMode = () => {
     setEditorMode("click-entry");
+    // Phase 25.1: caret lands on measure 0 by default; user can click
+    // another measure to re-anchor. Octave 4 = middle-C octave.
+    setCaret(caretAtEndOfMeasure(sheet, 0, 4));
   };
   const exitClickEntryMode = () => {
     setEditorMode("none");
+    setCaret(null);
   };
-  const onPlaceNoteAtClick = (measureIdx: number, pitch: string) => {
+
+  /**
+   * Phase 25.1 — Place a note at the caret + advance the caret. Pure
+   * function over (sheet, caret, side-panel state, pitch); used by
+   * both click placement and keyboard letter placement.
+   */
+  const placeAtCaret = (currentCaret: MelodyCaret, pitch: string) => {
     const note = entryRest
       ? buildRestNote(entryDuration, entryDotted)
       : buildPitchedNote(pitch, entryDuration, entryDotted);
-    const measures = appendMelodyNote(sheet, measureIdx, note);
+    const measures = appendMelodyNote(
+      sheet,
+      currentCaret.measureIdx,
+      note,
+    );
     updateSheet(id, { measures });
+    const beats = durationToBeats(entryDuration, entryDotted);
+    const fresh = useSheetsLibrary
+      .getState()
+      .sheets.find((s) => s.id === id);
+    if (fresh) {
+      setCaret(advanceCaret(currentCaret, beats, fresh));
+    }
+  };
+
+  /**
+   * Click on the staff: re-anchor the caret to the clicked measure
+   * (at the end of any existing notes), then place a note at the
+   * clicked pitch and advance.
+   */
+  const onClickStaff = (measureIdx: number, pitch: string) => {
+    // Move caret to clicked measure first — Dorico-style "click puts
+    // the caret here." Then place + advance.
+    const newCaret = caretAtEndOfMeasure(
+      sheet,
+      measureIdx,
+      caret?.octave ?? 4,
+    );
+    placeAtCaret(newCaret, pitch);
   };
 
   const moveCursorTo = (next: LyricCursor) => {
@@ -598,9 +766,36 @@ export default function SheetEditorPage() {
                 <span className="font-medium text-sky-500">
                   Click entry mode.
                 </span>{" "}
-                Click anywhere on a staff to append a note at that pitch.
-                Notes use the rhythm value below. Beat-targeting + keyboard
-                pitch entry land in 25.1 / 25.2.
+                Click a staff to place a note + anchor the caret.
+                Then keyboard:{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  A-G
+                </kbd>{" "}
+                place note,{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  R
+                </kbd>{" "}
+                rest,{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  ↑↓
+                </kbd>{" "}
+                nudge last pitch,{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  ←→
+                </kbd>{" "}
+                move caret,{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  1-5
+                </kbd>{" "}
+                rhythm (w/h/q/8/16),{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  .
+                </kbd>{" "}
+                dotted,{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  esc
+                </kbd>{" "}
+                exit.
               </p>
               <div className="flex flex-wrap items-center gap-2 text-[11px]">
                 <span className="font-mono uppercase tracking-wider text-muted-foreground">
@@ -667,7 +862,9 @@ export default function SheetEditorPage() {
               <MelodyEntryOverlay
                 measureRects={surfaceLayout.measureRects}
                 paperHeight={surfaceLayout.paperHeight}
-                onPlaceNote={onPlaceNoteAtClick}
+                caret={caret}
+                beatsPerMeasure={sheet.timeSignature.beatsPerMeasure}
+                onClickStaff={onClickStaff}
                 onExit={exitClickEntryMode}
               />
             )}
