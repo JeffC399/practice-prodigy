@@ -133,11 +133,13 @@ export const MODULES: ModuleEntry[] = [
     id: "lead-sheets",
     name: "Lead Sheet Builder",
     shortName: "Lead Sheets",
-    status: "designed",
-    bucket: "next",
+    status: "live",
+    bucket: "now",
+    route: "/sheets",
     description:
-      "Author lead sheets: title + composer + credits, key + time + tempo + style, chords + melody + lyrics, form markings (repeats, D.C. / D.S. / Coda), print + share. Basic tier designed (see LEAD-SHEET-DESIGN.md); advanced tier (MusicXML, multi-voice, mid-piece key/time changes) sketched separately.",
+      "Author lead sheets — Phase 24a MVP is shipped: title + composer + style + key + time signature + per-measure chord grid (1 or 2 chords per bar) + read-only display + print-to-PDF via browser dialog. Melody / lyrics / form markings ship in subsequent phases (see LEAD-SHEET-DESIGN.md).",
     icon: FileMusic,
+    routeMatch: (p) => p.startsWith("/sheets"),
   },
   {
     id: "sight-reading",

@@ -82,6 +82,18 @@ export type TunerRoutineItem = RoutineItemBase & {
 };
 
 /**
+ * Lead Sheet RoutineItem — references a saved lead sheet from the
+ * sheets-library. The routine player navigates to the sheet's view
+ * page and the user plays through it for the estimated duration.
+ */
+export type SheetRoutineItem = RoutineItemBase & {
+  type: "sheet";
+  sheetId: string;
+  /** Optional repetition count (play through N times). */
+  repetitions?: number;
+};
+
+/**
  * The full discriminated union. Add new module variants here as they
  * ship. Adding a variant is a non-breaking change — existing code
  * paths that switch on `type` get a TypeScript exhaustiveness warning
@@ -90,7 +102,8 @@ export type TunerRoutineItem = RoutineItemBase & {
 export type RoutineItem =
   | DrillRoutineItem
   | MetronomeRoutineItem
-  | TunerRoutineItem;
+  | TunerRoutineItem
+  | SheetRoutineItem;
 
 /** Type guard for narrowing. */
 export function isMetronomeItem(item: RoutineItem): item is MetronomeRoutineItem {
@@ -103,6 +116,10 @@ export function isDrillItem(item: RoutineItem): item is DrillRoutineItem {
 
 export function isTunerItem(item: RoutineItem): item is TunerRoutineItem {
   return item.type === "tuner";
+}
+
+export function isSheetItem(item: RoutineItem): item is SheetRoutineItem {
+  return item.type === "sheet";
 }
 
 /**
