@@ -165,10 +165,11 @@ class SheetPlayback {
     await Tone.start();
     this.cancel();
 
-    // Phase 27.1.1: default to synth (works offline, no sample CDN
-    // dependency). Users opt-in to sampled instruments via the picker.
-    const chordVoice: ChordVoice = sheet.chordVoice ?? "synth";
-    const melodyVoice: MelodyVoice = sheet.melodyVoice ?? "synth";
+    // Phase 27.2: default to piano (reliable Salamander Grand via
+    // Tone.Sampler + tonejs.github.io CDN). On any load failure, the
+    // voice loader falls back to the built-in synth automatically.
+    const chordVoice: ChordVoice = sheet.chordVoice ?? "piano";
+    const melodyVoice: MelodyVoice = sheet.melodyVoice ?? "piano";
     const mixer: SheetMixer = sheet.mixer ?? DEFAULT_SHEET_MIXER;
 
     // Lazy-load voices (cached). Both load in parallel.

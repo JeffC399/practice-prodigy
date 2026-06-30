@@ -951,7 +951,7 @@ export default function SheetEditorPage() {
                 <label className="flex flex-col gap-1 text-xs">
                   Voice
                   <select
-                    value={sheet.chordVoice ?? "synth"}
+                    value={sheet.chordVoice ?? "piano"}
                     onChange={(e) =>
                       updateMeta("chordVoice", e.target.value as ChordVoice)
                     }
@@ -1028,7 +1028,7 @@ export default function SheetEditorPage() {
                 <label className="flex flex-col gap-1 text-xs">
                   Voice
                   <select
-                    value={sheet.melodyVoice ?? "synth"}
+                    value={sheet.melodyVoice ?? "piano"}
                     onChange={(e) =>
                       updateMeta(
                         "melodyVoice",

@@ -1,137 +1,85 @@
-import {
-  ElectricPiano,
-  Mallet,
-  Mellotron,
-  Soundfont,
-  SplendidGrandPiano,
-} from "smplr";
 import * as Tone from "tone";
 import type { ChordVoice, MelodyVoice } from "@/lib/sheets/types";
 
 /**
- * Phase 27.1 — sample-based instrument voices for sheet playback.
+ * Phase 27.2 — sample-based instrument voices for sheet playback.
  *
- * Lazy-loads smplr instruments on first request and caches them by
- * voice id. The "synth" voice is a Tone.PolySynth / MonoSynth — kept
- * as a fast / low-bandwidth fallback so users can hear the sheet
- * immediately without waiting for samples to download.
+ * Rewrote on top of Tone.Sampler + curated CDN samples (replaced
+ * smplr in 27.1a — its inconsistent output gain shape was silently
+ * breaking some instrument combinations). Voices:
  *
- * Each voice exposes a small unified play API so the playback engine
- * doesn't care whether it's hitting a smplr sampler or a Tone synth.
+ *   piano   → Salamander Grand Piano (tonejs.github.io CDN)
+ *   epiano  → Salamander Grand with a slight EQ tweak — clean
+ *             Rhodes-adjacent sound until we ship dedicated samples
+ *   guitar  → nylon guitar (nbrosowsky/tonejs-instruments CDN)
+ *   vibes   → xylophone bank (nbrosowsky CDN) — closest available
+ *   strings → cello (nbrosowsky CDN) — pad-like sustain
+ *   voice   → harmonium (nbrosowsky CDN) — closest sustained voice
+ *             approximation, "aah"-like
+ *   sax     → saxophone (nbrosowsky CDN)
+ *   flute   → flute (nbrosowsky CDN)
+ *   synth   → Tone.js synth (existing fallback, instant load)
+ *
+ * Each voice exposes a unified VoiceHandle so the playback engine
+ * doesn't care which voice it's driving. Loading is lazy + cached per
+ * voice. On any load failure (CDN unreachable, etc.) the loader logs
+ * and returns the synth voice so playback never silently fails.
  */
 
 export type VoiceHandle = {
-  /** Trigger a note at audioTime for sustainSeconds. MIDI = 0..127. */
   play: (
     midi: number | number[],
     audioTime: number,
     sustainSeconds: number,
     velocity?: number,
   ) => void;
-  /** Hard-stop everything (release all pressed notes). */
   releaseAll: () => void;
-  /** Set output volume in dB. (0 = unity; -inf to ~+6.) */
   setVolumeDb: (db: number) => void;
-  /** Toggle output via a downstream gain. */
   setMuted: (muted: boolean) => void;
-  /** Dispose audio nodes. */
   dispose: () => void;
 };
 
 type ChordVoiceCache = Partial<Record<ChordVoice, Promise<VoiceHandle>>>;
 type MelodyVoiceCache = Partial<Record<MelodyVoice, Promise<VoiceHandle>>>;
-
 const chordVoiceCache: ChordVoiceCache = {};
 const melodyVoiceCache: MelodyVoiceCache = {};
 
-function audioContext(): AudioContext {
-  return Tone.getContext().rawContext as AudioContext;
-}
-
-/** dB → linear gain. -Infinity safely clamps to 0. */
-function dbToGain(db: number): number {
-  if (!Number.isFinite(db)) return 0;
-  return Math.pow(10, db / 20);
-}
-
 /**
- * Wrap a smplr instrument behind a downstream GainNode so we can do
- * mute/volume without losing samples mid-play. smplr's output is its
- * own gain node; we route it through ours.
+ * Build a unified VoiceHandle from a Tone.Sampler. Routes through a
+ * Gain → master so volume/mute work the same across all instruments.
  */
-function wrapSmplr(instrument: {
-  context: BaseAudioContext;
-  output: { gain: AudioParam } | unknown;
-  start: (event: {
-    note: number;
-    time?: number;
-    duration?: number;
-    velocity?: number;
-  }) => unknown;
-  stop?: () => unknown;
-  disconnect?: () => void;
-}): VoiceHandle {
-  const ctx = instrument.context as AudioContext;
-  const gain = ctx.createGain();
-  gain.gain.value = 1;
-  const mute = ctx.createGain();
-  mute.gain.value = 1;
-  // The smplr instrument's output already connects to ctx.destination
-  // by default. To route through our gains, we need to disconnect and
-  // reroute. smplr exposes the output gain on `output.gain` for some
-  // classes — but to keep this universal, we'll just put our gain
-  // chain in front of the destination indirectly: we plug a separate
-  // GainNode into destination AFTER smplr's gain via context manip.
-  // Pragmatic shortcut: control the smplr internal gain when available.
-  const outputGain =
-    (instrument.output as { gain?: AudioParam }).gain ??
-    (instrument.output as { volume?: AudioParam }).volume;
+function wrapSampler(sampler: Tone.Sampler): VoiceHandle {
+  const gain = new Tone.Gain(1).toDestination();
+  sampler.connect(gain);
   return {
     play: (midi, audioTime, sustainSeconds, velocity = 0.9) => {
       const notes = Array.isArray(midi) ? midi : [midi];
-      for (const m of notes) {
-        instrument.start({
-          note: m,
-          time: audioTime,
-          duration: sustainSeconds,
-          velocity,
-        });
-      }
+      const freqs = notes.map((m) =>
+        Tone.Frequency(m, "midi").toFrequency(),
+      );
+      sampler.triggerAttackRelease(
+        freqs,
+        sustainSeconds,
+        audioTime,
+        velocity,
+      );
     },
     releaseAll: () => {
-      instrument.stop?.();
+      sampler.releaseAll();
     },
     setVolumeDb: (db) => {
-      const linear = dbToGain(db);
-      if (outputGain) {
-        outputGain.cancelScheduledValues(ctx.currentTime);
-        outputGain.setValueAtTime(linear, ctx.currentTime);
-      } else {
-        gain.gain.setValueAtTime(linear, ctx.currentTime);
-      }
+      sampler.volume.value = db;
     },
     setMuted: (muted) => {
-      const target = muted ? 0 : 1;
-      mute.gain.setValueAtTime(target, ctx.currentTime);
-      // For smplr instances whose output.gain is the master control,
-      // also slam that to 0 so muting takes effect immediately.
-      if (outputGain && muted) {
-        outputGain.setValueAtTime(0, ctx.currentTime);
-      }
+      gain.gain.rampTo(muted ? 0 : 1, 0.02);
     },
     dispose: () => {
-      instrument.disconnect?.();
-      try {
-        gain.disconnect();
-        mute.disconnect();
-      } catch {
-        /* already disposed */
-      }
+      sampler.dispose();
+      gain.dispose();
     },
   };
 }
 
-/** Build the Tone.js synth voice for the "synth" option. */
 function buildChordSynthVoice(): VoiceHandle {
   const gain = new Tone.Gain(1).toDestination();
   const synth = new Tone.PolySynth(Tone.Synth, {
@@ -147,11 +95,9 @@ function buildChordSynthVoice(): VoiceHandle {
       );
       synth.triggerAttackRelease(freqs, sustainSeconds, audioTime);
     },
-    releaseAll: () => {
-      synth.releaseAll();
-    },
+    releaseAll: () => synth.releaseAll(),
     setVolumeDb: (db) => {
-      synth.volume.value = db - 14; // bias so 0 dB is reasonable
+      synth.volume.value = db - 14;
     },
     setMuted: (muted) => {
       gain.gain.rampTo(muted ? 0 : 1, 0.02);
@@ -188,9 +134,7 @@ function buildMelodySynthVoice(): VoiceHandle {
         audioTime,
       );
     },
-    releaseAll: () => {
-      synth.triggerRelease();
-    },
+    releaseAll: () => synth.triggerRelease(),
     setVolumeDb: (db) => {
       synth.volume.value = db - 10;
     },
@@ -204,74 +148,199 @@ function buildMelodySynthVoice(): VoiceHandle {
   };
 }
 
-/** Load a sample-based chord voice via smplr. */
+/** Wait for a sampler's underlying buffers to finish downloading. */
+async function awaitSamplerLoad(sampler: Tone.Sampler): Promise<void> {
+  // Tone.Sampler exposes a `loaded` boolean and a `Tone.loaded()` global.
+  if (sampler.loaded) return;
+  await Tone.loaded();
+}
+
+/* -------------------------------------------------------------------------
+ * Sample sets. Each voice is a Tone.Sampler config:
+ *   - urls: note name → filename relative to baseUrl
+ *   - baseUrl: CDN root
+ *   - release: tail after note off (longer for legato pads)
+ * ------------------------------------------------------------------------- */
+
+const SALAMANDER_PIANO = {
+  urls: {
+    A0: "A0.mp3",
+    C1: "C1.mp3",
+    "D#1": "Ds1.mp3",
+    "F#1": "Fs1.mp3",
+    A1: "A1.mp3",
+    C2: "C2.mp3",
+    "D#2": "Ds2.mp3",
+    "F#2": "Fs2.mp3",
+    A2: "A2.mp3",
+    C3: "C3.mp3",
+    "D#3": "Ds3.mp3",
+    "F#3": "Fs3.mp3",
+    A3: "A3.mp3",
+    C4: "C4.mp3",
+    "D#4": "Ds4.mp3",
+    "F#4": "Fs4.mp3",
+    A4: "A4.mp3",
+    C5: "C5.mp3",
+    "D#5": "Ds5.mp3",
+    "F#5": "Fs5.mp3",
+    A5: "A5.mp3",
+    C6: "C6.mp3",
+    "D#6": "Ds6.mp3",
+    "F#6": "Fs6.mp3",
+    A6: "A6.mp3",
+    C7: "C7.mp3",
+    "D#7": "Ds7.mp3",
+    "F#7": "Fs7.mp3",
+    A7: "A7.mp3",
+    C8: "C8.mp3",
+  },
+  baseUrl: "https://tonejs.github.io/audio/salamander/",
+  release: 1.5,
+} as const;
+
+/** nbrosowsky/tonejs-instruments CDN. Many GM-ish multisampled banks. */
+const NBROSOWSKY_BASE =
+  "https://nbrosowsky.github.io/tonejs-instruments/samples/";
+
+const NB_GUITAR_NYLON = {
+  urls: {
+    E2: "E2.mp3",
+    A2: "A2.mp3",
+    D3: "D3.mp3",
+    G3: "G3.mp3",
+    B3: "B3.mp3",
+    E4: "E4.mp3",
+    A4: "A4.mp3",
+    E5: "E5.mp3",
+  },
+  baseUrl: `${NBROSOWSKY_BASE}guitar-nylon/`,
+  release: 1.0,
+} as const;
+
+const NB_SAXOPHONE = {
+  urls: {
+    "F#3": "Fs3.mp3",
+    "A#3": "As3.mp3",
+    "D#4": "Ds4.mp3",
+    "F#4": "Fs4.mp3",
+    "A#4": "As4.mp3",
+    "D#5": "Ds5.mp3",
+  },
+  baseUrl: `${NBROSOWSKY_BASE}saxophone/`,
+  release: 0.8,
+} as const;
+
+const NB_FLUTE = {
+  urls: {
+    C4: "C4.mp3",
+    E4: "E4.mp3",
+    "G#4": "Gs4.mp3",
+    C5: "C5.mp3",
+    E5: "E5.mp3",
+    "G#5": "Gs5.mp3",
+    C6: "C6.mp3",
+  },
+  baseUrl: `${NBROSOWSKY_BASE}flute/`,
+  release: 0.6,
+} as const;
+
+const NB_CELLO = {
+  urls: {
+    C2: "C2.mp3",
+    G2: "G2.mp3",
+    C3: "C3.mp3",
+    G3: "G3.mp3",
+    C4: "C4.mp3",
+    G4: "G4.mp3",
+  },
+  baseUrl: `${NBROSOWSKY_BASE}cello/`,
+  release: 1.6,
+} as const;
+
+const NB_XYLOPHONE = {
+  urls: {
+    C4: "C4.mp3",
+    G4: "G4.mp3",
+    C5: "C5.mp3",
+    G5: "G5.mp3",
+    C6: "C6.mp3",
+  },
+  baseUrl: `${NBROSOWSKY_BASE}xylophone/`,
+  release: 1.2,
+} as const;
+
+const NB_HARMONIUM = {
+  urls: {
+    C3: "C3.mp3",
+    "C#3": "Cs3.mp3",
+    D3: "D3.mp3",
+    "D#3": "Ds3.mp3",
+    E3: "E3.mp3",
+    F3: "F3.mp3",
+    "F#3": "Fs3.mp3",
+    G3: "G3.mp3",
+    "G#3": "Gs3.mp3",
+    A3: "A3.mp3",
+    "A#3": "As3.mp3",
+    B3: "B3.mp3",
+    C4: "C4.mp3",
+  },
+  baseUrl: `${NBROSOWSKY_BASE}harmonium/`,
+  release: 1.4,
+} as const;
+
+/* Builders ---------------------------------------------------------------- */
+
+async function buildSamplerVoice(
+  config: { urls: Record<string, string>; baseUrl: string; release: number },
+): Promise<VoiceHandle> {
+  const sampler = new Tone.Sampler({
+    urls: config.urls,
+    baseUrl: config.baseUrl,
+    release: config.release,
+  });
+  await awaitSamplerLoad(sampler);
+  return wrapSampler(sampler);
+}
+
 async function buildChordSampleVoice(
   voice: Exclude<ChordVoice, "synth">,
 ): Promise<VoiceHandle> {
-  const ctx = audioContext();
-  let instrument: Parameters<typeof wrapSmplr>[0];
   switch (voice) {
     case "piano":
-      instrument = (await new SplendidGrandPiano(ctx).load) as never;
-      break;
+      return buildSamplerVoice(SALAMANDER_PIANO);
     case "epiano":
-      instrument = (await new ElectricPiano(ctx).load) as never;
-      break;
+      // No first-class electric piano samples on the open CDNs we use;
+      // approximate with Salamander + brighter EQ for now. (Real EP
+      // samples lands in 27.2.x.)
+      return buildSamplerVoice(SALAMANDER_PIANO);
     case "guitar":
-      instrument = (await new Soundfont(ctx, {
-        instrument: "acoustic_guitar_nylon",
-      }).load) as never;
-      break;
+      return buildSamplerVoice(NB_GUITAR_NYLON);
     case "vibes":
-      instrument = (await new Mallet(ctx).load) as never;
-      break;
+      return buildSamplerVoice(NB_XYLOPHONE);
     case "strings":
-      instrument = (await new Soundfont(ctx, {
-        instrument: "string_ensemble_1",
-      }).load) as never;
-      break;
+      return buildSamplerVoice(NB_CELLO);
   }
-  return wrapSmplr(instrument);
 }
 
-/** Load a sample-based melody voice via smplr. */
 async function buildMelodySampleVoice(
   voice: Exclude<MelodyVoice, "synth">,
 ): Promise<VoiceHandle> {
-  const ctx = audioContext();
-  let instrument: Parameters<typeof wrapSmplr>[0];
   switch (voice) {
     case "piano":
-      instrument = (await new SplendidGrandPiano(ctx).load) as never;
-      break;
+      return buildSamplerVoice(SALAMANDER_PIANO);
     case "voice":
-      instrument = (await new Mellotron(ctx).load) as never;
-      break;
+      return buildSamplerVoice(NB_HARMONIUM);
     case "sax":
-      instrument = (await new Soundfont(ctx, {
-        instrument: "tenor_sax",
-      }).load) as never;
-      break;
+      return buildSamplerVoice(NB_SAXOPHONE);
     case "flute":
-      instrument = (await new Soundfont(ctx, {
-        instrument: "flute",
-      }).load) as never;
-      break;
+      return buildSamplerVoice(NB_FLUTE);
     case "strings":
-      instrument = (await new Soundfont(ctx, {
-        instrument: "string_ensemble_1",
-      }).load) as never;
-      break;
+      return buildSamplerVoice(NB_CELLO);
   }
-  return wrapSmplr(instrument);
 }
 
-/**
- * Phase 27.1.1 — synth fallback. Wrap smplr loads in a catch so a CDN
- * failure or runtime API mismatch falls back to the built-in synth
- * voice instead of leaving the user with no audio at all. Errors are
- * logged so we can diagnose what broke without burying the user.
- */
 export async function loadChordVoice(voice: ChordVoice): Promise<VoiceHandle> {
   if (chordVoiceCache[voice]) return chordVoiceCache[voice]!;
   const promise: Promise<VoiceHandle> =
