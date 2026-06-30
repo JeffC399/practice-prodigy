@@ -25,6 +25,18 @@ import {
 const A4_REFERENCE_MIN = 415;
 const A4_REFERENCE_MAX = 466;
 const A4_PRESETS = [415, 432, 440, 442, 444] as const;
+/**
+ * One-word context for each A4 preset. 444 has no widely-accepted
+ * single-word label in classical practice ("bright" is the most
+ * honest descriptive choice — higher A is perceptually brighter).
+ */
+const A4_PRESET_LABELS: Record<(typeof A4_PRESETS)[number], string> = {
+  415: "baroque",
+  432: "new-age",
+  440: "standard",
+  442: "modern",
+  444: "bright",
+};
 
 /** Smoothing window for cents — averages last N frames to stabilize the needle. */
 const CENTS_SMOOTHING_WINDOW = 6;
@@ -260,40 +272,36 @@ export default function TunerPage() {
               aria-label="A4 reference frequency"
             />
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {A4_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setA4Reference(preset)}
-                className={`rounded-md border px-2.5 py-1 text-xs font-mono transition-colors ${
-                  a4Reference === preset
-                    ? "border-primary bg-primary/15 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                }`}
-              >
-                {preset}
-                {preset === 432 && (
-                  <span className="ml-1 text-[10px] opacity-60">
-                    new-age
+          {/* Uniform-width preset buttons — each carries a one-word
+              context label so the column reads as a balanced row of
+              equal-sized tiles instead of variable-width chips. */}
+          <div className="grid grid-cols-5 gap-1.5">
+            {A4_PRESETS.map((preset) => {
+              const label = A4_PRESET_LABELS[preset];
+              const active = a4Reference === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setA4Reference(preset)}
+                  className={`flex flex-col items-center gap-0.5 rounded-md border px-2 py-1.5 transition-colors ${
+                    active
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  }`}
+                >
+                  <span className="font-mono text-sm tabular-nums">
+                    {preset}
                   </span>
-                )}
-                {preset === 440 && (
-                  <span className="ml-1 text-[10px] opacity-60">
-                    standard
-                  </span>
-                )}
-                {preset === 415 && (
-                  <span className="ml-1 text-[10px] opacity-60">
-                    baroque
-                  </span>
-                )}
-              </button>
-            ))}
+                  <span className="text-[10px] opacity-70">{label}</span>
+                </button>
+              );
+            })}
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Standard is 440 Hz. Modern orchestras tune to 442; baroque
-            performance practice uses 415; 432 is the new-age tuning.
+            Standard is 440 Hz. Modern orchestras tune to 442 (and a few
+            even brighter at 444). Baroque performance practice uses
+            415; 432 is the new-age tuning.
           </p>
         </section>
       </div>
