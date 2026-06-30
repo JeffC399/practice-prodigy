@@ -94,7 +94,7 @@ const BUILT_IN_DEFS: Record<BuiltInPattern, BuiltInPatternDef> = {
     displayName: "7th Chords ascending (1-3-5-7)",
     shortName: "7th Chords ↑",
     description:
-      "The foundational jazz arpeggio. Drills the four chord tones in order so each chord quality (maj7, m7, dom7, dim7) lands in your fingers as a distinct shape. Master this first.",
+      "The foundational jazz arpeggio. Drills the four chord tones in order so each quality lands as a distinct shape. Master this first.",
     notes: [
       { kind: "chordTone", index: 0, octaveShift: 0, duration: "quarter" },
       { kind: "chordTone", index: 1, octaveShift: 0, duration: "quarter" },
@@ -109,7 +109,7 @@ const BUILT_IN_DEFS: Record<BuiltInPattern, BuiltInPatternDef> = {
     displayName: "7th Chords descending (8-7-5-3)",
     shortName: "7th Chords ↓",
     description:
-      "Builds fluency for descending lines — the direction most bassists are weakest in. Trains your ear to hear chord quality from the top down, which is how voice-leading actually moves.",
+      "Builds fluency for descending lines — the direction most bassists are weakest in. Trains your ear to hear quality from the top down.",
     notes: [
       // Octave-up root, then 7, 5, 3 descending.
       { kind: "chordTone", index: 0, octaveShift: 1, duration: "quarter" },

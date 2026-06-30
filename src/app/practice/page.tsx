@@ -1463,7 +1463,10 @@ export default function PracticeSetupPage() {
                             </span>
                           )}
                         </span>
-                        <span className="text-[11px] text-muted-foreground leading-snug line-clamp-3">
+                        <span
+                          className="text-[11px] text-muted-foreground leading-snug"
+                          title={getPatternDescription(p)}
+                        >
                           {getPatternDescription(p)}
                         </span>
                       </div>
