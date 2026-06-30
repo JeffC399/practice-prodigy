@@ -7,6 +7,7 @@ import {
   Dot,
   Formatter,
   Renderer,
+  Repetition,
   Stave,
   StaveNote,
   StaveTie,
@@ -481,6 +482,54 @@ export function SheetSurface({
       ctx.fillText(String(lineIdx * measuresPerLine + 1), 0, lineY + 10);
       ctx.restore();
 
+      // Phase 28: volta-span detection. Walk the line measures and
+      // build contiguous runs of equal `volta` numbers; render a
+      // bracket per run after all staves draw.
+      type VoltaSpan = {
+        number: number;
+        startMeasureIdx: number;
+        endMeasureIdx: number;
+      };
+      const voltaSpansForLine: VoltaSpan[] = [];
+      {
+        let currentVolta: number | undefined = undefined;
+        let voltaStartIdx = 0;
+        for (let mi = 0; mi < lineMeasures.length; mi++) {
+          const m = lineMeasures[mi];
+          if (m.volta !== undefined) {
+            if (currentVolta !== m.volta) {
+              if (currentVolta !== undefined) {
+                voltaSpansForLine.push({
+                  number: currentVolta,
+                  startMeasureIdx: voltaStartIdx,
+                  endMeasureIdx: mi - 1,
+                });
+              }
+              currentVolta = m.volta;
+              voltaStartIdx = mi;
+            }
+          } else if (currentVolta !== undefined) {
+            voltaSpansForLine.push({
+              number: currentVolta,
+              startMeasureIdx: voltaStartIdx,
+              endMeasureIdx: mi - 1,
+            });
+            currentVolta = undefined;
+          }
+        }
+        if (currentVolta !== undefined) {
+          voltaSpansForLine.push({
+            number: currentVolta,
+            startMeasureIdx: voltaStartIdx,
+            endMeasureIdx: lineMeasures.length - 1,
+          });
+        }
+      }
+      // Track per-measure note-area X bounds so we can draw voltas
+      // after the loop.
+      const measureXBounds: Array<{ noteStartX: number; noteEndX: number }> =
+        [];
+
       lineMeasures.forEach((measure, i) => {
         const isFirst = i === 0;
         const staveX = isFirst ? 0 : lineOverhead + i * noteAreaPer;
@@ -500,8 +549,49 @@ export function SheetSurface({
             );
           }
         }
-        if (isLastLine && i === lineMeasures.length - 1) {
+        // Phase 28: repeat barlines. setBegBarType for repeat-start;
+        // setEndBarType for repeat-end (overrides the default single
+        // barline).
+        if (measure.repeatStart) {
+          stave.setBegBarType(Barline.type.REPEAT_BEGIN);
+        }
+        if (measure.repeatEnd) {
+          stave.setEndBarType(Barline.type.REPEAT_END);
+        } else if (isLastLine && i === lineMeasures.length - 1) {
           stave.setEndBarType(Barline.type.END);
+        }
+        // Phase 28: Coda / Segno marks attached to the stave (VexFlow
+        // renders them as glyphs above the staff). Repetition.type
+        // values: CODA_LEFT / CODA_RIGHT / SEGNO_LEFT etc. Place above
+        // the first beat for either mark.
+        if (measure.mark === "coda") {
+          stave.addModifier(
+            new Repetition(Repetition.type.CODA_LEFT, -36, -22),
+          );
+        } else if (measure.mark === "segno") {
+          stave.addModifier(
+            new Repetition(Repetition.type.SEGNO_LEFT, -36, -22),
+          );
+        }
+        // Phase 28: D.C. al Fine / D.S. al Coda / To Coda / Fine — these
+        // render as text above the END barline of the measure they're
+        // anchored to. We use Repetition's text variants.
+        if (measure.instruction === "dc-al-fine") {
+          stave.addModifier(
+            new Repetition(Repetition.type.DC_AL_FINE, 0, -22),
+          );
+        } else if (measure.instruction === "ds-al-coda") {
+          stave.addModifier(
+            new Repetition(Repetition.type.DS_AL_CODA, 0, -22),
+          );
+        } else if (measure.instruction === "to-coda") {
+          stave.addModifier(
+            new Repetition(Repetition.type.TO_CODA, 0, -22),
+          );
+        } else if (measure.instruction === "fine") {
+          stave.addModifier(
+            new Repetition(Repetition.type.FINE, 0, -22),
+          );
         }
         stave.setContext(ctx).draw();
 
@@ -511,6 +601,20 @@ export function SheetSurface({
         // staff top so chord symbols sit closer to the staff.
         const chordY = staveY - 3;
 
+        // Phase 28: cache X bounds for the volta-rendering pass below.
+        measureXBounds[i] = { noteStartX, noteEndX };
+        // Phase 28: section label above the measure (left-aligned to
+        // the note area, bold serif). Renders above the chord row.
+        if (measure.sectionLabel) {
+          ctx.save();
+          ctx.setFont("Georgia, 'Times New Roman', serif", 12, "bold");
+          ctx.fillText(
+            measure.sectionLabel,
+            noteStartX,
+            lineY + 10,
+          );
+          ctx.restore();
+        }
         // Phase 25: capture this measure's rect for the click-on-staff
         // overlay. topLineY / bottomLineY are computed via VexFlow's
         // line-Y helper so pitch math stays accurate even if the stave
@@ -766,6 +870,38 @@ export function SheetSurface({
             _measureFirstIdx: i, // unused once translated
           });
         });
+      });
+
+      // Phase 28: volta-bracket render pass. After all measures of the
+      // line are drawn, walk the detected spans and draw a bracket per
+      // span just above the chord band. Engraving convention: a thin
+      // horizontal line with a downward tick on each side and a small
+      // number label ("1." or "2.") at the upper-left of the bracket.
+      voltaSpansForLine.forEach((span) => {
+        const startBounds = measureXBounds[span.startMeasureIdx];
+        const endBounds = measureXBounds[span.endMeasureIdx];
+        if (!startBounds || !endBounds) return;
+        const bracketY = lineY + 4;
+        const tickHeight = 12;
+        const xL = startBounds.noteStartX - 2;
+        const xR = endBounds.noteEndX + 2;
+        ctx.save();
+        ctx.beginPath();
+        // Left downward tick.
+        ctx.moveTo(xL, bracketY);
+        ctx.lineTo(xL, bracketY + tickHeight);
+        // Top bracket line.
+        ctx.moveTo(xL, bracketY);
+        ctx.lineTo(xR, bracketY);
+        // Right downward tick.
+        ctx.moveTo(xR, bracketY);
+        ctx.lineTo(xR, bracketY + tickHeight);
+        ctx.setLineWidth(1.3);
+        ctx.stroke();
+        // Number label.
+        ctx.setFont("Georgia, 'Times New Roman', serif", 11, "bold");
+        ctx.fillText(`${span.number}.`, xL + 4, bracketY + 11);
+        ctx.restore();
       });
     });
 

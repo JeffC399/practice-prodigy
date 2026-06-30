@@ -680,6 +680,31 @@ export default function SheetEditorPage() {
     updateSheet(id, { measures: next });
   };
 
+  /**
+   * Phase 28 — Apply a partial form-marking update to a single measure.
+   * Pass `undefined` for any field you want to clear (e.g. mark: undefined
+   * to remove the Coda symbol).
+   */
+  const updateMeasureForm = (
+    measureIdx: number,
+    update: Partial<
+      Pick<
+        (typeof sheet.measures)[number],
+        | "repeatStart"
+        | "repeatEnd"
+        | "volta"
+        | "mark"
+        | "instruction"
+        | "sectionLabel"
+      >
+    >,
+  ) => {
+    const next = sheet.measures.map((m, i) =>
+      i === measureIdx ? { ...m, ...update } : m,
+    );
+    updateSheet(id, { measures: next });
+  };
+
   // Phase 24c — Lyric editing helpers.
   /**
    * Commit the current draft to the note at `cursor` (or clear if
@@ -1807,6 +1832,119 @@ export default function SheetEditorPage() {
                     ? `Edit melody (${measure.melody.length})`
                     : "Add melody"}
                 </button>
+                {/* Phase 28 — Form markings: section label + repeat
+                    barlines + volta + mark + instruction. Always-visible
+                    compact row. */}
+                <div className="flex flex-col gap-1 rounded border border-border/30 bg-background/40 p-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                      Form
+                    </span>
+                    <input
+                      type="text"
+                      value={measure.sectionLabel ?? ""}
+                      onChange={(e) =>
+                        updateMeasureForm(mIdx, {
+                          sectionLabel: e.target.value || undefined,
+                        })
+                      }
+                      placeholder="Section (A / Verse / …)"
+                      className="flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-[10px]"
+                      aria-label={`Section label for measure ${mIdx + 1}`}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateMeasureForm(mIdx, {
+                          repeatStart: !measure.repeatStart,
+                        })
+                      }
+                      className={`rounded border px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
+                        measure.repeatStart
+                          ? "border-primary/60 bg-primary/15 text-primary"
+                          : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      }`}
+                      title="Repeat start (𝄆 at this measure)"
+                    >
+                      𝄆
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateMeasureForm(mIdx, {
+                          repeatEnd: !measure.repeatEnd,
+                        })
+                      }
+                      className={`rounded border px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
+                        measure.repeatEnd
+                          ? "border-primary/60 bg-primary/15 text-primary"
+                          : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      }`}
+                      title="Repeat end (𝄇 at this measure)"
+                    >
+                      𝄇
+                    </button>
+                    <select
+                      value={measure.volta ?? ""}
+                      onChange={(e) =>
+                        updateMeasureForm(mIdx, {
+                          volta: e.target.value
+                            ? Number(e.target.value)
+                            : undefined,
+                        })
+                      }
+                      className="rounded border border-border bg-background px-1 py-0.5 text-[10px]"
+                      aria-label="Volta (ending bracket)"
+                      title="Volta (1st / 2nd ending bracket)"
+                    >
+                      <option value="">— Volta —</option>
+                      <option value="1">1.</option>
+                      <option value="2">2.</option>
+                    </select>
+                    <select
+                      value={measure.mark ?? ""}
+                      onChange={(e) =>
+                        updateMeasureForm(mIdx, {
+                          mark: (e.target.value || undefined) as
+                            | "coda"
+                            | "segno"
+                            | undefined,
+                        })
+                      }
+                      className="rounded border border-border bg-background px-1 py-0.5 text-[10px]"
+                      aria-label="Mark"
+                      title="Mark symbol (Coda / Segno)"
+                    >
+                      <option value="">— Mark —</option>
+                      <option value="coda">Coda</option>
+                      <option value="segno">Segno</option>
+                    </select>
+                    <select
+                      value={measure.instruction ?? ""}
+                      onChange={(e) =>
+                        updateMeasureForm(mIdx, {
+                          instruction: (e.target.value || undefined) as
+                            | "dc-al-fine"
+                            | "ds-al-coda"
+                            | "to-coda"
+                            | "fine"
+                            | undefined,
+                        })
+                      }
+                      className="rounded border border-border bg-background px-1 py-0.5 text-[10px]"
+                      aria-label="Instruction"
+                      title="Instruction text (D.C. al Fine etc.)"
+                    >
+                      <option value="">— Instruction —</option>
+                      <option value="dc-al-fine">D.C. al Fine</option>
+                      <option value="ds-al-coda">D.S. al Coda</option>
+                      <option value="to-coda">To Coda</option>
+                      <option value="fine">Fine</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

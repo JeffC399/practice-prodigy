@@ -138,6 +138,34 @@ export type ChordBeat = {
 };
 
 /**
+ * Phase 28 — form-marking instruction text rendered above the staff
+ * (above the chord band). One per measure.
+ */
+export const SHEET_INSTRUCTIONS = [
+  "dc-al-fine",
+  "ds-al-coda",
+  "to-coda",
+  "fine",
+] as const;
+export type SheetInstruction = (typeof SHEET_INSTRUCTIONS)[number];
+
+export const INSTRUCTION_LABELS: Record<SheetInstruction, string> = {
+  "dc-al-fine": "D.C. al Fine",
+  "ds-al-coda": "D.S. al Coda",
+  "to-coda": "To Coda",
+  fine: "Fine",
+};
+
+/** Visual mark symbols (Coda 𝄌 / Segno 𝄋). Placed above a measure. */
+export const SHEET_MARKS = ["coda", "segno"] as const;
+export type SheetMark = (typeof SHEET_MARKS)[number];
+
+export const MARK_LABELS: Record<SheetMark, string> = {
+  coda: "Coda",
+  segno: "Segno",
+};
+
+/**
  * One measure of the sheet. Carries chords + an optional melody line.
  */
 export type SheetMeasure = {
@@ -159,6 +187,25 @@ export type SheetMeasure = {
    * partial bars later).
    */
   melody?: MelodyNote[];
+  /** Phase 28: 𝄆 at the start of this measure. */
+  repeatStart?: boolean;
+  /** Phase 28: 𝄇 at the end of this measure. */
+  repeatEnd?: boolean;
+  /**
+   * Phase 28: volta bracket number. Each measure that's part of a
+   * "1st ending" carries volta: 1; "2nd ending" carries volta: 2. The
+   * renderer draws a single bracket spanning the contiguous run.
+   */
+  volta?: number;
+  /** Phase 28: instruction text above the staff. */
+  instruction?: SheetInstruction;
+  /** Phase 28: visual mark (Coda or Segno) above the staff. */
+  mark?: SheetMark;
+  /**
+   * Phase 28: section label rendered above the first measure of a
+   * section (e.g. "A", "Verse", "Chorus", "Bridge", custom).
+   */
+  sectionLabel?: string;
 };
 
 /**
