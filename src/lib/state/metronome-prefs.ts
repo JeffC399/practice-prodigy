@@ -7,6 +7,7 @@ import {
   type MetronomeConfig,
   type MetronomeSound,
 } from "@/lib/audio/standalone-metronome";
+import { TIME_SIGNATURES } from "@/lib/state/practice-config";
 
 /**
  * User-defined time signature shape (broader than the built-in
@@ -74,6 +75,14 @@ type MetronomeStore = MetronomeConfig & {
   addCustomTimeSignature: (sig: CustomTimeSignature) => void;
   /** Remove a custom time signature by its numerator+denominator. */
   removeCustomTimeSignature: (sig: CustomTimeSignature) => void;
+  /**
+   * Defensive: if the active beatsPerMeasure/beatUnit doesn't match
+   * any built-in TIME_SIGNATURES entry OR any saved custom sig, snap
+   * back to the default 4/4. Catches orphan state from prior bugs
+   * where a custom sig was deleted without resetting the active
+   * config. Call once on mount.
+   */
+  validateActiveTimeSignature: () => void;
   /** Resize the accent pattern when beatsPerMeasure changes. */
   resyncAccentPattern: () => void;
   resetToDefaults: () => void;
@@ -172,6 +181,31 @@ export const useMetronomePrefs = create<MetronomeStore>()(
           }
           return {
             customTimeSignatures: filtered,
+            beatsPerMeasure: DEFAULT_METRONOME_CONFIG.beatsPerMeasure,
+            beatUnit: DEFAULT_METRONOME_CONFIG.beatUnit,
+            accentPattern: defaultAccentPattern(
+              DEFAULT_METRONOME_CONFIG.beatsPerMeasure,
+            ),
+          };
+        }),
+      validateActiveTimeSignature: () =>
+        set((state) => {
+          const isBuiltIn = (TIME_SIGNATURES as ReadonlyArray<{
+            beatsPerMeasure: number;
+            beatUnit: number;
+          }>).some(
+            (ts) =>
+              ts.beatsPerMeasure === state.beatsPerMeasure &&
+              ts.beatUnit === state.beatUnit,
+          );
+          const isCustom = state.customTimeSignatures.some(
+            (ts) =>
+              ts.beatsPerMeasure === state.beatsPerMeasure &&
+              ts.beatUnit === state.beatUnit,
+          );
+          if (isBuiltIn || isCustom) return {};
+          // Orphan state — active sig isn't in either list. Snap to default.
+          return {
             beatsPerMeasure: DEFAULT_METRONOME_CONFIG.beatsPerMeasure,
             beatUnit: DEFAULT_METRONOME_CONFIG.beatUnit,
             accentPattern: defaultAccentPattern(

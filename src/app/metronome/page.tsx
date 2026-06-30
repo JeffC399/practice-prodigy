@@ -86,6 +86,7 @@ export default function MetronomePage() {
     customTimeSignatures,
     addCustomTimeSignature,
     removeCustomTimeSignature,
+    validateActiveTimeSignature,
     resetToDefaults,
   } = prefs;
 
@@ -97,6 +98,16 @@ export default function MetronomePage() {
     isDroppedMeasure: false,
   });
   const [mounted, setMounted] = useState(false);
+  // One-shot orphan-state cleanup: if the persisted active time
+  // signature is neither a built-in nor a saved custom (e.g. a
+  // previously-saved custom was deleted under the old buggy
+  // behavior), snap back to default 4/4 so the dropdown, accent
+  // tiles, and engine all agree.
+  useEffect(() => {
+    validateActiveTimeSignature();
+    // Intentionally one-shot on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Inline custom-time-signature composer state. When `addingCustom`
   // is true, two inputs + a Save button surface under the time-sig
   // dropdown. The numerator is held as a STRING so the user can
