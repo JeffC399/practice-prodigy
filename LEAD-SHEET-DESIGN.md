@@ -301,5 +301,6 @@ Each hook is a small button in the lead sheet editor toolbar, surfacing in which
 ## 11. Status & Roadmap Position
 
 - **2026-06-29**: design pass complete (this doc). Module promoted from `bucket: "later"` / `status: "sketch"` to `bucket: "next"` / `status: "designed"` in `src/lib/modules/registry.ts`.
-- **Build window**: opens after Bass Arpeggios v1.x polish closes out (cloud sync + native wrappers). Realistically v2 milestone.
+- **2026-06-30**: build window opened ahead of schedule. Phases 24a (chord chart MVP), 24b (melody via VexFlow), 24b.2 (intra-measure ties + triplets), 24b.3 (pro engraving rework — continuous multi-measure paper surface), and **24c (lyrics — inline Sibelius-style typing on the staff)** have all shipped to production. Registry status flipped `designed → live`.
+- **Remaining slices to close out Basic Tier:** 24b.4 (cross-measure ties + slurs), 24d (form markings: repeats / endings / D.C. / D.S. / Coda / Segno / Fine), 24e (share via URL-encoded JSON), Slice 8 polish (library search / thumbnails / mobile tab-strip).
 - **Advanced Tier**: stays in `bucket: "later"` / `status: "sketch"` until basic ships and is in production use.

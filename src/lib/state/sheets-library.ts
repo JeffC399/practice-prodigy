@@ -65,7 +65,7 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
     {
       name: "practice-prodigy:sheets-library:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
         if (!persistedState || typeof persistedState !== "object") {
           return persistedState;
@@ -96,6 +96,11 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
         // to undefined / false — no data migration needed. Bump the
         // version for cleanliness.
         if (version <= 2) {
+          void next; // explicit no-op
+        }
+        // v3 → v4: Phase 24c added optional `lyric` on the note variant
+        // of MelodyNote. Optional + additive — no data migration needed.
+        if (version <= 3) {
           void next; // explicit no-op
         }
         return next;

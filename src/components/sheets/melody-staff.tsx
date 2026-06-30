@@ -29,9 +29,12 @@ import type {
  *   - Clef shown only on the first measure of a line (caller-driven)
  *   - Time signature shown only on the first measure (caller-driven)
  *
- * Deferred to 24b.2:
- *   - Ties (cross-measure note connection)
- *   - Triplets
+ * Phase 24c — lyrics. Single-measure preview renders any lyric
+ * syllables below the staff (matches the SheetSurface engraving so
+ * the in-modal preview is faithful to the final output).
+ *
+ * Deferred to 24b.4:
+ *   - Cross-measure ties (multi-measure render coordination required)
  *   - Slurs / phrasing
  *   - Multi-voice
  */
@@ -53,8 +56,10 @@ export type MelodyStaffProps = {
 
 /** Standard per-measure width when not overridden. */
 const DEFAULT_WIDTH = 180;
-const DEFAULT_HEIGHT = 90;
+const DEFAULT_HEIGHT = 120;
 const STAVE_TOP_PAD = 10;
+const STAVE_VISUAL_HEIGHT = 40;
+const LYRIC_OFFSET_BELOW_STAFF = 26;
 
 export function MelodyStaff({
   melody,
@@ -184,6 +189,46 @@ export function MelodyStaff({
     voice.draw(context, stave);
     tuplets.forEach((t) => t.setContext(context).draw());
     ties.forEach((t) => t.setContext(context).draw());
+
+    // Phase 24c — Lyrics. Render syllables below the staff. Matches
+    // the SheetSurface engraving so the modal preview is faithful.
+    const lyricY = STAVE_TOP_PAD + STAVE_VISUAL_HEIGHT + LYRIC_OFFSET_BELOW_STAFF;
+    context.save();
+    context.setFont("Georgia, 'Times New Roman', serif", 11, "");
+    const noteAbsoluteXs = staveNotes.map((sn) => sn.getAbsoluteX());
+    melody.forEach((mn, idx) => {
+      if (mn.kind !== "note") return;
+      if (!mn.lyric || mn.lyric.text.length === 0) return;
+      const noteX = noteAbsoluteXs[idx];
+      const displayText =
+        mn.lyric.continuation === "hyphen"
+          ? `${mn.lyric.text}-`
+          : mn.lyric.text;
+      const approxTextWidth = displayText.length * 6.2;
+      const textX = noteX - approxTextWidth / 2;
+      context.fillText(displayText, textX, lyricY);
+      if (mn.lyric.continuation === "underscore") {
+        let lastMelismaIdx = idx;
+        for (let q = idx + 1; q < melody.length; q++) {
+          const nq = melody[q];
+          if (nq.kind === "note") {
+            if (nq.lyric && nq.lyric.text.length > 0) break;
+            lastMelismaIdx = q;
+          }
+        }
+        if (lastMelismaIdx > idx) {
+          const lineStartX = textX + approxTextWidth + 2;
+          const lineEndX = noteAbsoluteXs[lastMelismaIdx] + 6;
+          const lineY = lyricY - 3;
+          context.beginPath();
+          context.moveTo(lineStartX, lineY);
+          context.lineTo(lineEndX, lineY);
+          context.setLineWidth(1.2);
+          context.stroke();
+        }
+      }
+    });
+    context.restore();
   }, [melody, timeSignature, showClef, showTimeSignature, width, height]);
 
   return (

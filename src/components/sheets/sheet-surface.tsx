@@ -23,7 +23,8 @@ import type {
 import { useUserPrefs } from "@/lib/state/user-prefs";
 
 /**
- * Lead-sheet "paper" surface (Phase 24b.3 visual rework).
+ * Lead-sheet "paper" surface (Phase 24b.3 visual rework, Phase 24c
+ * lyric pass).
  *
  * Renders a Sheet as a multi-line continuous staff on a light paper
  * background, following standard engraving conventions:
@@ -33,17 +34,54 @@ import { useUserPrefs } from "@/lib/state/user-prefs";
  *   - Chord symbols positioned directly above each measure
  *   - Measure-number label above the first measure of each line
  *   - Serif title block (title centered, style top-left, composer top-right)
+ *   - Phase 24c: lyric syllables rendered below the staff (serif).
+ *     Trailing dash for hyphen continuation; horizontal line for
+ *     underscore (melisma) continuation, within-measure scope.
  *
  * Replaces the previous one-measure-per-card grid. The single-measure
  * `<MelodyStaff>` component is retained for the in-modal preview where
  * a single-measure render is what the user is editing.
+ *
+ * Lyric editing layer: when `onLayout` is supplied, the renderer fires
+ * a callback after each draw with the pixel positions of every melody
+ * note in the sheet (in the paper's coordinate space). The editor uses
+ * these positions to overlay a floating lyric input and click regions.
  */
+
+/** One note's pixel position within the paper-div coord space. */
+export type SheetNotePosition = {
+  measureIdx: number;
+  noteIdx: number;
+  /** Center X of the note glyph within the paper div. */
+  x: number;
+  /** Center Y of the note (used for click-region centering). */
+  y: number;
+  /** Stave bottom Y — anchor for the lyric band below. */
+  staffBottomY: number;
+  /** Approximate hit-region width (px). */
+  width: number;
+  /** True for pitched notes; false for rests. */
+  isPitched: boolean;
+};
+
+export type SheetSurfaceLayout = {
+  positions: SheetNotePosition[];
+  paperWidth: number;
+  paperHeight: number;
+};
+
 export type SheetSurfaceProps = {
   sheet: Sheet;
   /** Width of the rendered paper in px. */
   width?: number;
   /** Measures per line — default 4 (jazz-lead-sheet convention). */
   measuresPerLine?: number;
+  /**
+   * Fires after each render with per-note pixel positions. Used by the
+   * editor's lyric-mode overlay to position click regions + the
+   * floating input. Undefined in pure-view contexts (view page, print).
+   */
+  onLayout?: (layout: SheetSurfaceLayout) => void;
 };
 
 const PAPER_PADDING_X = 64;
@@ -52,7 +90,10 @@ const LINE_GAP = 14;
 const CHORD_BAND_HEIGHT = 22;
 const STAVE_GAP_TOP = 6;
 const STAVE_HEIGHT = 78;
-const LINE_HEIGHT = CHORD_BAND_HEIGHT + STAVE_GAP_TOP + STAVE_HEIGHT;
+/** Phase 24c: extra vertical space below each staff for lyrics. */
+const LYRIC_BAND_HEIGHT = 22;
+const LINE_HEIGHT =
+  CHORD_BAND_HEIGHT + STAVE_GAP_TOP + STAVE_HEIGHT + LYRIC_BAND_HEIGHT;
 
 // Approximate overhead widths used to apportion measure note-areas
 // before VexFlow has drawn. Actual VexFlow widths may differ a few px;
@@ -61,6 +102,11 @@ const CLEF_PX = 30;
 const KEY_SIG_PX_PER_ACCIDENTAL = 9;
 const TIME_SIG_PX = 28;
 const MIN_MEASURE_NOTE_WIDTH = 110;
+
+/** Vertical offset from staff bottom to lyric text baseline. */
+const LYRIC_BASELINE_OFFSET = 16;
+/** Vertical extra padding for the click region below the staff. */
+const NOTE_HIT_REGION_HEIGHT = 44;
 
 const KEY_SPEC_MAJOR: Record<PitchClass, string> = {
   C: "C",
@@ -203,6 +249,7 @@ export function SheetSurface({
   sheet,
   width = 880,
   measuresPerLine = 4,
+  onLayout,
 }: SheetSurfaceProps) {
   const musicRef = useRef<HTMLDivElement>(null);
   const notationStyle = useUserPrefs((s) => s.notationDefault);
@@ -235,11 +282,18 @@ export function SheetSurface({
     renderer.resize(contentWidth, totalHeight);
     const ctx = renderer.getContext();
 
+    /** Local pixel positions in the music-ref coord space — translated
+     *  to paper-div space at the end before firing `onLayout`. */
+    const localPositions: Array<
+      SheetNotePosition & { _measureFirstIdx: number }
+    > = [];
+
     lines.forEach((lineMeasures, lineIdx) => {
       const showTimeSig = lineIdx === 0;
       const isLastLine = lineIdx === lines.length - 1;
       const lineY = lineIdx * (LINE_HEIGHT + LINE_GAP);
       const staveY = lineY + CHORD_BAND_HEIGHT + STAVE_GAP_TOP;
+      const staffBottomY = staveY + STAVE_HEIGHT * 0.55; // approx 5-line bottom
 
       const lineOverhead =
         CLEF_PX + keyAccidentalPx + (showTimeSig ? TIME_SIG_PX : 0);
@@ -261,6 +315,8 @@ export function SheetSurface({
         const staveWidth = isFirst
           ? lineOverhead + noteAreaPer
           : noteAreaPer;
+        // Original measure index in the sheet's flat measures array.
+        const measureIdx = lineIdx * measuresPerLine + i;
 
         const stave = new Stave(staveX, staveY, staveWidth);
         if (isFirst) {
@@ -332,13 +388,106 @@ export function SheetSurface({
         // Tuplets after beams so the bracket + numeral sit on top.
         tuplets.forEach((t) => t.setContext(ctx).draw());
         ties.forEach((t) => t.setContext(ctx).draw());
+
+        // Phase 24c — Lyrics. Render syllable text below the staff and
+        // collect note positions for the editor's interactive layer.
+        const lyricY = staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET;
+        ctx.save();
+        ctx.setFont("Georgia, 'Times New Roman', serif", 11, "");
+
+        const noteAbsoluteXs: number[] = staveNotes.map((sn) =>
+          sn.getAbsoluteX(),
+        );
+
+        // For each pitched note with a lyric, draw the text. For
+        // hyphen continuation: append a trailing dash. For underscore
+        // continuation: draw a horizontal line from this note's right
+        // edge to the right edge of the last melisma note within this
+        // measure (boundary = next note with its own lyric, or end of
+        // measure).
+        melody.forEach((mn, noteIdxInMeasure) => {
+          if (mn.kind !== "note") return;
+          if (!mn.lyric || mn.lyric.text.length === 0) return;
+          const noteX = noteAbsoluteXs[noteIdxInMeasure];
+          const displayText =
+            mn.lyric.continuation === "hyphen"
+              ? `${mn.lyric.text}-`
+              : mn.lyric.text;
+          // Crude width approximation — VexFlow's context doesn't
+          // expose measureText in a portable way across backends.
+          // 6.2px per char @ 11pt serif is a workable estimate.
+          const approxTextWidth = displayText.length * 6.2;
+          const textX = noteX - approxTextWidth / 2;
+          ctx.fillText(displayText, textX, lyricY);
+
+          if (mn.lyric.continuation === "underscore") {
+            // Find the next pitched note in this measure that has its
+            // own lyric (or end of measure). The line draws to the
+            // right edge of the LAST melisma note before that
+            // boundary.
+            let lastMelismaIdx = noteIdxInMeasure;
+            for (let q = noteIdxInMeasure + 1; q < melody.length; q++) {
+              const nq = melody[q];
+              if (nq.kind === "note") {
+                if (nq.lyric && nq.lyric.text.length > 0) break;
+                lastMelismaIdx = q;
+              }
+            }
+            if (lastMelismaIdx > noteIdxInMeasure) {
+              const lineStartX = textX + approxTextWidth + 2;
+              const lineEndX = noteAbsoluteXs[lastMelismaIdx] + 6;
+              const lineY = lyricY - 3;
+              ctx.beginPath();
+              ctx.moveTo(lineStartX, lineY);
+              ctx.lineTo(lineEndX, lineY);
+              ctx.setLineWidth(1.2);
+              ctx.stroke();
+            }
+          }
+        });
+        ctx.restore();
+
+        // Record positions for every note (pitched or rest) so the
+        // editor's cursor walk can map rest indices too if needed.
+        melody.forEach((mn, noteIdxInMeasure) => {
+          const noteX = noteAbsoluteXs[noteIdxInMeasure];
+          localPositions.push({
+            measureIdx,
+            noteIdx: noteIdxInMeasure,
+            x: noteX,
+            y: staveY + STAVE_HEIGHT / 2,
+            staffBottomY,
+            width: Math.max(28, noteAreaPer / Math.max(1, melody.length)),
+            isPitched: mn.kind === "note",
+            _measureFirstIdx: i, // unused once translated
+          });
+        });
       });
     });
-  }, [sheet, notationStyle, width, measuresPerLine]);
+
+    if (onLayout) {
+      const musicOffsetTop = musicRef.current.offsetTop;
+      const musicOffsetLeft = musicRef.current.offsetLeft;
+      const positions: SheetNotePosition[] = localPositions.map((p) => ({
+        measureIdx: p.measureIdx,
+        noteIdx: p.noteIdx,
+        x: p.x + musicOffsetLeft,
+        y: p.y + musicOffsetTop,
+        staffBottomY: p.staffBottomY + musicOffsetTop,
+        width: p.width,
+        isPitched: p.isPitched,
+      }));
+      onLayout({
+        positions,
+        paperWidth: width,
+        paperHeight: musicOffsetTop + totalHeight + PAPER_PADDING_Y,
+      });
+    }
+  }, [sheet, notationStyle, width, measuresPerLine, onLayout]);
 
   return (
     <div
-      className="sheet-paper mx-auto rounded-sm shadow-2xl print:shadow-none"
+      className="sheet-paper relative mx-auto rounded-sm shadow-2xl print:shadow-none"
       style={{
         background: "#fbfaf5",
         color: "#1a1a1a",
@@ -385,3 +534,9 @@ export function SheetSurface({
     </div>
   );
 }
+
+/** Hit-region height used by the editor's note click overlay. */
+export const SHEET_NOTE_HIT_REGION_HEIGHT = NOTE_HIT_REGION_HEIGHT;
+
+/** Approx Y offset from staffBottomY where the lyric input should center. */
+export const SHEET_LYRIC_INPUT_OFFSET = LYRIC_BASELINE_OFFSET + 6;

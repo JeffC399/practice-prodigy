@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, Eye, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Eye, Plus, Trash2, Type, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CHORD_QUALITIES,
   PITCH_CLASSES,
@@ -25,7 +25,21 @@ import {
   type SheetKeyMode,
 } from "@/lib/sheets/types";
 import { MelodyStaff } from "@/components/sheets/melody-staff";
-import { SheetSurface } from "@/components/sheets/sheet-surface";
+import {
+  SheetSurface,
+  type SheetSurfaceLayout,
+} from "@/components/sheets/sheet-surface";
+import { LyricOverlay } from "@/components/sheets/lyric-overlay";
+import {
+  firstLyricPosition,
+  formatLyricForInput,
+  getLyricAt,
+  nextLyricPosition,
+  parseLyricInput,
+  prevLyricPosition,
+  setLyricAt,
+  type LyricCursor,
+} from "@/lib/sheets/lyric-cursor";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -69,6 +83,42 @@ export default function SheetEditorPage() {
   const [editingMelodyIdx, setEditingMelodyIdx] = useState<number | null>(
     null,
   );
+  // Phase 24c — Lyric editing mode state. The toggle below the Preview
+  // header flips lyricMode on; when on, the SheetSurface emits per-note
+  // pixel positions via onLayout, and the LyricOverlay renders click
+  // regions + a floating input over the paper.
+  const [lyricMode, setLyricMode] = useState(false);
+  const [lyricCursor, setLyricCursor] = useState<LyricCursor | null>(null);
+  const [lyricDraft, setLyricDraft] = useState("");
+  const [lyricLayout, setLyricLayout] = useState<SheetSurfaceLayout | null>(
+    null,
+  );
+  const handleLayout = useCallback((layout: SheetSurfaceLayout) => {
+    setLyricLayout(layout);
+  }, []);
+  // Phase 24c — Lyric overlay click positions: pitched notes that are
+  // NOT tied followers. Computed here (above the early returns) so the
+  // useMemo hook order stays stable across renders.
+  const eligibleLyricPositions = useMemo(() => {
+    if (!sheet || !lyricLayout) return [];
+    return lyricLayout.positions.filter((p) => {
+      if (!p.isPitched) return false;
+      const melody = sheet.measures[p.measureIdx]?.melody ?? [];
+      const note = melody[p.noteIdx];
+      if (!note || note.kind !== "note") return false;
+      if (p.noteIdx === 0) return true;
+      const prev = melody[p.noteIdx - 1];
+      if (
+        prev &&
+        prev.kind === "note" &&
+        prev.tieToNext === true &&
+        prev.pitch === note.pitch
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [lyricLayout, sheet]);
 
   if (!mounted) {
     return (
@@ -155,6 +205,93 @@ export default function SheetEditorPage() {
       i === measureIdx ? { ...m, melody } : m,
     );
     updateSheet(id, { measures: next });
+  };
+
+  // Phase 24c — Lyric editing helpers.
+  /**
+   * Commit the current draft to the note at `cursor` (or clear if
+   * the draft is empty). Returns true if a write happened.
+   */
+  const commitDraftAt = (cursor: LyricCursor, draft: string): boolean => {
+    const parsed = parseLyricInput(draft);
+    const existing = getLyricAt(sheet, cursor);
+    const same =
+      (parsed === null && existing === undefined) ||
+      (parsed !== null &&
+        existing !== undefined &&
+        parsed.text === existing.text &&
+        parsed.continuation === existing.continuation);
+    if (same) return false;
+    const measures = setLyricAt(sheet, cursor, parsed);
+    updateSheet(id, { measures });
+    return true;
+  };
+
+  const enterLyricMode = () => {
+    const first = firstLyricPosition(sheet);
+    if (!first) {
+      // No pitched notes — nothing to lyric-edit. Still flip mode on so
+      // the overlay shows the (empty) state; user-facing helper text
+      // covers this case.
+      setLyricMode(true);
+      setLyricCursor(null);
+      setLyricDraft("");
+      return;
+    }
+    setLyricMode(true);
+    setLyricCursor(first);
+    const existing = getLyricAt(sheet, first);
+    setLyricDraft(existing ? formatLyricForInput(existing) : "");
+  };
+
+  const exitLyricMode = () => {
+    if (lyricCursor) commitDraftAt(lyricCursor, lyricDraft);
+    setLyricMode(false);
+    setLyricCursor(null);
+    setLyricDraft("");
+  };
+
+  const moveCursorTo = (next: LyricCursor) => {
+    if (lyricCursor) commitDraftAt(lyricCursor, lyricDraft);
+    setLyricCursor(next);
+    // Read existing AFTER potential write. Use the freshest sheet via
+    // the store getState() since `sheet` here is the stale React prop.
+    const fresh = useSheetsLibrary
+      .getState()
+      .sheets.find((s) => s.id === id);
+    const existing = fresh ? getLyricAt(fresh, next) : undefined;
+    setLyricDraft(existing ? formatLyricForInput(existing) : "");
+  };
+
+  const onLyricCommitAdvance = () => {
+    if (!lyricCursor) return;
+    commitDraftAt(lyricCursor, lyricDraft);
+    const fresh = useSheetsLibrary
+      .getState()
+      .sheets.find((s) => s.id === id);
+    if (!fresh) return;
+    const next = nextLyricPosition(fresh, lyricCursor);
+    if (!next) {
+      // End of sheet — exit lyric mode after committing.
+      setLyricMode(false);
+      setLyricCursor(null);
+      setLyricDraft("");
+      return;
+    }
+    setLyricCursor(next);
+    const existing = getLyricAt(fresh, next);
+    setLyricDraft(existing ? formatLyricForInput(existing) : "");
+  };
+
+  const onLyricRetreat = () => {
+    if (!lyricCursor) return;
+    const prev = prevLyricPosition(sheet, lyricCursor);
+    if (!prev) return; // already at start — no-op
+    // Don't auto-commit on retreat (the draft is empty by definition
+    // since backspace-on-empty is what triggers this).
+    setLyricCursor(prev);
+    const existing = getLyricAt(sheet, prev);
+    setLyricDraft(existing ? formatLyricForInput(existing) : "");
   };
 
   return (
@@ -290,12 +427,85 @@ export default function SheetEditorPage() {
         </section>
 
         {/* Live preview — same engraving as the View / Print page so the
-            user sees their work in its final form as they edit. */}
+            user sees their work in its final form as they edit.
+            Phase 24c: "Edit lyrics" toggle turns the preview into an
+            interactive lyric authoring surface — click a note, type the
+            syllable, space to advance, hyphen for continuation,
+            underscore for melisma, esc to exit. */}
         <section className="flex flex-col gap-2">
-          <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-            Preview
-          </h2>
-          <SheetSurface sheet={sheet} width={720} />
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Preview
+            </h2>
+            <button
+              type="button"
+              onClick={() =>
+                lyricMode ? exitLyricMode() : enterLyricMode()
+              }
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                lyricMode
+                  ? "border-amber-500/60 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                  : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+              title={
+                lyricMode
+                  ? "Exit lyric editing"
+                  : "Click notes and type lyrics under the staff"
+              }
+            >
+              <Type className="h-3.5 w-3.5" />
+              {lyricMode ? "Done editing lyrics" : "Edit lyrics"}
+            </button>
+          </div>
+          {lyricMode && (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-muted-foreground">
+              <span className="font-medium text-amber-500">
+                Lyric mode.
+              </span>{" "}
+              Click any note to place the cursor. Type a syllable,{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                space
+              </kbd>{" "}
+              to advance,{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                -
+              </kbd>{" "}
+              for syllable continuation (e.g. <em>love-</em> <em>ly</em>),{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                _
+              </kbd>{" "}
+              for melisma (one syllable across multiple notes),{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                esc
+              </kbd>{" "}
+              to exit. Rests + tied follower notes are skipped.
+            </p>
+          )}
+          <div className="relative" style={{ width: 720 }}>
+            <SheetSurface
+              sheet={sheet}
+              width={720}
+              onLayout={lyricMode ? handleLayout : undefined}
+            />
+            {lyricMode && (
+              <LyricOverlay
+                positions={eligibleLyricPositions}
+                cursor={lyricCursor}
+                draft={lyricDraft}
+                onDraftChange={setLyricDraft}
+                onSetCursor={moveCursorTo}
+                onCommitAdvance={onLyricCommitAdvance}
+                onRetreat={onLyricRetreat}
+                onExit={exitLyricMode}
+              />
+            )}
+          </div>
+          {lyricMode && eligibleLyricPositions.length === 0 && (
+            <p className="rounded-md border border-border bg-card/40 px-3 py-2 text-[11px] text-muted-foreground">
+              No pitched notes to lyric-edit yet. Add a melody to a
+              measure below, then re-enter lyric mode.
+            </p>
+          )}
         </section>
 
         {/* Measures */}

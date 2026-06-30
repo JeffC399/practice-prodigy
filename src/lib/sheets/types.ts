@@ -4,10 +4,12 @@ import type { Chord, PitchClass } from "@/lib/music/chord";
  * Lead-sheet types.
  *
  * Phase 24a shipped chord-chart only. Phase 24b adds melody (notes +
- * rests) per measure, rendered via VexFlow. Subsequent phases:
- *   24c: Lyrics
- *   24d: Form markings (repeats, endings, D.C., D.S., Coda, Segno)
- *   24e: Share via URL-encoded JSON
+ * rests) per measure, rendered via VexFlow. Phase 24c (this slice)
+ * adds optional per-note lyric syllables with hyphen / underscore
+ * continuation. Subsequent phases:
+ *   24b.4: Cross-measure ties + slurs
+ *   24d:  Form markings (repeats, endings, D.C., D.S., Coda, Segno)
+ *   24e:  Share via URL-encoded JSON
  */
 
 /** Scale / mode for the key indicator. */
@@ -56,6 +58,30 @@ export const MELODY_DURATION_BEATS: Record<MelodyDuration, number> = {
  */
 export type MelodyPitch = string;
 
+/**
+ * Phase 24c — a lyric syllable attached to a pitched note.
+ *
+ * `text` is the syllable as the user typed it. The renderer strips
+ * any trailing continuation marker before drawing — the marker is
+ * captured separately so the engraving can render the standard
+ * convention (trailing dash for "love-", a horizontal line for
+ * the melisma "ah_").
+ *
+ * Continuation semantics:
+ *   - "none":       terminal syllable (default for single-word notes
+ *                   and the last syllable of a hyphenated word).
+ *   - "hyphen":     this syllable continues into the next pitched
+ *                   note's syllable (e.g. "love" then "ly").
+ *                   Rendered with a trailing dash.
+ *   - "underscore": melisma — this syllable extends across the next
+ *                   pitched note(s) until the next syllable or end
+ *                   of melody. Rendered with a horizontal line.
+ */
+export type LyricSyllable = {
+  text: string;
+  continuation: "none" | "hyphen" | "underscore";
+};
+
 export type MelodyNote =
   | {
       kind: "note";
@@ -66,7 +92,7 @@ export type MelodyNote =
       /**
        * Phase 24b.2: tie this note to the next note. v0.1 only renders
        * the tie when both notes are within the same measure. Cross-
-       * measure ties land in Phase 24b.3 (multi-measure render
+       * measure ties land in Phase 24b.4 (multi-measure render
        * coordination required).
        */
       tieToNext?: boolean;
@@ -78,6 +104,14 @@ export type MelodyNote =
        * 3); quintuplets / sextuplets land later.
        */
       tupletGroup?: string;
+      /**
+       * Phase 24c: optional lyric syllable attached to this note.
+       * Only pitched notes carry lyrics — rests skip the cursor and
+       * never hold a syllable. Tied "follower" notes (the second-
+       * and-later notes of a tied chain) also skip the cursor and
+       * inherit the previous note's syllable visually via the tie.
+       */
+      lyric?: LyricSyllable;
     }
   | {
       kind: "rest";
