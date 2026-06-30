@@ -4,10 +4,8 @@ import { ArrowLeft, Pencil, Printer } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { renderChord } from "@/lib/music/render-chord";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
-import { useUserPrefs } from "@/lib/state/user-prefs";
-import { MelodyStaff } from "@/components/sheets/melody-staff";
+import { SheetSurface } from "@/components/sheets/sheet-surface";
 
 /**
  * /sheets/[id] — read-only display + print view (Phase 24a MVP).
@@ -22,7 +20,6 @@ export default function SheetViewPage() {
   const id = params.id;
   const sheet = useSheetsLibrary((s) => s.sheets.find((x) => x.id === id));
   const markSheetOpened = useSheetsLibrary((s) => s.markSheetOpened);
-  const notationStyle = useUserPrefs((s) => s.notationDefault);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -60,7 +57,7 @@ export default function SheetViewPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-8">
-      <div className="flex w-full max-w-3xl flex-col gap-6">
+      <div className="flex w-full max-w-5xl flex-col gap-6">
         {/* Toolbar — hidden in print */}
         <div className="flex items-center justify-between print:hidden">
           <Link
@@ -89,94 +86,18 @@ export default function SheetViewPage() {
           </div>
         </div>
 
-        {/* The printable sheet itself */}
-        <article className="flex flex-col gap-6 rounded-xl border border-border bg-card/40 px-8 py-10 print:border-0 print:bg-transparent print:p-0">
-          {/* Title block */}
-          <header className="flex flex-col items-center gap-2 text-center">
-            <h1 className="text-3xl font-semibold tracking-tight">
-              {sheet.title || "Untitled"}
-            </h1>
-            {sheet.composer && (
-              <p className="text-sm text-muted-foreground italic">
-                {sheet.composer}
-              </p>
-            )}
-            <div className="flex flex-wrap items-center justify-center gap-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              {sheet.style && <span>{sheet.style}</span>}
-              {sheet.bpm && <span>♩ = {sheet.bpm}</span>}
-              <span>
-                {sheet.keyTonic} {sheet.keyMode}
-              </span>
-              <span>
-                {sheet.timeSignature.beatsPerMeasure}/
-                {sheet.timeSignature.beatUnit}
-              </span>
-            </div>
-          </header>
-
-          {/* Measure grid — 2 measures per line for melody breathing
-              room. Each measure shows the chord(s) on top + the
-              melody staff below. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {sheet.measures.map((measure, mIdx) => {
-              const hasMelody = (measure.melody?.length ?? 0) > 0;
-              return (
-                <div
-                  key={measure.id}
-                  className="relative flex flex-col gap-1 rounded border border-foreground/30 px-2 py-2"
-                >
-                  <span className="absolute -top-2 left-2 bg-card px-1 font-mono text-[9px] text-muted-foreground/60 print:bg-transparent">
-                    {mIdx + 1}
-                  </span>
-                  <div className="flex min-h-[1.75rem] items-center justify-center">
-                    {measure.chords.length === 0 ? (
-                      <span className="font-mono text-xs text-muted-foreground/40">
-                        —
-                      </span>
-                    ) : measure.chords.length === 1 ? (
-                      <span className="font-mono text-lg font-semibold text-foreground">
-                        {renderChord(measure.chords[0], notationStyle)}
-                      </span>
-                    ) : (
-                      <div className="flex w-full items-center justify-around gap-2">
-                        {measure.chords.map((chord, cIdx) => (
-                          <span
-                            key={cIdx}
-                            className="font-mono text-base font-semibold text-foreground"
-                          >
-                            {renderChord(chord, notationStyle)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {hasMelody && (
-                    <div className="flex justify-center">
-                      <MelodyStaff
-                        melody={measure.melody ?? []}
-                        timeSignature={sheet.timeSignature}
-                        showClef={mIdx === 0}
-                        showTimeSignature={mIdx === 0}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Footer (printable) */}
-          <footer className="flex items-center justify-end font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Practice Prodigy
-          </footer>
-        </article>
+        {/* The printable sheet itself — light paper surface with
+            continuous staff engraving (Phase 24b.3 rework). */}
+        <div className="sheet-print-wrap">
+          <SheetSurface sheet={sheet} />
+        </div>
       </div>
 
       {/* @media print rules: hide chrome, ensure clean page */}
       <style jsx global>{`
         @media print {
           @page {
-            margin: 0.75in;
+            margin: 0.5in;
           }
           body {
             background: white !important;
@@ -184,6 +105,13 @@ export default function SheetViewPage() {
           }
           .print\\:hidden {
             display: none !important;
+          }
+          .sheet-print-wrap {
+            margin: 0 !important;
+          }
+          .sheet-paper {
+            width: 100% !important;
+            box-shadow: none !important;
           }
         }
       `}</style>

@@ -25,6 +25,7 @@ import {
   type SheetKeyMode,
 } from "@/lib/sheets/types";
 import { MelodyStaff } from "@/components/sheets/melody-staff";
+import { SheetSurface } from "@/components/sheets/sheet-surface";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -286,6 +287,15 @@ export default function SheetEditorPage() {
               </select>
             </label>
           </div>
+        </section>
+
+        {/* Live preview — same engraving as the View / Print page so the
+            user sees their work in its final form as they edit. */}
+        <section className="flex flex-col gap-2">
+          <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Preview
+          </h2>
+          <SheetSurface sheet={sheet} width={720} />
         </section>
 
         {/* Measures */}
