@@ -534,19 +534,52 @@ export function SheetSurface({
           // Phase 25.2: render each ChordBeat at its beat-derived X
           // position. Sorted by beat so visual order matches musical
           // order. Slash chord bass override renders as "Chord/Bass".
+          // Phase 26.1: two-pass layout to avoid horizontal collision
+          // on consecutive-beat chords (e.g. dense bossa-nova bars
+          // with a different chord on every quarter). Pass 1 collects
+          // wanted X + measured width per chord; pass 2 walks left-to-
+          // right and shifts later chords right whenever they would
+          // overlap the previous one's right edge. Engraving trade-off:
+          // chords drift slightly off-beat in service of readability —
+          // same convention used by lyrics, same MIN_CHORD_GAP semantic.
           const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
           const measureWidth = noteEndX - noteStartX;
           const sortedChords = [...measure.chords].sort(
             (a, b) => a.beat - b.beat,
           );
-          sortedChords.forEach((cb) => {
+          type ChordLayout = {
+            text: string;
+            leftX: number;
+            width: number;
+          };
+          const chordLayouts: ChordLayout[] = sortedChords.map((cb) => {
             const fraction =
-              Math.max(0, Math.min(beatsPerMeasure - 0.001, cb.beat - 1)) /
-              beatsPerMeasure;
+              Math.max(
+                0,
+                Math.min(beatsPerMeasure - 0.001, cb.beat - 1),
+              ) / beatsPerMeasure;
             const x = noteStartX + fraction * measureWidth;
             const base = renderChord(cb.chord, notationStyle);
             const text = cb.bass ? `${base}/${cb.bass}` : base;
-            ctx.fillText(text, x, chordY);
+            const measured = ctx.measureText
+              ? ctx.measureText(text)
+              : null;
+            const width =
+              measured && typeof measured.width === "number"
+                ? measured.width
+                : text.length * (chordSize * 0.55);
+            return { text, leftX: x, width };
+          });
+          const MIN_CHORD_GAP = 6;
+          let prevRight = -Infinity;
+          chordLayouts.forEach((cl) => {
+            if (cl.leftX < prevRight + MIN_CHORD_GAP) {
+              cl.leftX = prevRight + MIN_CHORD_GAP;
+            }
+            prevRight = cl.leftX + cl.width;
+          });
+          chordLayouts.forEach((cl) => {
+            ctx.fillText(cl.text, cl.leftX, chordY);
           });
           ctx.restore();
         }
