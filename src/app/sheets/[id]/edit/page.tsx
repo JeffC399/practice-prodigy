@@ -1253,6 +1253,21 @@ export default function SheetEditorPage() {
                 placeholder="e.g. Charlie Parker"
               />
             </label>
+            {/* Phase 27.1.2 — Lyricist (optional). When set with composer,
+                the title block renders "Music by ___" / "Words by ___".
+                Same person in both fields → "Music and Lyrics by ___". */}
+            <label className="flex flex-col gap-1 text-xs">
+              Lyricist
+              <input
+                type="text"
+                value={sheet.lyricist ?? ""}
+                onChange={(e) =>
+                  updateMeta("lyricist", e.target.value || undefined)
+                }
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                placeholder="If different from composer"
+              />
+            </label>
             <label className="flex flex-col gap-1 text-xs">
               Style
               <input

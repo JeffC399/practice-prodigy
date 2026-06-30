@@ -861,11 +861,53 @@ export function SheetSurface({
               )}
             </div>
             <div className="flex flex-col items-end">
-              {sheet.composer && (
-                <span className={fontStyle === "handwritten" ? "" : "italic"}>
-                  {sheet.composer}
-                </span>
-              )}
+              {/* Phase 27.1.2 — smart composer / lyricist credit.
+                  - Both set, same person → "Music and Lyrics by X"
+                  - Both set, different → "Music by X" / "Words by Y"
+                  - Only one → plain name
+                  - Neither → nothing
+                  Italic in standard engraving; drops italic in
+                  handwritten mode (synthesized italic on Patrick
+                  Hand reads awkwardly).
+              */}
+              {(() => {
+                const composer = sheet.composer?.trim();
+                const lyricist = sheet.lyricist?.trim();
+                const italicClass =
+                  fontStyle === "handwritten" ? "" : "italic";
+                if (composer && lyricist) {
+                  if (
+                    composer.toLowerCase() === lyricist.toLowerCase()
+                  ) {
+                    return (
+                      <span className={italicClass}>
+                        Music and Lyrics by {composer}
+                      </span>
+                    );
+                  }
+                  return (
+                    <>
+                      <span className={italicClass}>
+                        Music by {composer}
+                      </span>
+                      <span className={italicClass}>
+                        Words by {lyricist}
+                      </span>
+                    </>
+                  );
+                }
+                if (composer) {
+                  return (
+                    <span className={italicClass}>{composer}</span>
+                  );
+                }
+                if (lyricist) {
+                  return (
+                    <span className={italicClass}>{lyricist}</span>
+                  );
+                }
+                return null;
+              })()}
               <span className="text-xs text-black/50">
                 {sheet.keyTonic} {sheet.keyMode}
               </span>

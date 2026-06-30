@@ -251,6 +251,13 @@ export type Sheet = {
   title: string;
   /** Composer name (often "Trad." or a band name). */
   composer?: string;
+  /**
+   * Phase 27.1.2 — Lyricist credit. When composer + lyricist are both
+   * set and distinct, the renderer shows "Music by ___" / "Words by ___"
+   * stacked. When they're the same person, it shows "Music and Lyrics
+   * by ___". When only one is set, plain name.
+   */
+  lyricist?: string;
   /** Free-text style indicator. */
   style?: SheetStyle;
   /** Optional explicit tempo. */
