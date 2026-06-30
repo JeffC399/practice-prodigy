@@ -317,21 +317,22 @@ type SoundVoices = {
 /**
  * Per-sound loudness trim in dB. Calibrated by ear so each preset
  * sounds roughly the same perceived loudness at the same master
- * volume. Necessary because raw dB doesn't map to perceived loudness:
- * pure sines (electronic) read quieter than equivalent triangles
- * (tonal), MembraneSynth + bandpass (wood) is naturally percussive
- * and reads loud, filtered noise (stick) is harsh and reads loud.
+ * volume.
  *
- * Reference point: tonal click at -8 dB is the baseline; others are
- * trimmed relative to that. Tune these values if a particular sound
- * still pokes out — they're the single tuning knob for loudness
- * normalization.
+ * Reference: ELECTRONIC at -4 dB is the target loudness — pure sine
+ * with simple envelope, no boost needed. The other three sources sit
+ * within a couple dB of that target. Previous calibration over-cut
+ * them all so they were noticeably quieter than electronic; this pass
+ * brings them up to match.
+ *
+ * Tune these values if a particular sound still pokes out — they're
+ * the single tuning knob for loudness normalization.
  */
 const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
-  tonal: -8,
-  wood: -16, // MembraneSynth is the hottest source — biggest trim
-  electronic: -4, // Pure sine is the quietest perceptually — boost
-  stick: -14, // Filtered noise reads loud + harsh — significant trim
+  tonal: -4, // Triangle wave, moderate harmonic content
+  wood: -6, // MembraneSynth + narrow bandpass — slight trim
+  electronic: -4, // Reference target
+  stick: -8, // Filtered noise — small trim to tame the harshness
 };
 
 /**

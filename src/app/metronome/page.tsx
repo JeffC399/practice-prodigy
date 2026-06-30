@@ -4,9 +4,11 @@ import { motion } from "framer-motion";
 import {
   Pause,
   Play,
+  Plus,
   RotateCcw,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,6 +19,8 @@ import {
   type MetronomeState,
 } from "@/lib/audio/standalone-metronome";
 import {
+  CUSTOM_TIME_SIGNATURE_DENOMINATORS,
+  CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX,
   METRONOME_VISUAL_STYLE_LABELS,
   METRONOME_VISUAL_STYLES,
   useMetronomePrefs,
@@ -79,6 +83,9 @@ export default function MetronomePage() {
     setTempoRamp,
     setDropEveryNthMeasure,
     setVisualStyle,
+    customTimeSignatures,
+    addCustomTimeSignature,
+    removeCustomTimeSignature,
     resetToDefaults,
   } = prefs;
 
@@ -90,6 +97,12 @@ export default function MetronomePage() {
     isDroppedMeasure: false,
   });
   const [mounted, setMounted] = useState(false);
+  // Inline custom-time-signature composer state. When `addingCustom`
+  // is true, two number inputs + a Save button surface under the
+  // time-sig dropdown.
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [customNumerator, setCustomNumerator] = useState(5);
+  const [customDenominator, setCustomDenominator] = useState<number>(8);
   useEffect(() => {
     // SSR-hydration guard: persisted Zustand state isn't available
     // until after mount, so we defer the first real render to avoid
@@ -354,27 +367,155 @@ export default function MetronomePage() {
             Meter & subdivisions
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <label className="flex flex-col gap-1.5 text-sm">
-              Time signature
-              <select
-                value={`${beatsPerMeasure}/${beatUnit}`}
-                onChange={(e) => {
-                  const [b, u] = e.target.value.split("/").map(Number);
-                  setBeatsPerMeasure(b);
-                  setBeatUnit(u);
-                }}
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-              >
-                {TIME_SIGNATURES.map((ts) => (
-                  <option
-                    key={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
-                    value={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
-                  >
-                    {ts.beatsPerMeasure}/{ts.beatUnit}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex flex-col gap-1.5 text-sm sm:col-span-1">
+              <label htmlFor="metronome-time-sig">Time signature</label>
+              {/* Built-in + user-saved custom sigs share the dropdown.
+                  Custom entries get a "(custom)" suffix so they're
+                  visually distinct. The "+ Custom" button below
+                  toggles an inline composer for adding new ones. */}
+              <div className="flex items-center gap-2">
+                <select
+                  id="metronome-time-sig"
+                  value={`${beatsPerMeasure}/${beatUnit}`}
+                  onChange={(e) => {
+                    const [b, u] = e.target.value.split("/").map(Number);
+                    setBeatsPerMeasure(b);
+                    setBeatUnit(u);
+                  }}
+                  className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                >
+                  {TIME_SIGNATURES.map((ts) => (
+                    <option
+                      key={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                      value={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                    >
+                      {ts.beatsPerMeasure}/{ts.beatUnit}
+                    </option>
+                  ))}
+                  {customTimeSignatures.length > 0 && (
+                    <optgroup label="Your custom">
+                      {customTimeSignatures.map((ts) => (
+                        <option
+                          key={`c-${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                          value={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                        >
+                          {ts.beatsPerMeasure}/{ts.beatUnit} (custom)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+              {/* Add-custom inline form */}
+              {addingCustom ? (
+                <div className="flex flex-col gap-1.5 rounded-md border border-primary/30 bg-primary/5 p-2">
+                  <span className="text-[11px] font-medium text-primary">
+                    New custom time signature
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      max={CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX}
+                      value={customNumerator}
+                      onChange={(e) =>
+                        setCustomNumerator(
+                          Math.max(
+                            1,
+                            Math.min(
+                              CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX,
+                              Number(e.target.value) || 1,
+                            ),
+                          ),
+                        )
+                      }
+                      className="w-14 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+                      aria-label="Numerator"
+                    />
+                    <span className="text-muted-foreground">/</span>
+                    <select
+                      value={customDenominator}
+                      onChange={(e) =>
+                        setCustomDenominator(Number(e.target.value))
+                      }
+                      className="rounded border border-border bg-background px-2 py-1 text-sm"
+                      aria-label="Denominator"
+                    >
+                      {CUSTOM_TIME_SIGNATURE_DENOMINATORS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sig = {
+                          beatsPerMeasure: customNumerator,
+                          beatUnit: customDenominator,
+                        };
+                        addCustomTimeSignature(sig);
+                        setBeatsPerMeasure(customNumerator);
+                        setBeatUnit(customDenominator);
+                        setAddingCustom(false);
+                      }}
+                      className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                    >
+                      Save & use
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddingCustom(false)}
+                      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddingCustom(true)}
+                  className="inline-flex items-center gap-1 self-start rounded-md border border-dashed border-border bg-background/30 px-2 py-1 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add custom time signature
+                </button>
+              )}
+              {/* Manage saved customs — small inline list with delete affordance. */}
+              {customTimeSignatures.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                    Saved:
+                  </span>
+                  {customTimeSignatures.map((ts) => {
+                    const isActive =
+                      ts.beatsPerMeasure === beatsPerMeasure &&
+                      ts.beatUnit === beatUnit;
+                    return (
+                      <span
+                        key={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                        className={`inline-flex items-center gap-1 rounded-full border pl-2 pr-0.5 py-0 text-[10px] font-mono ${
+                          isActive
+                            ? "border-primary/50 bg-primary/10 text-primary"
+                            : "border-border bg-background/30 text-muted-foreground"
+                        }`}
+                      >
+                        {ts.beatsPerMeasure}/{ts.beatUnit}
+                        <button
+                          type="button"
+                          onClick={() => removeCustomTimeSignature(ts)}
+                          className="rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors"
+                          aria-label={`Remove custom ${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <label className="flex flex-col gap-1.5 text-sm sm:col-span-2">
               Subdivisions per beat
               <div className="flex gap-1.5">

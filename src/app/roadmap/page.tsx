@@ -34,7 +34,7 @@ export default function RoadmapPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-12">
-      <div className="flex w-full max-w-5xl flex-col gap-10">
+      <div className="flex w-full max-w-3xl flex-col gap-10">
         <div className="flex flex-col gap-3">
           <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Roadmap

@@ -9,6 +9,22 @@ import {
 } from "@/lib/audio/standalone-metronome";
 
 /**
+ * User-defined time signature shape (broader than the built-in
+ * readonly tuple type). Any numerator + standard denominator.
+ */
+export type CustomTimeSignature = {
+  beatsPerMeasure: number;
+  beatUnit: number;
+};
+
+/** Denominators we allow for custom time sigs (standard note values). */
+export const CUSTOM_TIME_SIGNATURE_DENOMINATORS = [
+  1, 2, 4, 8, 16, 32,
+] as const;
+
+export const CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX = 32;
+
+/**
  * Persistent user preferences for the standalone Metronome module.
  *
  * Holds the user's last-used config so the metronome page lands ready
@@ -33,6 +49,12 @@ export const METRONOME_VISUAL_STYLE_LABELS: Record<
 
 type MetronomeStore = MetronomeConfig & {
   visualStyle: MetronomeVisualStyle;
+  /**
+   * User-saved custom time signatures (numerator + denominator).
+   * Surfaced in the metronome time-signature picker alongside the
+   * built-in TIME_SIGNATURES from practice-config.
+   */
+  customTimeSignatures: CustomTimeSignature[];
   setBpm: (bpm: number) => void;
   setBeatsPerMeasure: (n: number) => void;
   setBeatUnit: (n: number) => void;
@@ -48,6 +70,10 @@ type MetronomeStore = MetronomeConfig & {
     update: Partial<MetronomeConfig["tempoRamp"]>,
   ) => void;
   setDropEveryNthMeasure: (n: number) => void;
+  /** Add a custom time signature (no-op if a duplicate already exists). */
+  addCustomTimeSignature: (sig: CustomTimeSignature) => void;
+  /** Remove a custom time signature by its numerator+denominator. */
+  removeCustomTimeSignature: (sig: CustomTimeSignature) => void;
   /** Resize the accent pattern when beatsPerMeasure changes. */
   resyncAccentPattern: () => void;
   resetToDefaults: () => void;
@@ -70,6 +96,7 @@ export const useMetronomePrefs = create<MetronomeStore>()(
     (set, get) => ({
       ...DEFAULT_METRONOME_CONFIG,
       visualStyle: "dots",
+      customTimeSignatures: [],
       setBpm: (bpm) => set({ bpm: clamp(Math.round(bpm), MIN_BPM, MAX_BPM) }),
       setBeatsPerMeasure: (beatsPerMeasure) =>
         set({
@@ -104,16 +131,42 @@ export const useMetronomePrefs = create<MetronomeStore>()(
         })),
       setDropEveryNthMeasure: (n) =>
         set({ dropEveryNthMeasure: clamp(Math.round(n), 0, 16) }),
+      addCustomTimeSignature: (sig) =>
+        set((state) => {
+          const exists = state.customTimeSignatures.some(
+            (s) =>
+              s.beatsPerMeasure === sig.beatsPerMeasure &&
+              s.beatUnit === sig.beatUnit,
+          );
+          if (exists) return {};
+          return {
+            customTimeSignatures: [...state.customTimeSignatures, sig],
+          };
+        }),
+      removeCustomTimeSignature: (sig) =>
+        set((state) => ({
+          customTimeSignatures: state.customTimeSignatures.filter(
+            (s) =>
+              !(
+                s.beatsPerMeasure === sig.beatsPerMeasure &&
+                s.beatUnit === sig.beatUnit
+              ),
+          ),
+        })),
       resyncAccentPattern: () => {
         const state = get();
         if (state.accentPattern.length === state.beatsPerMeasure) return;
         set({ accentPattern: defaultAccentPattern(state.beatsPerMeasure) });
       },
       resetToDefaults: () =>
-        set({
+        set((state) => ({
           ...DEFAULT_METRONOME_CONFIG,
           visualStyle: "dots",
-        }),
+          // Preserve the user's saved custom time signatures across
+          // a defaults reset — those are library entries, not
+          // session config.
+          customTimeSignatures: state.customTimeSignatures,
+        })),
     }),
     {
       name: "practice-prodigy:metronome-prefs:v1",
@@ -126,8 +179,13 @@ export const useMetronomePrefs = create<MetronomeStore>()(
         const next = {
           ...DEFAULT_METRONOME_CONFIG,
           visualStyle: "dots" as MetronomeVisualStyle,
+          customTimeSignatures: [] as CustomTimeSignature[],
           ...(persistedState as Partial<MetronomeStore>),
         };
+        // Sanity: ensure customTimeSignatures is always an array
+        if (!Array.isArray(next.customTimeSignatures)) {
+          next.customTimeSignatures = [];
+        }
         // Sanity: accentPattern length must match beatsPerMeasure
         if (
           !Array.isArray(next.accentPattern) ||
