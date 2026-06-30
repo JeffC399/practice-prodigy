@@ -1,0 +1,146 @@
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import {
+  DEFAULT_METRONOME_CONFIG,
+  METRONOME_SOUNDS,
+  type BeatAccent,
+  type MetronomeConfig,
+  type MetronomeSound,
+} from "@/lib/audio/standalone-metronome";
+
+/**
+ * Persistent user preferences for the standalone Metronome module.
+ *
+ * Holds the user's last-used config so the metronome page lands ready
+ * to play on revisit. Also holds the user's visual-style preference
+ * (which beat-indicator rendering they prefer).
+ *
+ * Persisted to its own localStorage key so it survives independently
+ * of drill state.
+ */
+
+export const METRONOME_VISUAL_STYLES = ["dots", "pulse", "pendulum"] as const;
+export type MetronomeVisualStyle = (typeof METRONOME_VISUAL_STYLES)[number];
+
+export const METRONOME_VISUAL_STYLE_LABELS: Record<
+  MetronomeVisualStyle,
+  string
+> = {
+  dots: "Beat dots",
+  pulse: "Pulsing circle",
+  pendulum: "Pendulum",
+};
+
+type MetronomeStore = MetronomeConfig & {
+  visualStyle: MetronomeVisualStyle;
+  setBpm: (bpm: number) => void;
+  setBeatsPerMeasure: (n: number) => void;
+  setBeatUnit: (n: number) => void;
+  setSubdivisionsPerBeat: (n: 1 | 2 | 3 | 4) => void;
+  cycleBeatAccent: (beatIdx: number) => void;
+  setSound: (s: MetronomeSound) => void;
+  setVolume: (v: number) => void;
+  setVisualStyle: (s: MetronomeVisualStyle) => void;
+  setPolyrhythm: (
+    update: Partial<MetronomeConfig["polyrhythm"]>,
+  ) => void;
+  setTempoRamp: (
+    update: Partial<MetronomeConfig["tempoRamp"]>,
+  ) => void;
+  setDropEveryNthMeasure: (n: number) => void;
+  /** Resize the accent pattern when beatsPerMeasure changes. */
+  resyncAccentPattern: () => void;
+  resetToDefaults: () => void;
+};
+
+const MIN_BPM = 30;
+const MAX_BPM = 300;
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function defaultAccentPattern(beatsPerMeasure: number): BeatAccent[] {
+  return Array.from({ length: beatsPerMeasure }, (_, i) =>
+    i === 0 ? "accent" : "normal",
+  );
+}
+
+export const useMetronomePrefs = create<MetronomeStore>()(
+  persist(
+    (set, get) => ({
+      ...DEFAULT_METRONOME_CONFIG,
+      visualStyle: "dots",
+      setBpm: (bpm) => set({ bpm: clamp(Math.round(bpm), MIN_BPM, MAX_BPM) }),
+      setBeatsPerMeasure: (beatsPerMeasure) =>
+        set({
+          beatsPerMeasure,
+          accentPattern: defaultAccentPattern(beatsPerMeasure),
+        }),
+      setBeatUnit: (beatUnit) => set({ beatUnit }),
+      setSubdivisionsPerBeat: (n) => set({ subdivisionsPerBeat: n }),
+      cycleBeatAccent: (beatIdx) => {
+        const state = get();
+        const pattern = [...state.accentPattern];
+        const current: BeatAccent = pattern[beatIdx] ?? "normal";
+        const nextAccent: BeatAccent =
+          current === "normal"
+            ? "accent"
+            : current === "accent"
+              ? "mute"
+              : "normal";
+        pattern[beatIdx] = nextAccent;
+        set({ accentPattern: pattern });
+      },
+      setSound: (sound) => set({ sound }),
+      setVolume: (volume) => set({ volume: clamp(volume, 0, 1) }),
+      setVisualStyle: (visualStyle) => set({ visualStyle }),
+      setPolyrhythm: (update) =>
+        set((state) => ({
+          polyrhythm: { ...state.polyrhythm, ...update },
+        })),
+      setTempoRamp: (update) =>
+        set((state) => ({
+          tempoRamp: { ...state.tempoRamp, ...update },
+        })),
+      setDropEveryNthMeasure: (n) =>
+        set({ dropEveryNthMeasure: clamp(Math.round(n), 0, 16) }),
+      resyncAccentPattern: () => {
+        const state = get();
+        if (state.accentPattern.length === state.beatsPerMeasure) return;
+        set({ accentPattern: defaultAccentPattern(state.beatsPerMeasure) });
+      },
+      resetToDefaults: () =>
+        set({
+          ...DEFAULT_METRONOME_CONFIG,
+          visualStyle: "dots",
+        }),
+    }),
+    {
+      name: "practice-prodigy:metronome-prefs:v1",
+      storage: createJSONStorage(() => localStorage),
+      version: 1,
+      migrate: (persistedState) => {
+        if (!persistedState || typeof persistedState !== "object") {
+          return persistedState;
+        }
+        const next = {
+          ...DEFAULT_METRONOME_CONFIG,
+          visualStyle: "dots" as MetronomeVisualStyle,
+          ...(persistedState as Partial<MetronomeStore>),
+        };
+        // Sanity: accentPattern length must match beatsPerMeasure
+        if (
+          !Array.isArray(next.accentPattern) ||
+          next.accentPattern.length !== next.beatsPerMeasure
+        ) {
+          next.accentPattern = defaultAccentPattern(next.beatsPerMeasure);
+        }
+        // Sanity: sound must be a known value
+        if (!(METRONOME_SOUNDS as readonly string[]).includes(next.sound)) {
+          next.sound = DEFAULT_METRONOME_CONFIG.sound;
+        }
+        return next;
+      },
+    },
+  ),
+);

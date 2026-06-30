@@ -79,11 +79,13 @@ export const MODULES: ModuleEntry[] = [
     id: "metronome",
     name: "Metronome",
     shortName: "Metronome",
-    status: "designed",
-    bucket: "next",
+    status: "live",
+    bucket: "now",
+    route: "/metronome",
     description:
-      "Standalone metronome — subdivisions, accents, polymetric, programmable sequences. Same audio engine. First module to implement the cross-module RoutineItem interface (see ROUTINE-DESIGN.md), shipping paired with My Practice v0.1.",
+      "Premium-tier metronome — subdivisions (quarter / 8th / triplet / 16th), per-beat accents, 4 sound presets, 3 visual styles (dots / pulse / pendulum), polyrhythms, tempo ramping, silent measures for ear training. Tap tempo + keyboard shortcuts. First module to implement the cross-module RoutineItem interface (see ROUTINE-DESIGN.md).",
     icon: Timer,
+    routeMatch: (p) => p.startsWith("/metronome"),
   },
   {
     id: "tuner",
