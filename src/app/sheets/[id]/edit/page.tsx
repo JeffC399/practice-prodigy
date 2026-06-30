@@ -554,6 +554,18 @@ export default function SheetEditorPage() {
     setChordDraft(chordToText(existing ?? null));
   };
 
+  /**
+   * Phase 25.2.1 — click-outside closes the autocomplete + input.
+   * Commits the current draft to the cursor's beat, then clears the
+   * cursor so the input/dropdown unmount. Stays in chord-entry mode
+   * so the hit regions remain available for the next edit.
+   */
+  const onChordClickOutside = () => {
+    if (chordCursor) commitChordDraftAt(chordCursor, chordDraft);
+    setChordCursor(null);
+    setChordDraft("");
+  };
+
   const onChordPickSuggestion = (text: string) => {
     setChordDraft(text);
     if (chordCursor) {
@@ -1154,6 +1166,7 @@ export default function SheetEditorPage() {
                 onCommitAdvance={onChordCommitAdvance}
                 onCommitRetreat={onChordCommitRetreat}
                 onPickSuggestion={onChordPickSuggestion}
+                onClickOutside={onChordClickOutside}
                 onExit={exitChordMode}
               />
             )}

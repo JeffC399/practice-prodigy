@@ -42,6 +42,14 @@ export type ChordEntryOverlayProps = {
   onCommitRetreat: () => void;
   /** Pick a specific autocomplete suggestion. */
   onPickSuggestion: (suggestion: string) => void;
+  /**
+   * Phase 25.2.1: fires when the user clicks anywhere outside the
+   * input/dropdown wrapper AND outside any beat hit region. The parent
+   * commits the current draft and clears the cursor (which hides the
+   * input + dropdown) but stays in chord-entry mode so hit regions
+   * remain available.
+   */
+  onClickOutside: () => void;
   /** Exit chord-entry mode entirely. */
   onExit: () => void;
 };
@@ -62,9 +70,11 @@ export function ChordEntryOverlay({
   onCommitAdvance,
   onCommitRetreat,
   onPickSuggestion,
+  onClickOutside,
   onExit,
 }: ChordEntryOverlayProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const editorWrapperRef = useRef<HTMLDivElement>(null);
 
   // Auto-focus the input whenever the cursor changes.
   useEffect(() => {
@@ -74,6 +84,31 @@ export function ChordEntryOverlay({
       inputRef.current.setSelectionRange(len, len);
     }
   }, [cursor]);
+
+  /**
+   * Phase 25.2.1 — click-outside-closes. Listens for mousedown
+   * anywhere on the document while the inline input/dropdown is
+   * open. If the click landed outside the wrapper AND outside any
+   * beat hit region (those handle their own re-anchor via onSetCursor),
+   * commit + clear the cursor via onClickOutside. mousedown (not
+   * click) so the close fires before any subsequent focus/blur
+   * disrupts the next interaction.
+   */
+  useEffect(() => {
+    if (!cursor) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      // Inside the input + dropdown wrapper? — leave it alone.
+      if (editorWrapperRef.current?.contains(target)) return;
+      // Inside a beat hit region? — its own onClick will re-anchor
+      // the cursor, so don't preemptively close.
+      if (target.closest("[data-chord-hit]")) return;
+      onClickOutside();
+    };
+    window.addEventListener("mousedown", onMouseDown);
+    return () => window.removeEventListener("mousedown", onMouseDown);
+  }, [cursor, onClickOutside]);
 
   // Compute the inline-input position from the active cursor.
   const activeRect = cursor
@@ -114,6 +149,7 @@ export function ChordEntryOverlay({
             <button
               key={`${rect.measureIdx}-${beat}`}
               type="button"
+              data-chord-hit="true"
               onClick={() =>
                 onSetCursor({ measureIdx: rect.measureIdx, beat })
               }
@@ -138,6 +174,7 @@ export function ChordEntryOverlay({
       {/* Inline text input + autocomplete dropdown. */}
       {cursor && activeRect && (
         <div
+          ref={editorWrapperRef}
           className="pointer-events-auto absolute"
           style={{ left: inputX, top: inputY - 32 }}
         >
