@@ -65,7 +65,7 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
     {
       name: "practice-prodigy:sheets-library:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       migrate: (persistedState, version) => {
         if (!persistedState || typeof persistedState !== "object") {
           return persistedState;
@@ -90,6 +90,13 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
               })),
             };
           });
+        }
+        // v2 → v3: Phase 24b.2 added optional `tieToNext` + `tupletGroup`
+        // on MelodyNote. Both are optional, so existing notes default
+        // to undefined / false — no data migration needed. Bump the
+        // version for cleanliness.
+        if (version <= 2) {
+          void next; // explicit no-op
         }
         return next;
       },

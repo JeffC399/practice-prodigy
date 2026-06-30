@@ -5,6 +5,8 @@ import {
   Renderer,
   Stave,
   StaveNote,
+  StaveTie,
+  Tuplet,
   Voice,
   Formatter,
   Dot,
@@ -107,14 +109,6 @@ export function MelodyStaff({
         keys: [n.pitch],
         duration: n.duration,
       });
-      // Mark sharps / flats on the note.
-      const accidentalMatch = n.pitch.match(/^[a-g]([#b])/i);
-      if (accidentalMatch) {
-        // VexFlow auto-renders accidentals from key signatures, but
-        // here we author them per-note. The Accidental import keeps
-        // the bundle leaner if we add it later; v0.1 relies on
-        // VexFlow's automatic accidental rendering from key strings.
-      }
       if (n.dotted) Dot.buildAndAttach([note], { all: true });
       return note;
     });
@@ -128,11 +122,68 @@ export function MelodyStaff({
     voice.setStrict(false);
     voice.addTickables(staveNotes);
 
+    // Phase 24b.2 — Tuplets. Group consecutive notes that share the
+    // same tupletGroup id and wrap them in a VexFlow Tuplet. The
+    // Tuplet renders the bracket + the number ("3" for triplet).
+    const tuplets: Tuplet[] = [];
+    let i = 0;
+    while (i < melody.length) {
+      const groupId = melody[i].tupletGroup;
+      if (!groupId) {
+        i++;
+        continue;
+      }
+      // Collect run of consecutive same-group notes.
+      let j = i;
+      while (j < melody.length && melody[j].tupletGroup === groupId) j++;
+      const runNotes = staveNotes.slice(i, j);
+      if (runNotes.length >= 2) {
+        tuplets.push(
+          new Tuplet(runNotes, {
+            numNotes: runNotes.length,
+            // For a triplet (3 in space of 2) at any duration, the
+            // notesOccupied is the next-power-of-2 below the count.
+            // Tuple of 3 → 2, 5 → 4, 6 → 4, 7 → 4. Standard.
+            notesOccupied: Math.pow(
+              2,
+              Math.floor(Math.log2(runNotes.length)),
+            ),
+          }),
+        );
+      }
+      i = j;
+    }
+
+    // Phase 24b.2 — Intra-measure ties. For each note with tieToNext
+    // set, build a StaveTie connecting it to the next note.
+    // Cross-measure ties are deferred to Phase 24b.3 (would require
+    // multi-measure render coordination).
+    const ties: StaveTie[] = [];
+    for (let k = 0; k < melody.length - 1; k++) {
+      const cur = melody[k];
+      if (cur.kind !== "note" || !cur.tieToNext) continue;
+      const next = melody[k + 1];
+      // Only render a tie when the next note is a pitched note (not a
+      // rest) and same pitch — that's the musically meaningful case.
+      if (next.kind === "note" && next.pitch === cur.pitch) {
+        ties.push(
+          new StaveTie({
+            firstNote: staveNotes[k],
+            lastNote: staveNotes[k + 1],
+            firstIndexes: [0],
+            lastIndexes: [0],
+          }),
+        );
+      }
+    }
+
     // Format + draw.
     const startX = stave.getNoteStartX();
     const availableWidth = width - startX - 12;
     new Formatter().joinVoices([voice]).format([voice], availableWidth);
     voice.draw(context, stave);
+    tuplets.forEach((t) => t.setContext(context).draw());
+    ties.forEach((t) => t.setContext(context).draw());
   }, [melody, timeSignature, showClef, showTimeSignature, width, height]);
 
   return (

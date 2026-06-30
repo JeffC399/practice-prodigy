@@ -18,6 +18,7 @@ import {
   MELODY_DURATIONS,
   MELODY_DURATION_LABELS,
   newMeasureId,
+  newTupletGroupId,
   SHEET_KEY_MODES,
   type MelodyDuration,
   type MelodyNote,
@@ -607,10 +608,46 @@ function MelodyEditorModal({
   const removeAt = (idx: number) => {
     setDraft((prev) => prev.filter((_, i) => i !== idx));
   };
+  const toggleTieAt = (idx: number) => {
+    setDraft((prev) =>
+      prev.map((n, i) => {
+        if (i !== idx || n.kind !== "note") return n;
+        return { ...n, tieToNext: !n.tieToNext };
+      }),
+    );
+  };
+  /** Wrap the last 3 notes/rests into a triplet group. */
+  const makeTripletFromLast = () => {
+    setDraft((prev) => {
+      if (prev.length < 3) return prev;
+      const groupId = newTupletGroupId();
+      const cut = prev.length - 3;
+      return prev.map((n, i) =>
+        i >= cut ? { ...n, tupletGroup: groupId } : n,
+      );
+    });
+  };
+  /** Remove the tuplet grouping from a single note (and all of its group-mates). */
+  const ungrouptupletAt = (idx: number) => {
+    setDraft((prev) => {
+      const groupId = prev[idx]?.tupletGroup;
+      if (!groupId) return prev;
+      return prev.map((n) => {
+        if (n.tupletGroup !== groupId) return n;
+        const { tupletGroup: _drop, ...rest } = n;
+        void _drop;
+        return rest as MelodyNote;
+      });
+    });
+  };
   const handleSave = () => {
     onSave(draft);
     onClose();
   };
+  // Last-3-or-more notes available to triplet-ize?
+  const canMakeTriplet =
+    draft.length >= 3 &&
+    !draft.slice(-3).some((n) => n.tupletGroup);
 
   return (
     <div
@@ -718,7 +755,7 @@ function MelodyEditorModal({
           Dotted (1.5× duration)
         </label>
 
-        <div className="mb-4 flex items-center gap-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={addNote}
@@ -735,32 +772,87 @@ function MelodyEditorModal({
             <Plus className="h-3.5 w-3.5" />
             Add rest
           </button>
+          <button
+            type="button"
+            onClick={makeTripletFromLast}
+            disabled={!canMakeTriplet}
+            className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="Group the last 3 notes/rests into a triplet"
+          >
+            Triplet (last 3)
+          </button>
         </div>
 
-        {/* Sequence list */}
+        {/* Sequence list. Each chip now shows tie + tuplet state and
+            offers per-note controls: tie-to-next toggle (note chips
+            only), ungroup-tuplet (when grouped), remove. */}
         {draft.length > 0 && (
-          <div className="mb-4 flex flex-wrap gap-1.5 rounded-md border border-border bg-background/30 p-3">
-            {draft.map((n, i) => (
-              <span
-                key={i}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-card pl-2.5 pr-1 py-0.5 text-xs font-mono"
-              >
-                <span>
-                  {n.kind === "rest"
-                    ? `R-${MELODY_DURATION_LABELS[n.duration]}`
-                    : `${n.pitch.replace("/", "")}-${MELODY_DURATION_LABELS[n.duration]}`}
-                  {n.dotted && "."}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeAt(i)}
-                  className="rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors"
-                  aria-label={`Remove note ${i + 1}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
+          <div className="mb-4 flex flex-col gap-1.5 rounded-md border border-border bg-background/30 p-3">
+            <div className="flex flex-wrap gap-1.5">
+              {draft.map((n, i) => {
+                const isLast = i === draft.length - 1;
+                const isNote = n.kind === "note";
+                const hasTie = isNote && n.tieToNext === true && !isLast;
+                const isTuplet = !!n.tupletGroup;
+                return (
+                  <span
+                    key={i}
+                    className={`inline-flex items-center gap-1 rounded-full border pl-2.5 pr-1 py-0.5 text-xs font-mono ${
+                      isTuplet
+                        ? "border-amber-400/60 bg-amber-400/10"
+                        : "border-border bg-card"
+                    }`}
+                  >
+                    <span>
+                      {n.kind === "rest"
+                        ? `R-${MELODY_DURATION_LABELS[n.duration]}`
+                        : `${n.pitch.replace("/", "")}-${MELODY_DURATION_LABELS[n.duration]}`}
+                      {n.dotted && "."}
+                      {hasTie && " ⌣"}
+                      {isTuplet && " ³"}
+                    </span>
+                    {isNote && !isLast && (
+                      <button
+                        type="button"
+                        onClick={() => toggleTieAt(i)}
+                        className={`rounded-full px-1 text-[10px] font-medium transition-colors ${
+                          hasTie
+                            ? "bg-primary/30 text-primary"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        title="Toggle tie to next note (same pitch required to render)"
+                      >
+                        tie
+                      </button>
+                    )}
+                    {isTuplet && (
+                      <button
+                        type="button"
+                        onClick={() => ungrouptupletAt(i)}
+                        className="rounded-full px-1 text-[10px] font-medium text-amber-500 hover:text-amber-400 transition-colors"
+                        title="Remove this note's tuplet grouping (un-triplet)"
+                      >
+                        ungroup
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeAt(i)}
+                      className="rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors"
+                      aria-label={`Remove note ${i + 1}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              <span className="font-mono">⌣</span> = tied to next note
+              (renders only when next note is the same pitch).{" "}
+              <span className="font-mono">³</span> = part of a tuplet
+              group.
+            </p>
           </div>
         )}
 

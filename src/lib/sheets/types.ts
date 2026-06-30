@@ -63,11 +63,27 @@ export type MelodyNote =
       duration: MelodyDuration;
       /** Dotted note: duration * 1.5. */
       dotted?: boolean;
+      /**
+       * Phase 24b.2: tie this note to the next note. v0.1 only renders
+       * the tie when both notes are within the same measure. Cross-
+       * measure ties land in Phase 24b.3 (multi-measure render
+       * coordination required).
+       */
+      tieToNext?: boolean;
+      /**
+       * Phase 24b.2: tuplet group. Consecutive notes with the same
+       * non-null group id form a tuplet (e.g. group "t1" with 3
+       * notes = triplet). The renderer wraps them in a VexFlow
+       * Tuplet automatically. v0.1 only supports triplets (groups of
+       * 3); quintuplets / sextuplets land later.
+       */
+      tupletGroup?: string;
     }
   | {
       kind: "rest";
       duration: MelodyDuration;
       dotted?: boolean;
+      tupletGroup?: string;
     };
 
 /**
@@ -130,6 +146,11 @@ export function newSheetId(): string {
 
 export function newMeasureId(): string {
   return `mes_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Generate a fresh tuplet group id (Phase 24b.2). */
+export function newTupletGroupId(): string {
+  return `tup_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
 /** Default sheet for the "new sheet" CTA. */
