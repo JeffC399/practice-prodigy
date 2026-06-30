@@ -376,6 +376,30 @@ export function SheetSurface({
 }: SheetSurfaceProps) {
   const musicRef = useRef<HTMLDivElement>(null);
   const notationStyle = useUserPrefs((s) => s.notationDefault);
+  /**
+   * Phase 25.0.2 — font family family selector. "standard" uses the
+   * classic serif Georgia/Times engraving; "handwritten" uses Patrick
+   * Hand for a Real Book / iReal Pro vibe. Lyrics, chord symbols, and
+   * the title block all switch together so the whole page reads with
+   * one aesthetic voice.
+   */
+  const fontStyle = sheet.fontStyle ?? "standard";
+  const titleFont =
+    fontStyle === "handwritten"
+      ? "var(--font-patrick-hand), 'Patrick Hand', cursive"
+      : "Georgia, 'Times New Roman', serif";
+  const chordFont =
+    fontStyle === "handwritten"
+      ? "'Patrick Hand', cursive"
+      : "Georgia, 'Times New Roman', serif";
+  const lyricFont =
+    fontStyle === "handwritten"
+      ? "'Patrick Hand', cursive"
+      : "Georgia, 'Times New Roman', serif";
+  // Patrick Hand is wider than Georgia at the same nominal size — bump
+  // the rendered point sizes so chord symbols + lyrics stay readable.
+  const chordSize = fontStyle === "handwritten" ? 18 : 14;
+  const lyricSize = fontStyle === "handwritten" ? 14 : 11;
 
   useEffect(() => {
     if (!musicRef.current) return;
@@ -500,7 +524,11 @@ export function SheetSurface({
 
         if (measure.chords.length > 0) {
           ctx.save();
-          ctx.setFont("Georgia, 'Times New Roman', serif", 14, "bold");
+          ctx.setFont(
+            chordFont,
+            chordSize,
+            fontStyle === "handwritten" ? "" : "bold",
+          );
           if (measure.chords.length === 1) {
             ctx.fillText(
               renderChord(measure.chords[0], notationStyle),
@@ -567,7 +595,7 @@ export function SheetSurface({
         // notes (e.g. "know" + "where") don't collide into "knowwhere".
         const lyricY = staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET;
         ctx.save();
-        ctx.setFont("Georgia, 'Times New Roman', serif", 11, "");
+        ctx.setFont(lyricFont, lyricSize, "");
 
         const noteAbsoluteXs: number[] = staveNotes.map((sn) =>
           sn.getAbsoluteX(),
@@ -701,7 +729,18 @@ export function SheetSurface({
         paperHeight: musicOffsetTop + totalHeight + PAPER_PADDING_Y,
       });
     }
-  }, [sheet, notationStyle, width, measuresPerLine, onLayout]);
+  }, [
+    sheet,
+    notationStyle,
+    width,
+    measuresPerLine,
+    onLayout,
+    fontStyle,
+    chordFont,
+    chordSize,
+    lyricFont,
+    lyricSize,
+  ]);
 
   return (
     <div
@@ -724,9 +763,13 @@ export function SheetSurface({
       >
         <header className="mb-7 border-b border-black/10 pb-4">
           <h1
-            className="mb-3 text-center text-3xl font-bold tracking-tight"
+            className={`mb-3 text-center tracking-tight ${
+              fontStyle === "handwritten"
+                ? "text-4xl"
+                : "text-3xl font-bold"
+            }`}
             style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontFamily: titleFont,
               color: "#1a1a1a",
             }}
           >
@@ -734,7 +777,7 @@ export function SheetSurface({
           </h1>
           <div
             className="flex items-end justify-between text-sm"
-            style={{ fontFamily: "Georgia, serif", color: "#333" }}
+            style={{ fontFamily: titleFont, color: "#333" }}
           >
             <div className="flex min-h-[1.25rem] flex-col gap-0.5">
               {sheet.style && <span className="italic">{sheet.style}</span>}

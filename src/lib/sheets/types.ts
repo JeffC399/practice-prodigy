@@ -151,6 +151,20 @@ export type SheetMeasure = {
  */
 export type SheetStyle = string;
 
+/**
+ * Phase 25.0.2 — visual font style for the lead sheet.
+ *
+ *   - "standard":    classic serif engraving (Georgia / Times New Roman).
+ *                    Cleanest, most legible. Default.
+ *   - "handwritten": Real-Book / iReal-Pro style handwritten block-print
+ *                    via Patrick Hand. Adds personality + jazz authenticity.
+ *
+ * Per-sheet (not per-user) — the font is part of the chart's aesthetic
+ * and travels with the sheet when shared.
+ */
+export const SHEET_FONT_STYLES = ["standard", "handwritten"] as const;
+export type SheetFontStyle = (typeof SHEET_FONT_STYLES)[number];
+
 export type Sheet = {
   id: string;
   /** Display title. */
@@ -168,6 +182,8 @@ export type Sheet = {
   timeSignature: SheetTimeSignature;
   /** Ordered list of measures. */
   measures: SheetMeasure[];
+  /** Phase 25.0.2: visual font style. Defaults to "standard". */
+  fontStyle?: SheetFontStyle;
   createdAt: number;
   updatedAt: number;
   /** Last time the sheet was opened. */

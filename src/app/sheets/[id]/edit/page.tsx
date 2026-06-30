@@ -27,6 +27,7 @@ import {
   MELODY_DURATION_LABELS,
   newMeasureId,
   newTupletGroupId,
+  SHEET_FONT_STYLES,
   SHEET_KEY_MODES,
   type MelodyDuration,
   type MelodyNote,
@@ -451,7 +452,7 @@ export default function SheetEditorPage() {
                 </select>
               </div>
             </label>
-            <label className="flex flex-col gap-1 text-xs sm:col-span-2">
+            <label className="flex flex-col gap-1 text-xs">
               Time signature
               <select
                 value={`${sheet.timeSignature.beatsPerMeasure}/${sheet.timeSignature.beatUnit}`}
@@ -473,6 +474,35 @@ export default function SheetEditorPage() {
                   </option>
                 ))}
               </select>
+            </label>
+            {/* Phase 25.0.2 — Font style toggle. Per-sheet aesthetic
+                choice; "standard" keeps the classic Georgia serif
+                engraving, "handwritten" switches the whole page to a
+                Patrick Hand block-print font (Real Book / iReal Pro
+                vibe). */}
+            <label className="flex flex-col gap-1 text-xs">
+              Font style
+              <div className="flex items-center gap-1">
+                {SHEET_FONT_STYLES.map((fs) => (
+                  <button
+                    key={fs}
+                    type="button"
+                    onClick={() => updateMeta("fontStyle", fs)}
+                    className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                      (sheet.fontStyle ?? "standard") === fs
+                        ? "border-primary/60 bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                    title={
+                      fs === "handwritten"
+                        ? "Real Book / iReal Pro handwritten block-print"
+                        : "Classic serif engraving"
+                    }
+                  >
+                    {fs === "handwritten" ? "Handwritten" : "Standard"}
+                  </button>
+                ))}
+              </div>
             </label>
           </div>
         </section>
