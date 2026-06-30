@@ -144,15 +144,41 @@ export const useMetronomePrefs = create<MetronomeStore>()(
           };
         }),
       removeCustomTimeSignature: (sig) =>
-        set((state) => ({
-          customTimeSignatures: state.customTimeSignatures.filter(
+        set((state) => {
+          // If the deleted sig is the CURRENTLY ACTIVE one, fall back
+          // to the default 4/4 so we don't leave the config pointing
+          // at a deleted/unknown time signature. Without this reset:
+          //   - The dropdown's value no longer matches any option,
+          //     so React's <select> visually defaults to the first
+          //     built-in (2/4) — misleading.
+          //   - The engine still reads the deleted beatsPerMeasure +
+          //     beatUnit from config, so it plays the deleted sig
+          //     anyway.
+          // Resetting + resyncing the accent pattern keeps the state
+          // consistent across the dropdown, the engine, and the
+          // accent tiles.
+          const isActive =
+            state.beatsPerMeasure === sig.beatsPerMeasure &&
+            state.beatUnit === sig.beatUnit;
+          const filtered = state.customTimeSignatures.filter(
             (s) =>
               !(
                 s.beatsPerMeasure === sig.beatsPerMeasure &&
                 s.beatUnit === sig.beatUnit
               ),
-          ),
-        })),
+          );
+          if (!isActive) {
+            return { customTimeSignatures: filtered };
+          }
+          return {
+            customTimeSignatures: filtered,
+            beatsPerMeasure: DEFAULT_METRONOME_CONFIG.beatsPerMeasure,
+            beatUnit: DEFAULT_METRONOME_CONFIG.beatUnit,
+            accentPattern: defaultAccentPattern(
+              DEFAULT_METRONOME_CONFIG.beatsPerMeasure,
+            ),
+          };
+        }),
       resyncAccentPattern: () => {
         const state = get();
         if (state.accentPattern.length === state.beatsPerMeasure) return;
