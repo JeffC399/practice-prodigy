@@ -304,9 +304,16 @@ export default function MetronomePage() {
               Tap tempo (T)
             </button>
           </div>
-          <div className="flex items-center justify-center gap-3">
-            <BpmAdjust onClick={() => setBpm(bpm - 5)} label="−5" />
-            <BpmAdjust onClick={() => setBpm(bpm - 1)} label="−1" />
+          {/* Slider row: −5 / −1 nudge buttons on the left, slider in
+              the middle, and a 2x2 adjust grid on the right (+1/+5 on
+              top, ÷2/×2 on bottom). All adjust buttons share the same
+              BpmAdjust component so they're guaranteed identical in
+              size + styling. */}
+          <div className="flex items-center gap-3">
+            <div className="grid grid-cols-1 gap-1.5">
+              <BpmAdjust onClick={() => setBpm(bpm - 5)} label="−5" />
+              <BpmAdjust onClick={() => setBpm(bpm - 1)} label="−1" />
+            </div>
             <input
               type="range"
               min={30}
@@ -316,42 +323,28 @@ export default function MetronomePage() {
               className="flex-1 accent-primary"
               aria-label="BPM slider"
             />
-            <BpmAdjust onClick={() => setBpm(bpm + 1)} label="+1" />
-            <BpmAdjust onClick={() => setBpm(bpm + 5)} label="+5" />
+            <div className="grid grid-cols-2 gap-1.5">
+              <BpmAdjust onClick={() => setBpm(bpm + 1)} label="+1" />
+              <BpmAdjust onClick={() => setBpm(bpm + 5)} label="+5" />
+              <BpmAdjust onClick={() => setBpm(Math.round(bpm / 2))} label="÷2" />
+              <BpmAdjust onClick={() => setBpm(bpm * 2)} label="×2" />
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-1.5">
-              {BPM_PRESETS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setBpm(p)}
-                  className={`rounded-md border px-2.5 py-1 text-xs font-mono transition-colors ${
-                    bpm === p
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
+            {BPM_PRESETS.map((p) => (
               <button
+                key={p}
                 type="button"
-                onClick={() => setBpm(Math.round(bpm / 2))}
-                className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-mono text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+                onClick={() => setBpm(p)}
+                className={`rounded-md border px-2.5 py-1 text-xs font-mono transition-colors ${
+                  bpm === p
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
               >
-                ÷2
+                {p}
               </button>
-              <button
-                type="button"
-                onClick={() => setBpm(bpm * 2)}
-                className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-mono text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
-              >
-                ×2
-              </button>
-            </div>
+            ))}
           </div>
         </section>
 
@@ -711,11 +704,14 @@ function BpmAdjust({
   onClick: () => void;
   label: string;
 }) {
+  // Fixed width + height so every adjust button looks identical, no
+  // matter which row it appears in or what its label length is. The
+  // 2.75rem width fits "−5" / "+5" / "÷2" / "×2" with equal whitespace.
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground active:scale-95 transition-all"
+      className="flex h-8 w-11 items-center justify-center rounded-md border border-border bg-background font-mono text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground active:scale-95 transition-all"
     >
       {label}
     </button>
