@@ -1,15 +1,10 @@
 import type { Chord, PitchClass } from "@/lib/music/chord";
 
 /**
- * Lead-sheet types — Phase 24a MVP scope: chord-chart-only.
+ * Lead-sheet types.
  *
- * No melody, no lyrics, no form markings yet. Each Sheet has metadata
- * + an ordered list of measures, each measure carrying chord(s) for
- * that bar. Reuses the existing Chord type so chord-vocabulary
- * features (notation styles, chord-to-scale mapping) work for free.
- *
- * Future phases (per LEAD-SHEET-DESIGN.md):
- *   24b: VexFlow melody engraving
+ * Phase 24a shipped chord-chart only. Phase 24b adds melody (notes +
+ * rests) per measure, rendered via VexFlow. Subsequent phases:
  *   24c: Lyrics
  *   24d: Form markings (repeats, endings, D.C., D.S., Coda, Segno)
  *   24e: Share via URL-encoded JSON
@@ -26,9 +21,57 @@ export type SheetTimeSignature = {
 };
 
 /**
- * One measure of the sheet. Carries 1..N chords (e.g. "two chords per
- * bar" is common in jazz). When empty, the measure renders as "N.C."
- * (no chord) or just blank depending on the display mode.
+ * Note duration vocabulary for melody notes + rests. Maps directly
+ * to VexFlow's duration strings ("w" / "h" / "q" / "8" / "16").
+ * v0.1 of the melody slice ships these five durations + an optional
+ * dotted modifier per note. Triplets / ties land in Phase 24b.2.
+ */
+export const MELODY_DURATIONS = ["w", "h", "q", "8", "16"] as const;
+export type MelodyDuration = (typeof MELODY_DURATIONS)[number];
+
+export const MELODY_DURATION_LABELS: Record<MelodyDuration, string> = {
+  w: "Whole",
+  h: "Half",
+  q: "Quarter",
+  "8": "Eighth",
+  "16": "Sixteenth",
+};
+
+/**
+ * Beat values per duration (quarter = 1 beat reference).
+ * Multiply by 1.5 when `dotted` is true.
+ */
+export const MELODY_DURATION_BEATS: Record<MelodyDuration, number> = {
+  w: 4,
+  h: 2,
+  q: 1,
+  "8": 0.5,
+  "16": 0.25,
+};
+
+/**
+ * VexFlow-style key string. Letter + accidental + octave, e.g. "c/4",
+ * "f#/5", "bb/3". Accidentals: "#" (sharp), "b" (flat), "n" (natural).
+ * Octave 4 = middle C octave (so "c/4" = middle C, "a/4" = A above middle C).
+ */
+export type MelodyPitch = string;
+
+export type MelodyNote =
+  | {
+      kind: "note";
+      pitch: MelodyPitch;
+      duration: MelodyDuration;
+      /** Dotted note: duration * 1.5. */
+      dotted?: boolean;
+    }
+  | {
+      kind: "rest";
+      duration: MelodyDuration;
+      dotted?: boolean;
+    };
+
+/**
+ * One measure of the sheet. Carries chords + an optional melody line.
  */
 export type SheetMeasure = {
   /** Stable id for drag-reorder / animation. */
@@ -40,6 +83,15 @@ export type SheetMeasure = {
    * explicit beat positions.
    */
   chords: Chord[];
+  /**
+   * Optional melody line (Phase 24b). Empty array = no melody for
+   * this measure (renderer draws an empty staff). Notes + rests
+   * render in sequence; the renderer doesn't enforce total beat
+   * count matching the time signature (user can author measures
+   * that overflow or under-fill the bar — useful for pickups /
+   * partial bars later).
+   */
+  melody?: MelodyNote[];
 };
 
 /**
@@ -95,6 +147,7 @@ export function makeDefaultSheet(): Omit<Sheet, "id" | "createdAt" | "updatedAt"
     measures: Array.from({ length: 8 }, () => ({
       id: newMeasureId(),
       chords: [],
+      melody: [],
     })),
   };
 }

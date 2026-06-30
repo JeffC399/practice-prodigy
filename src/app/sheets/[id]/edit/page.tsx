@@ -15,10 +15,15 @@ import {
 } from "@/lib/music/chord";
 import { renderChord } from "@/lib/music/render-chord";
 import {
+  MELODY_DURATIONS,
+  MELODY_DURATION_LABELS,
   newMeasureId,
   SHEET_KEY_MODES,
+  type MelodyDuration,
+  type MelodyNote,
   type SheetKeyMode,
 } from "@/lib/sheets/types";
+import { MelodyStaff } from "@/components/sheets/melody-staff";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -58,6 +63,10 @@ export default function SheetEditorPage() {
     measureIdx: number;
     chordIdx: number;
   } | null>(null);
+  // Per-measure melody editor pop-up.
+  const [editingMelodyIdx, setEditingMelodyIdx] = useState<number | null>(
+    null,
+  );
 
   if (!mounted) {
     return (
@@ -136,6 +145,13 @@ export default function SheetEditorPage() {
       if (i !== measureIdx) return m;
       return { ...m, chords: m.chords.filter((_, ci) => ci !== chordIdx) };
     });
+    updateSheet(id, { measures: next });
+  };
+
+  const updateMeasureMelody = (measureIdx: number, melody: MelodyNote[]) => {
+    const next = sheet.measures.map((m, i) =>
+      i === measureIdx ? { ...m, melody } : m,
+    );
     updateSheet(id, { measures: next });
   };
 
@@ -286,15 +302,15 @@ export default function SheetEditorPage() {
               Add measure
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {sheet.measures.map((measure, mIdx) => (
               <div
                 key={measure.id}
-                className="group relative flex min-h-[5rem] flex-col gap-1 rounded-md border border-border bg-card/40 p-2 transition-colors hover:border-primary/40"
+                className="group relative flex flex-col gap-2 rounded-md border border-border bg-card/40 p-3 transition-colors hover:border-primary/40"
               >
                 <div className="flex items-start justify-between">
                   <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {mIdx + 1}
+                    Measure {mIdx + 1}
                   </span>
                   {sheet.measures.length > 1 && (
                     <button
@@ -307,7 +323,8 @@ export default function SheetEditorPage() {
                     </button>
                   )}
                 </div>
-                <div className="flex flex-1 flex-wrap items-center gap-1">
+                {/* Chord chips */}
+                <div className="flex flex-wrap items-center gap-1 min-h-[2rem]">
                   {measure.chords.length === 0 ? (
                     <button
                       type="button"
@@ -317,10 +334,11 @@ export default function SheetEditorPage() {
                           quality: sheet.keyMode === "major" ? "maj7" : "min7",
                         })
                       }
-                      className="flex flex-1 items-center justify-center rounded border border-dashed border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                      className="flex flex-1 items-center justify-center gap-1 rounded border border-dashed border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                       aria-label="Add chord"
                     >
                       <Plus className="h-3 w-3" />
+                      Add chord
                     </button>
                   ) : (
                     measure.chords.map((chord, cIdx) => (
@@ -356,6 +374,24 @@ export default function SheetEditorPage() {
                     </button>
                   )}
                 </div>
+                {/* Melody staff (Phase 24b) */}
+                <div className="rounded border border-border/40 bg-background/50 p-1">
+                  <MelodyStaff
+                    melody={measure.melody ?? []}
+                    timeSignature={sheet.timeSignature}
+                    showClef={mIdx === 0}
+                    showTimeSignature={mIdx === 0}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingMelodyIdx(mIdx)}
+                  className="self-start rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                >
+                  {measure.melody && measure.melody.length > 0
+                    ? `Edit melody (${measure.melody.length})`
+                    : "Add melody"}
+                </button>
               </div>
             ))}
           </div>
@@ -385,6 +421,19 @@ export default function SheetEditorPage() {
               );
               setEditingChord(null);
             }}
+          />
+        )}
+
+        {/* Melody editor pop-up (Phase 24b) */}
+        {editingMelodyIdx !== null && (
+          <MelodyEditorModal
+            measureIdx={editingMelodyIdx}
+            melody={sheet.measures[editingMelodyIdx].melody ?? []}
+            timeSignature={sheet.timeSignature}
+            onSave={(melody) => {
+              updateMeasureMelody(editingMelodyIdx, melody);
+            }}
+            onClose={() => setEditingMelodyIdx(null)}
           />
         )}
 
@@ -505,6 +554,231 @@ function ChordPickerModal({
               Save
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Melody editor modal — pitch + duration pickers + a list of the
+ * current notes/rests with delete affordances. Live-renders the
+ * staff at the top so the user sees their changes as they author.
+ */
+function MelodyEditorModal({
+  measureIdx,
+  melody,
+  timeSignature,
+  onSave,
+  onClose,
+}: {
+  measureIdx: number;
+  melody: MelodyNote[];
+  timeSignature: { beatsPerMeasure: number; beatUnit: number };
+  onSave: (melody: MelodyNote[]) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<MelodyNote[]>(melody);
+  const [pitchLetter, setPitchLetter] = useState<string>("c");
+  const [pitchAccidental, setPitchAccidental] = useState<"" | "#" | "b">("");
+  const [pitchOctave, setPitchOctave] = useState<number>(4);
+  const [duration, setDuration] = useState<MelodyDuration>("q");
+  const [dotted, setDotted] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const pitchString = `${pitchLetter}${pitchAccidental}/${pitchOctave}`;
+
+  const addNote = () => {
+    setDraft((prev) => [
+      ...prev,
+      { kind: "note", pitch: pitchString, duration, dotted },
+    ]);
+  };
+  const addRest = () => {
+    setDraft((prev) => [...prev, { kind: "rest", duration, dotted }]);
+  };
+  const removeAt = (idx: number) => {
+    setDraft((prev) => prev.filter((_, i) => i !== idx));
+  };
+  const handleSave = () => {
+    onSave(draft);
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-lg border border-border bg-card p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">
+            Melody — measure {measureIdx + 1}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Live preview */}
+        <div className="mb-4 flex justify-center rounded-md border border-border bg-background/30 p-3">
+          <MelodyStaff
+            melody={draft}
+            timeSignature={timeSignature}
+            showClef
+            showTimeSignature
+            width={400}
+            height={110}
+          />
+        </div>
+
+        {/* Note pickers */}
+        <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <label className="flex flex-col gap-1 text-xs">
+            Pitch
+            <select
+              value={pitchLetter}
+              onChange={(e) => setPitchLetter(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              {["c", "d", "e", "f", "g", "a", "b"].map((p) => (
+                <option key={p} value={p}>
+                  {p.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Accidental
+            <select
+              value={pitchAccidental}
+              onChange={(e) =>
+                setPitchAccidental(e.target.value as "" | "#" | "b")
+              }
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="">Natural</option>
+              <option value="#">Sharp (♯)</option>
+              <option value="b">Flat (♭)</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Octave
+            <select
+              value={pitchOctave}
+              onChange={(e) => setPitchOctave(Number(e.target.value))}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              {[3, 4, 5, 6].map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Duration
+            <select
+              value={duration}
+              onChange={(e) => setDuration(e.target.value as MelodyDuration)}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              {MELODY_DURATIONS.map((d) => (
+                <option key={d} value={d}>
+                  {MELODY_DURATION_LABELS[d]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="mb-3 flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={dotted}
+            onChange={(e) => setDotted(e.target.checked)}
+            className="h-4 w-4 accent-primary"
+          />
+          Dotted (1.5× duration)
+        </label>
+
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={addNote}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add note ({pitchString.replace("/", "")})
+          </button>
+          <button
+            type="button"
+            onClick={addRest}
+            className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add rest
+          </button>
+        </div>
+
+        {/* Sequence list */}
+        {draft.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-1.5 rounded-md border border-border bg-background/30 p-3">
+            {draft.map((n, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card pl-2.5 pr-1 py-0.5 text-xs font-mono"
+              >
+                <span>
+                  {n.kind === "rest"
+                    ? `R-${MELODY_DURATION_LABELS[n.duration]}`
+                    : `${n.pitch.replace("/", "")}-${MELODY_DURATION_LABELS[n.duration]}`}
+                  {n.dotted && "."}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeAt(i)}
+                  className="rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors"
+                  aria-label={`Remove note ${i + 1}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>

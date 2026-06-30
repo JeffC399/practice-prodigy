@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { renderChord } from "@/lib/music/render-chord";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
+import { MelodyStaff } from "@/components/sheets/melody-staff";
 
 /**
  * /sheets/[id] — read-only display + print view (Phase 24a MVP).
@@ -113,40 +114,55 @@ export default function SheetViewPage() {
             </div>
           </header>
 
-          {/* Chord grid — 4 measures per line. Each measure renders
-              its chords (with split-bar treatment for 2-chord bars). */}
-          <div className="grid grid-cols-4 gap-0 border-l border-t border-foreground/30">
-            {sheet.measures.map((measure, mIdx) => (
-              <div
-                key={measure.id}
-                className="flex min-h-[4rem] items-center justify-center border-b border-r border-foreground/30 px-2 py-3"
-              >
-                {measure.chords.length === 0 ? (
-                  <span className="font-mono text-xs text-muted-foreground/40">
-                    —
+          {/* Measure grid — 2 measures per line for melody breathing
+              room. Each measure shows the chord(s) on top + the
+              melody staff below. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {sheet.measures.map((measure, mIdx) => {
+              const hasMelody = (measure.melody?.length ?? 0) > 0;
+              return (
+                <div
+                  key={measure.id}
+                  className="relative flex flex-col gap-1 rounded border border-foreground/30 px-2 py-2"
+                >
+                  <span className="absolute -top-2 left-2 bg-card px-1 font-mono text-[9px] text-muted-foreground/60 print:bg-transparent">
+                    {mIdx + 1}
                   </span>
-                ) : measure.chords.length === 1 ? (
-                  <span className="font-mono text-lg font-semibold text-foreground">
-                    {renderChord(measure.chords[0], notationStyle)}
-                  </span>
-                ) : (
-                  <div className="flex w-full items-center justify-around gap-2">
-                    {measure.chords.map((chord, cIdx) => (
-                      <span
-                        key={cIdx}
-                        className="font-mono text-base font-semibold text-foreground"
-                      >
-                        {renderChord(chord, notationStyle)}
+                  <div className="flex min-h-[1.75rem] items-center justify-center">
+                    {measure.chords.length === 0 ? (
+                      <span className="font-mono text-xs text-muted-foreground/40">
+                        —
                       </span>
-                    ))}
+                    ) : measure.chords.length === 1 ? (
+                      <span className="font-mono text-lg font-semibold text-foreground">
+                        {renderChord(measure.chords[0], notationStyle)}
+                      </span>
+                    ) : (
+                      <div className="flex w-full items-center justify-around gap-2">
+                        {measure.chords.map((chord, cIdx) => (
+                          <span
+                            key={cIdx}
+                            className="font-mono text-base font-semibold text-foreground"
+                          >
+                            {renderChord(chord, notationStyle)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-                {/* Measure number — small, top-left */}
-                <span className="absolute mt-[-2.5rem] ml-[-2.5rem] font-mono text-[9px] text-muted-foreground/60">
-                  {mIdx + 1}
-                </span>
-              </div>
-            ))}
+                  {hasMelody && (
+                    <div className="flex justify-center">
+                      <MelodyStaff
+                        melody={measure.melody ?? []}
+                        timeSignature={sheet.timeSignature}
+                        showClef={mIdx === 0}
+                        showTimeSignature={mIdx === 0}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Footer (printable) */}

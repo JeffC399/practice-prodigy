@@ -65,7 +65,34 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
     {
       name: "practice-prodigy:sheets-library:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persistedState, version) => {
+        if (!persistedState || typeof persistedState !== "object") {
+          return persistedState;
+        }
+        const next = { ...(persistedState as Record<string, unknown>) };
+        // v1 → v2: Phase 24b added optional `melody` per measure.
+        // Backfill empty arrays so the renderer doesn't get undefined
+        // when iterating existing measures.
+        if (version <= 1) {
+          const sheets = Array.isArray(next.sheets)
+            ? (next.sheets as Array<Record<string, unknown>>)
+            : [];
+          next.sheets = sheets.map((s) => {
+            const measures = Array.isArray(s.measures)
+              ? (s.measures as Array<Record<string, unknown>>)
+              : [];
+            return {
+              ...s,
+              measures: measures.map((m) => ({
+                ...m,
+                melody: Array.isArray(m.melody) ? m.melody : [],
+              })),
+            };
+          });
+        }
+        return next;
+      },
     },
   ),
 );
