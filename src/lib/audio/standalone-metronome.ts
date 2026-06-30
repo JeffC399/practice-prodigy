@@ -320,7 +320,7 @@ type SoundVoices = {
  * pass; the others got further boosts so they match.
  */
 const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
-  tonal: 8, // Bumped +2 → +8 for more presence
+  tonal: 14, // Bumped +8 → +14; also swapped MonoSynth → Synth to drop the filter chain
   wood: 12,
   electronic: -4, // Reference, unchanged
   stick: -2,
@@ -338,13 +338,18 @@ function makeSoundVoices(
 ): SoundVoices {
   switch (sound) {
     case "tonal": {
-      // Pitched click via short MonoSynth burst. Accent is a full
-      // octave higher than normal AND triggered with full velocity
-      // (vs 0.6 for normal) so the downbeat is unmissable — both a
-      // pitch jump AND a level jump distinguish accent from normal.
-      const synth = new Tone.MonoSynth({
+      // Pitched click via plain Synth burst. Switched away from
+      // MonoSynth because its built-in filter chain (Oscillator →
+      // AmpEnv → Filter → FilterEnv) was quietly cutting brightness
+      // even at higher dB — at the very short 50ms decay the filter
+      // wasn't fully opening before it closed again. Plain Synth is
+      // just Oscillator → AmpEnv → output. Triangle wave for tonal
+      // character; full velocity on the accent + pitch jump
+      // (G5 → C7, a full octave + a fourth) makes the downbeat
+      // unmissable.
+      const synth = new Tone.Synth({
         oscillator: { type: "triangle" },
-        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
+        envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.05 },
         volume: SOUND_VOLUME_DB.tonal,
       }).connect(destination);
       return {
