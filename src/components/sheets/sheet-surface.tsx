@@ -396,10 +396,12 @@ export function SheetSurface({
     fontStyle === "handwritten"
       ? "'Patrick Hand', cursive"
       : "Georgia, 'Times New Roman', serif";
-  // Patrick Hand is wider than Georgia at the same nominal size — bump
-  // the rendered point sizes so chord symbols + lyrics stay readable.
-  const chordSize = fontStyle === "handwritten" ? 18 : 14;
-  const lyricSize = fontStyle === "handwritten" ? 14 : 11;
+  // Patrick Hand reads slightly narrower than Georgia bold at the same
+  // nominal size — bump rendered point sizes a touch for readability,
+  // but not as aggressively as v0 (chord 18 → 16, lyric 14 → 13) so
+  // the chart still reads as a "tight real chart" rather than oversized.
+  const chordSize = fontStyle === "handwritten" ? 16 : 14;
+  const lyricSize = fontStyle === "handwritten" ? 13 : 11;
 
   useEffect(() => {
     if (!musicRef.current) return;
@@ -763,10 +765,8 @@ export function SheetSurface({
       >
         <header className="mb-7 border-b border-black/10 pb-4">
           <h1
-            className={`mb-3 text-center tracking-tight ${
-              fontStyle === "handwritten"
-                ? "text-4xl"
-                : "text-3xl font-bold"
+            className={`mb-3 text-center tracking-tight text-3xl ${
+              fontStyle === "handwritten" ? "" : "font-bold"
             }`}
             style={{
               fontFamily: titleFont,
@@ -780,14 +780,24 @@ export function SheetSurface({
             style={{ fontFamily: titleFont, color: "#333" }}
           >
             <div className="flex min-h-[1.25rem] flex-col gap-0.5">
-              {sheet.style && <span className="italic">{sheet.style}</span>}
+              {/* Phase 25.0.3: drop italic in handwritten mode — Real
+                  Book convention keeps composer/style in the same
+                  hand-print as everything else; browser-synthesized
+                  italic on Patrick Hand reads as awkwardly slanted. */}
+              {sheet.style && (
+                <span className={fontStyle === "handwritten" ? "" : "italic"}>
+                  {sheet.style}
+                </span>
+              )}
               {sheet.bpm && (
                 <span className="font-medium">♩ = {sheet.bpm}</span>
               )}
             </div>
             <div className="flex flex-col items-end">
               {sheet.composer && (
-                <span className="italic">{sheet.composer}</span>
+                <span className={fontStyle === "handwritten" ? "" : "italic"}>
+                  {sheet.composer}
+                </span>
               )}
               <span className="text-xs text-black/50">
                 {sheet.keyTonic} {sheet.keyMode}
