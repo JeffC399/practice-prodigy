@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  CalendarCheck,
   Ear,
   Eye,
   FileMusic,
@@ -65,13 +66,23 @@ export const MODULES: ModuleEntry[] = [
     routeMatch: (p) => p.startsWith("/practice"),
   },
   {
+    id: "my-practice",
+    name: "My Practice",
+    shortName: "My Practice",
+    status: "designed",
+    bucket: "next",
+    description:
+      "Compose practice routines across every module: chain a metronome warmup → arpeggio drills → scale focus → sight-reading into one playable session. The cross-module composition layer. Design locked in ROUTINE-DESIGN.md; ships paired with the Metronome module.",
+    icon: CalendarCheck,
+  },
+  {
     id: "metronome",
     name: "Metronome",
     shortName: "Metronome",
     status: "designed",
     bucket: "next",
     description:
-      "Standalone metronome — subdivisions, accents, polymetric, programmable sequences. Same audio engine.",
+      "Standalone metronome — subdivisions, accents, polymetric, programmable sequences. Same audio engine. First module to implement the cross-module RoutineItem interface (see ROUTINE-DESIGN.md), shipping paired with My Practice v0.1.",
     icon: Timer,
   },
   {
