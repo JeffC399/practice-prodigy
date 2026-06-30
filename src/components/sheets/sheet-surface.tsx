@@ -531,17 +531,13 @@ export function SheetSurface({
             chordSize,
             fontStyle === "handwritten" ? "" : "bold",
           );
-          // Phase 25.2: render each ChordBeat at its beat-derived X
-          // position. Sorted by beat so visual order matches musical
-          // order. Slash chord bass override renders as "Chord/Bass".
-          // Phase 26.1: two-pass layout to avoid horizontal collision
-          // on consecutive-beat chords (e.g. dense bossa-nova bars
-          // with a different chord on every quarter). Pass 1 collects
-          // wanted X + measured width per chord; pass 2 walks left-to-
-          // right and shifts later chords right whenever they would
-          // overlap the previous one's right edge. Engraving trade-off:
-          // chords drift slightly off-beat in service of readability —
-          // same convention used by lyrics, same MIN_CHORD_GAP semantic.
+          // Phase 25.2: render each ChordBeat at its beat-derived X.
+          // Phase 26.1: collision-avoidance two-pass layout.
+          // Phase 26.1.1: when the collision-shifted layout would
+          // overflow the measure's right edge, SHRINK the chord font
+          // proportionally to fit (floor at 9pt for readability).
+          // Engraving convention — dense bars get smaller chord text
+          // rather than getting clipped.
           const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
           const measureWidth = noteEndX - noteStartX;
           const sortedChords = [...measure.chords].sort(
@@ -549,6 +545,9 @@ export function SheetSurface({
           );
           type ChordLayout = {
             text: string;
+            /** Beat-derived target X (immutable). */
+            wantedX: number;
+            /** Final X after shift (mutable). */
             leftX: number;
             width: number;
           };
@@ -568,16 +567,59 @@ export function SheetSurface({
               measured && typeof measured.width === "number"
                 ? measured.width
                 : text.length * (chordSize * 0.55);
-            return { text, leftX: x, width };
+            return { text, wantedX: x, leftX: x, width };
           });
           const MIN_CHORD_GAP = 6;
+          const CHORD_FONT_FLOOR = 9;
+
+          // Test pass: where would the rightmost edge land after the
+          // collision shift? (Doesn't mutate chordLayouts.)
+          let testPrevRight = -Infinity;
+          let testMaxRight = noteStartX;
+          chordLayouts.forEach((cl) => {
+            const left = Math.max(
+              cl.wantedX,
+              testPrevRight + MIN_CHORD_GAP,
+            );
+            const right = left + cl.width;
+            testPrevRight = right;
+            if (right > testMaxRight) testMaxRight = right;
+          });
+
+          // Phase 26.1.1: shrink font + re-measure if we'd overflow.
+          if (testMaxRight > noteEndX) {
+            const required = testMaxRight - noteStartX;
+            const scale = measureWidth / required;
+            const newSize = Math.max(
+              chordSize * scale,
+              CHORD_FONT_FLOOR,
+            );
+            ctx.setFont(
+              chordFont,
+              newSize,
+              fontStyle === "handwritten" ? "" : "bold",
+            );
+            chordLayouts.forEach((cl) => {
+              const measured = ctx.measureText
+                ? ctx.measureText(cl.text)
+                : null;
+              cl.width =
+                measured && typeof measured.width === "number"
+                  ? measured.width
+                  : cl.text.length * (newSize * 0.55);
+            });
+          }
+
+          // Final collision-shift pass with (possibly shrunk) widths.
           let prevRight = -Infinity;
           chordLayouts.forEach((cl) => {
-            if (cl.leftX < prevRight + MIN_CHORD_GAP) {
-              cl.leftX = prevRight + MIN_CHORD_GAP;
-            }
+            cl.leftX = Math.max(
+              cl.wantedX,
+              prevRight + MIN_CHORD_GAP,
+            );
             prevRight = cl.leftX + cl.width;
           });
+
           chordLayouts.forEach((cl) => {
             ctx.fillText(cl.text, cl.leftX, chordY);
           });
