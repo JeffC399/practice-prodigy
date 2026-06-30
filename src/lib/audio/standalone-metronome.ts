@@ -320,10 +320,10 @@ type SoundVoices = {
  * pass; the others got further boosts so they match.
  */
 const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
-  tonal: 2, // Bumped from -4 → +2 (6 dB louder)
-  wood: 0, // Bumped from -6 → 0 (6 dB louder)
+  tonal: 2,
+  wood: 8, // Bumped 0 → +8 — narrow bandpass eats most of the signal so it needs a big trim-up
   electronic: -4, // Reference, unchanged
-  stick: -2, // Bumped from -8 → -2 (6 dB louder)
+  stick: -2,
 };
 
 /**

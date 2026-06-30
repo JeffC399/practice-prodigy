@@ -98,11 +98,18 @@ export default function MetronomePage() {
   });
   const [mounted, setMounted] = useState(false);
   // Inline custom-time-signature composer state. When `addingCustom`
-  // is true, two number inputs + a Save button surface under the
-  // time-sig dropdown.
+  // is true, two inputs + a Save button surface under the time-sig
+  // dropdown. The numerator is held as a STRING so the user can
+  // freely erase / retype (a number state with min={1} prevents
+  // clearing the field). Validation happens at Save time.
   const [addingCustom, setAddingCustom] = useState(false);
-  const [customNumerator, setCustomNumerator] = useState(5);
+  const [customNumeratorInput, setCustomNumeratorInput] = useState("5");
   const [customDenominator, setCustomDenominator] = useState<number>(8);
+  const customNumeratorParsed = parseInt(customNumeratorInput, 10);
+  const customNumeratorIsValid =
+    !Number.isNaN(customNumeratorParsed) &&
+    customNumeratorParsed >= 1 &&
+    customNumeratorParsed <= CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX;
   useEffect(() => {
     // SSR-hydration guard: persisted Zustand state isn't available
     // until after mount, so we defer the first real render to avoid
@@ -406,42 +413,44 @@ export default function MetronomePage() {
                   )}
                 </select>
               </div>
-              {/* Add-custom inline form. Two-row stack: inputs above,
-                  buttons below right-aligned. Prevents the previous
-                  single-row layout from busting out of the container
-                  when the parent gets narrow. */}
+              {/* Add-custom inline form. Two-row stack:
+                  inputs (matched height, evenly spaced) above,
+                  buttons right-aligned below. Numerator is a text
+                  input with a numeric pattern so the user can erase
+                  it; validity is checked at Save time. */}
               {addingCustom ? (
-                <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 p-3">
-                  <span className="text-[11px] font-medium text-primary">
+                <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <span className="text-[11px] font-medium text-primary uppercase tracking-wider">
                     New custom time signature
                   </span>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      min={1}
-                      max={CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX}
-                      value={customNumerator}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={customNumeratorInput}
                       onChange={(e) =>
-                        setCustomNumerator(
-                          Math.max(
-                            1,
-                            Math.min(
-                              CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX,
-                              Number(e.target.value) || 1,
-                            ),
-                          ),
+                        // Allow only digits; allow empty string so
+                        // the user can erase freely. Validation runs
+                        // when the user clicks Save (button disables
+                        // if value isn't in range).
+                        setCustomNumeratorInput(
+                          e.target.value.replace(/[^0-9]/g, ""),
                         )
                       }
-                      className="w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+                      className="h-9 w-16 rounded border border-border bg-background px-3 text-center text-sm tabular-nums"
                       aria-label="Numerator"
+                      placeholder="N"
                     />
-                    <span className="text-muted-foreground">/</span>
+                    <span className="text-muted-foreground text-lg select-none">
+                      /
+                    </span>
                     <select
                       value={customDenominator}
                       onChange={(e) =>
                         setCustomDenominator(Number(e.target.value))
                       }
-                      className="rounded border border-border bg-background px-2 py-1 text-sm"
+                      className="h-9 rounded border border-border bg-background px-3 text-sm"
                       aria-label="Denominator"
                     >
                       {CUSTOM_TIME_SIGNATURE_DENOMINATORS.map((d) => (
@@ -450,28 +459,33 @@ export default function MetronomePage() {
                         </option>
                       ))}
                     </select>
+                    <span className="ml-1 text-[10px] text-muted-foreground">
+                      Numerator 1–{CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX}
+                    </span>
                   </div>
                   <div className="flex items-center justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => setAddingCustom(false)}
-                      className="rounded-md border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      className="h-8 rounded-md border border-border bg-background px-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
+                      disabled={!customNumeratorIsValid}
                       onClick={() => {
+                        if (!customNumeratorIsValid) return;
                         const sig = {
-                          beatsPerMeasure: customNumerator,
+                          beatsPerMeasure: customNumeratorParsed,
                           beatUnit: customDenominator,
                         };
                         addCustomTimeSignature(sig);
-                        setBeatsPerMeasure(customNumerator);
+                        setBeatsPerMeasure(customNumeratorParsed);
                         setBeatUnit(customDenominator);
                         setAddingCustom(false);
                       }}
-                      className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                      className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
                     >
                       Save & use
                     </button>
