@@ -182,6 +182,69 @@ export type SheetStyle = string;
 export const SHEET_FONT_STYLES = ["standard", "handwritten"] as const;
 export type SheetFontStyle = (typeof SHEET_FONT_STYLES)[number];
 
+/**
+ * Phase 27.1 — instrument voices for live audio playback. Per-sheet
+ * because the pairing is part of the chart's identity (bossa wants
+ * guitar + flute; jazz wants piano + sax; rock wants electric guitar
+ * + voice). Strings via smplr's sample library; "synth" keeps the
+ * original Tone.js synth voice as a fast / low-bandwidth fallback.
+ */
+export const CHORD_VOICES = [
+  "piano",
+  "epiano",
+  "guitar",
+  "vibes",
+  "strings",
+  "synth",
+] as const;
+export type ChordVoice = (typeof CHORD_VOICES)[number];
+
+export const MELODY_VOICES = [
+  "piano",
+  "voice",
+  "sax",
+  "flute",
+  "strings",
+  "synth",
+] as const;
+export type MelodyVoice = (typeof MELODY_VOICES)[number];
+
+export const CHORD_VOICE_LABELS: Record<ChordVoice, string> = {
+  piano: "Acoustic Piano",
+  epiano: "Electric Piano",
+  guitar: "Acoustic Guitar",
+  vibes: "Vibraphone",
+  strings: "Strings",
+  synth: "Synth",
+};
+
+export const MELODY_VOICE_LABELS: Record<MelodyVoice, string> = {
+  piano: "Acoustic Piano",
+  voice: "Voice (Aah)",
+  sax: "Saxophone",
+  flute: "Flute",
+  strings: "Strings",
+  synth: "Synth",
+};
+
+/**
+ * Phase 27.1 — per-voice mixer state. Volume is in dB (0 = unity,
+ * -inf to ~+6). Muted overrides volume.
+ */
+export type SheetMixer = {
+  chordVolume: number;
+  chordMuted: boolean;
+  melodyVolume: number;
+  melodyMuted: boolean;
+};
+
+export const DEFAULT_SHEET_MIXER: SheetMixer = {
+  chordVolume: -4,
+  chordMuted: false,
+  melodyVolume: 0,
+  melodyMuted: false,
+};
+
 export type Sheet = {
   id: string;
   /** Display title. */
@@ -201,6 +264,12 @@ export type Sheet = {
   measures: SheetMeasure[];
   /** Phase 25.0.2: visual font style. Defaults to "standard". */
   fontStyle?: SheetFontStyle;
+  /** Phase 27.1: instrument voice for chord comping during playback. */
+  chordVoice?: ChordVoice;
+  /** Phase 27.1: instrument voice for melody during playback. */
+  melodyVoice?: MelodyVoice;
+  /** Phase 27.1: per-voice mixer state (volume + mute). */
+  mixer?: SheetMixer;
   createdAt: number;
   updatedAt: number;
   /** Last time the sheet was opened. */

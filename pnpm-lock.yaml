@@ -50,6 +50,9 @@ importers:
       shadcn:
         specifier: ^4.12.0
         version: 4.12.0(typescript@5.9.3)
+      smplr:
+        specifier: ^1.0.0
+        version: 1.0.0
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
@@ -2770,6 +2773,10 @@ packages:
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
+
+  smplr@1.0.0:
+    resolution: {integrity: sha512-mCggf1Ex9oNOMl3LJNq7qlc3/aotKsH4DRFz0WgB7g7H4P1qUxmENkoqZ8FKj5vFY6CeweGNk7Uz8vOU/exQ7w==}
+    engines: {node: '>=14.0.0'}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -6033,6 +6040,8 @@ snapshots:
   signal-exit@4.1.0: {}
 
   sisteransi@1.0.5: {}
+
+  smplr@1.0.0: {}
 
   source-map-js@1.2.1: {}
 

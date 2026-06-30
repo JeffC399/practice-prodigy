@@ -3,44 +3,42 @@ import { CHORD_INTERVALS } from "@/lib/music/intervals";
 import { type Chord, type PitchClass } from "@/lib/music/chord";
 import type {
   ChordBeat,
+  ChordVoice,
   MelodyDuration,
   MelodyNote,
+  MelodyVoice,
   Sheet,
+  SheetMixer,
 } from "@/lib/sheets/types";
-import { MELODY_DURATION_BEATS } from "@/lib/sheets/types";
+import {
+  DEFAULT_SHEET_MIXER,
+  MELODY_DURATION_BEATS,
+} from "@/lib/sheets/types";
+import {
+  loadChordVoice,
+  loadMelodyVoice,
+  type VoiceHandle,
+} from "@/lib/audio/sheet-voices";
 
 /**
  * Phase 27 — Lead-sheet live audio playback.
+ * Phase 27.1 — sample-based instruments + per-voice mixer.
  *
- * Plays a Sheet aloud through two synth voices:
- *   - Chord comping: a PolySynth holds each ChordBeat for the
- *     duration until the next chord change (or end of sheet).
- *     Voiced in the bass-baritone range (root from C3) so it sits
- *     below the melody.
- *   - Melody: a MonoSynth plays each MelodyNote at its computed
- *     start beat for its computed duration (whole/half/.../dotted).
- *     Rests advance the clock without scheduling audio.
+ * Plays a Sheet aloud through two configurable voices:
+ *   - Chord comping: holds each ChordBeat for the duration until the
+ *     next chord change. Voiced in the bass-baritone range (root from
+ *     C3) so it sits below the melody.
+ *   - Melody: plays each MelodyNote at its computed start beat for
+ *     its computed duration. Rests advance the clock without
+ *     scheduling audio. Tied note pairs combine sustain.
  *
- * One global Tone.Transport. Stops cleanly via .stop(). Per the
- * existing preview engine pattern, only one of {sheetPlayback,
- * preview, drillMetronome, standaloneMetronome} can own the
- * transport at a time. The editor's Play button cancels any
- * sibling engine before starting.
+ * Voice choice + mixer (volume + mute per voice) comes from the
+ * Sheet's `chordVoice` / `melodyVoice` / `mixer` fields (with sensible
+ * defaults). Voices lazy-load on first play and cache.
  */
 
 const LEAD_IN_SECONDS = 0.1;
-/** Default chord octave when none is implied. */
 const CHORD_OCTAVE = 3;
-
-const LETTER_TO_SEMITONE: Record<string, number> = {
-  c: 0,
-  d: 2,
-  e: 4,
-  f: 5,
-  g: 7,
-  a: 9,
-  b: 11,
-};
 
 const PITCH_CLASS_TO_SEMITONE: Record<PitchClass, number> = {
   C: 0,
@@ -57,10 +55,16 @@ const PITCH_CLASS_TO_SEMITONE: Record<PitchClass, number> = {
   B: 11,
 };
 
-/**
- * Convert a VexFlow-style pitch string ("c/4", "f#/5", "bb/3") to
- * an absolute MIDI note number. Returns null on unparseable input.
- */
+const LETTER_TO_SEMITONE: Record<string, number> = {
+  c: 0,
+  d: 2,
+  e: 4,
+  f: 5,
+  g: 7,
+  a: 9,
+  b: 11,
+};
+
 export function vexPitchToMidi(pitch: string): number | null {
   const slash = pitch.indexOf("/");
   if (slash < 0) return null;
@@ -77,7 +81,6 @@ export function vexPitchToMidi(pitch: string): number | null {
   return 12 * (octave + 1) + semitone;
 }
 
-/** Expand a Chord to its block-voicing MIDI notes at the given octave. */
 export function chordToMidiNotes(
   chord: Chord,
   octave: number = CHORD_OCTAVE,
@@ -87,15 +90,12 @@ export function chordToMidiNotes(
   const intervals = CHORD_INTERVALS[chord.quality];
   const notes = intervals.map((iv) => rootMidi + iv);
   if (bass) {
-    // Slash chord: add a bass note one octave below the chord's root.
-    const bassMidi =
-      12 * octave + PITCH_CLASS_TO_SEMITONE[bass];
+    const bassMidi = 12 * octave + PITCH_CLASS_TO_SEMITONE[bass];
     return [bassMidi, ...notes];
   }
   return notes;
 }
 
-/** Beats for a duration token, with optional dotted modifier. */
 function beatsForDuration(
   duration: MelodyDuration,
   dotted?: boolean,
@@ -105,68 +105,56 @@ function beatsForDuration(
 }
 
 class SheetPlayback {
-  private chordSynth: Tone.PolySynth | null = null;
-  private melodySynth: Tone.MonoSynth | null = null;
+  private chordVoice: VoiceHandle | null = null;
+  private melodyVoice: VoiceHandle | null = null;
   private scheduledEvents: number[] = [];
   private endEvent: number | null = null;
   private endCallback: (() => void) | null = null;
   private _isPlaying = false;
-
-  private ensureSynths(): void {
-    if (!this.chordSynth) {
-      // Soft electric-piano-ish PolySynth for chord comping. Mellow so
-      // it doesn't overpower the melody.
-      this.chordSynth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: "triangle" },
-        envelope: {
-          attack: 0.02,
-          decay: 0.4,
-          sustain: 0.5,
-          release: 0.6,
-        },
-        volume: -14,
-      }).toDestination();
-    }
-    if (!this.melodySynth) {
-      // Brighter MonoSynth for the melody line so it cuts through.
-      this.melodySynth = new Tone.MonoSynth({
-        oscillator: { type: "sawtooth" },
-        envelope: {
-          attack: 0.01,
-          decay: 0.15,
-          sustain: 0.3,
-          release: 0.25,
-        },
-        filter: { type: "lowpass", Q: 1, rolloff: -24 },
-        filterEnvelope: {
-          attack: 0.02,
-          decay: 0.15,
-          sustain: 0.5,
-          release: 0.25,
-          baseFrequency: 600,
-          octaves: 1.6,
-        },
-        volume: -10,
-      }).toDestination();
-    }
-  }
+  private _isLoading = false;
 
   isPlaying(): boolean {
     return this._isPlaying;
   }
+  isLoading(): boolean {
+    return this._isLoading;
+  }
 
-  /**
-   * Play the sheet end-to-end. Cancels any in-flight playback first.
-   * Optional `bpmOverride` lets the caller play at a different tempo
-   * than `sheet.bpm` (e.g. half-tempo practice mode).
-   */
+  /** Re-apply the mixer to currently-loaded voices. Called between plays
+   *  so volume / mute changes mid-stop are reflected next time. */
+  applyMixer(mixer: SheetMixer): void {
+    if (this.chordVoice) {
+      this.chordVoice.setVolumeDb(mixer.chordVolume);
+      this.chordVoice.setMuted(mixer.chordMuted);
+    }
+    if (this.melodyVoice) {
+      this.melodyVoice.setVolumeDb(mixer.melodyVolume);
+      this.melodyVoice.setMuted(mixer.melodyMuted);
+    }
+  }
+
   async play(
     sheet: Sheet,
     options?: { bpmOverride?: number; onEnded?: () => void },
   ): Promise<void> {
     await Tone.start();
-    this.ensureSynths();
     this.cancel();
+
+    const chordVoice: ChordVoice = sheet.chordVoice ?? "piano";
+    const melodyVoice: MelodyVoice = sheet.melodyVoice ?? "piano";
+    const mixer: SheetMixer = sheet.mixer ?? DEFAULT_SHEET_MIXER;
+
+    // Lazy-load voices (cached). Both load in parallel.
+    this._isLoading = true;
+    try {
+      [this.chordVoice, this.melodyVoice] = await Promise.all([
+        loadChordVoice(chordVoice),
+        loadMelodyVoice(melodyVoice),
+      ]);
+    } finally {
+      this._isLoading = false;
+    }
+    this.applyMixer(mixer);
 
     const bpm = options?.bpmOverride ?? sheet.bpm ?? 120;
     const transport = Tone.getTransport();
@@ -177,9 +165,8 @@ class SheetPlayback {
     const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
     const totalMeasureBeats = sheet.measures.length * beatsPerMeasure;
 
-    // 1) Chord events: each ChordBeat starts at (measureIdx*bpm + beat-1)
-    // beats; the chord sustains until the NEXT chord change in time
-    // order, or until end-of-sheet.
+    // 1) Chord events: each ChordBeat sustains until the NEXT chord
+    // change in time order, or end-of-sheet.
     type FlatChord = { startBeat: number; midi: number[] };
     const flatChords: FlatChord[] = [];
     sheet.measures.forEach((m, mi) => {
@@ -188,11 +175,7 @@ class SheetPlayback {
       );
       for (const cb of sorted) {
         const start = mi * beatsPerMeasure + (cb.beat - 1);
-        const midi = chordToMidiNotes(
-          cb.chord,
-          CHORD_OCTAVE,
-          cb.bass,
-        );
+        const midi = chordToMidiNotes(cb.chord, CHORD_OCTAVE, cb.bass);
         flatChords.push({ startBeat: start, midi });
       }
     });
@@ -207,22 +190,12 @@ class SheetPlayback {
       const durBeats = Math.max(0.25, nextStart - fc.startBeat);
       const sustainSeconds = durBeats * beatSeconds * 0.95;
       const id = transport.schedule((time) => {
-        const freqs = fc.midi.map((m) =>
-          Tone.Frequency(m, "midi").toFrequency(),
-        );
-        this.chordSynth?.triggerAttackRelease(
-          freqs,
-          sustainSeconds,
-          time,
-        );
+        this.chordVoice?.play(fc.midi, time, sustainSeconds, 0.7);
       }, LEAD_IN_SECONDS + fc.startBeat * beatSeconds);
       this.scheduledEvents.push(id);
     }
 
-    // 2) Melody events: walk each measure's melody and accumulate a
-    // beat cursor within the measure. Rests advance the cursor without
-    // scheduling audio. Tied "follower" notes get skipped (their
-    // duration is folded into the previous note).
+    // 2) Melody events.
     sheet.measures.forEach((m, mi) => {
       const melody: MelodyNote[] = m.melody ?? [];
       let cursor = 0;
@@ -230,8 +203,6 @@ class SheetPlayback {
         const beats = beatsForDuration(n.duration, n.dotted);
         const startBeat = mi * beatsPerMeasure + cursor;
         if (n.kind === "note") {
-          // Check if previous note tied into this one — if so, skip:
-          // the previous note's scheduling already covers it.
           const prev = melody[ni - 1];
           const isTiedFollower =
             prev &&
@@ -239,8 +210,6 @@ class SheetPlayback {
             prev.tieToNext === true &&
             prev.pitch === n.pitch;
           if (!isTiedFollower) {
-            // If THIS note ties to the next AND the next is same pitch,
-            // extend the sustain to cover both.
             let sustainBeats = beats;
             const next = melody[ni + 1];
             if (
@@ -253,14 +222,12 @@ class SheetPlayback {
             }
             const midi = vexPitchToMidi(n.pitch);
             if (midi !== null) {
-              const sustainSeconds =
-                Math.max(0.05, sustainBeats * beatSeconds * 0.92);
+              const sustainSeconds = Math.max(
+                0.05,
+                sustainBeats * beatSeconds * 0.92,
+              );
               const id = transport.schedule((time) => {
-                this.melodySynth?.triggerAttackRelease(
-                  Tone.Frequency(midi, "midi").toFrequency(),
-                  sustainSeconds,
-                  time,
-                );
+                this.melodyVoice?.play(midi, time, sustainSeconds, 0.85);
               }, LEAD_IN_SECONDS + startBeat * beatSeconds);
               this.scheduledEvents.push(id);
             }
@@ -270,8 +237,7 @@ class SheetPlayback {
       });
     });
 
-    // 3) End-of-sheet stop. Schedule a tiny tail after the final beat
-    // so the release of the last note completes.
+    // 3) End-of-sheet stop.
     const totalSeconds =
       LEAD_IN_SECONDS + totalMeasureBeats * beatSeconds + 0.8;
     this.endCallback = options?.onEnded ?? null;
@@ -294,19 +260,10 @@ class SheetPlayback {
     }
     transport.stop();
     transport.position = 0;
-    this.chordSynth?.releaseAll();
-    this.melodySynth?.triggerRelease();
+    this.chordVoice?.releaseAll();
+    this.melodyVoice?.releaseAll();
     this._isPlaying = false;
-  }
-
-  dispose(): void {
-    this.cancel();
-    this.chordSynth?.dispose();
-    this.chordSynth = null;
-    this.melodySynth?.dispose();
-    this.melodySynth = null;
   }
 }
 
-/** Module-level singleton. Same Transport-ownership pattern as preview.ts. */
 export const sheetPlayback = new SheetPlayback();

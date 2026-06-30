@@ -3,15 +3,19 @@
 import {
   ArrowLeft,
   Eye,
+  Loader2,
   Music,
   MousePointerClick,
   Play,
   Plus,
   Redo2,
+  SlidersHorizontal,
   Square,
   Trash2,
   Type,
   Undo2,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,15 +32,23 @@ import {
 } from "@/lib/music/chord";
 import { renderChord } from "@/lib/music/render-chord";
 import {
+  CHORD_VOICES,
+  CHORD_VOICE_LABELS,
+  DEFAULT_SHEET_MIXER,
   MELODY_DURATIONS,
   MELODY_DURATION_LABELS,
+  MELODY_VOICES,
+  MELODY_VOICE_LABELS,
   newMeasureId,
   newTupletGroupId,
   SHEET_FONT_STYLES,
   SHEET_KEY_MODES,
+  type ChordVoice,
   type MelodyDuration,
   type MelodyNote,
+  type MelodyVoice,
   type SheetKeyMode,
+  type SheetMixer,
 } from "@/lib/sheets/types";
 import { MelodyStaff } from "@/components/sheets/melody-staff";
 import {
@@ -144,6 +156,9 @@ export default function SheetEditorPage() {
   const [recentChords, setRecentChords] = useState<string[]>([]);
   // Phase 27 — Live audio playback state.
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  // Phase 27.1 — instrument picker + mixer panel toggle.
+  const [audioPanelOpen, setAudioPanelOpen] = useState(false);
   useEffect(() => {
     // Stop any in-flight playback when leaving the editor.
     return () => {
@@ -815,26 +830,30 @@ export default function SheetEditorPage() {
           </Link>
           <div className="flex items-center gap-2">
             {/* Phase 27 — Play / Stop. Plays the sheet aloud via Tone.js
-                (chord comping + melody synth). */}
+                (sample-based chord comping + melody voice). */}
             <button
               type="button"
+              disabled={isLoadingAudio}
               onClick={async () => {
                 if (isPlaying) {
                   sheetPlayback.cancel();
                   setIsPlaying(false);
                 } else {
                   if (!sheet) return;
-                  setIsPlaying(true);
+                  setIsLoadingAudio(true);
                   try {
                     await sheetPlayback.play(sheet, {
                       onEnded: () => setIsPlaying(false),
                     });
+                    setIsPlaying(true);
                   } catch {
                     setIsPlaying(false);
+                  } finally {
+                    setIsLoadingAudio(false);
                   }
                 }
               }}
-              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 isPlaying
                   ? "border-rose-500/60 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
                   : "border-emerald-500/40 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/15"
@@ -842,12 +861,32 @@ export default function SheetEditorPage() {
               title={isPlaying ? "Stop playback" : "Play this sheet aloud"}
               aria-label={isPlaying ? "Stop playback" : "Play"}
             >
-              {isPlaying ? (
+              {isLoadingAudio ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isPlaying ? (
                 <Square className="h-4 w-4" />
               ) : (
                 <Play className="h-4 w-4" />
               )}
-              {isPlaying ? "Stop" : "Play"}
+              {isLoadingAudio
+                ? "Loading…"
+                : isPlaying
+                  ? "Stop"
+                  : "Play"}
+            </button>
+            {/* Phase 27.1 — Audio settings (voice picker + mixer). */}
+            <button
+              type="button"
+              onClick={() => setAudioPanelOpen((o) => !o)}
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                audioPanelOpen
+                  ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-500"
+                  : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/40"
+              }`}
+              title="Audio settings — instruments + mixer"
+              aria-label="Audio settings"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
             </button>
             {/* Phase 26 — Undo / Redo. Keyboard: Cmd/Ctrl+Z (undo),
                 Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y (redo). */}
@@ -880,6 +919,180 @@ export default function SheetEditorPage() {
             </Link>
           </div>
         </div>
+
+        {/* Phase 27.1 — Audio settings panel. Toggled by the SlidersHorizontal
+            button in the header. Voice picker + per-voice mute + volume. */}
+        {audioPanelOpen && (
+          <section className="flex flex-col gap-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-mono text-xs uppercase tracking-wider text-emerald-500">
+                Audio
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                Per-sheet voice + mixer. Samples lazy-load on first Play.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {/* Chord voice + mixer */}
+              <div className="flex flex-col gap-2 rounded-md border border-border/40 bg-card/40 p-3">
+                <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Chords
+                </h4>
+                <label className="flex flex-col gap-1 text-xs">
+                  Voice
+                  <select
+                    value={sheet.chordVoice ?? "piano"}
+                    onChange={(e) =>
+                      updateMeta("chordVoice", e.target.value as ChordVoice)
+                    }
+                    className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  >
+                    {CHORD_VOICES.map((v) => (
+                      <option key={v} value={v}>
+                        {CHORD_VOICE_LABELS[v]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const m = sheet.mixer ?? DEFAULT_SHEET_MIXER;
+                      const next: SheetMixer = {
+                        ...m,
+                        chordMuted: !m.chordMuted,
+                      };
+                      updateMeta("mixer", next);
+                      sheetPlayback.applyMixer(next);
+                    }}
+                    className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                      (sheet.mixer ?? DEFAULT_SHEET_MIXER).chordMuted
+                        ? "border-rose-500/60 bg-rose-500/10 text-rose-500"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="Mute chord voice"
+                    aria-label="Mute chord voice"
+                  >
+                    {(sheet.mixer ?? DEFAULT_SHEET_MIXER).chordMuted ? (
+                      <VolumeX className="h-3.5 w-3.5" />
+                    ) : (
+                      <Volume2 className="h-3.5 w-3.5" />
+                    )}
+                    {(sheet.mixer ?? DEFAULT_SHEET_MIXER).chordMuted
+                      ? "Muted"
+                      : "On"}
+                  </button>
+                  <div className="flex-1 flex flex-col gap-0.5">
+                    <input
+                      type="range"
+                      min={-30}
+                      max={6}
+                      step={1}
+                      value={
+                        (sheet.mixer ?? DEFAULT_SHEET_MIXER).chordVolume
+                      }
+                      onChange={(e) => {
+                        const m = sheet.mixer ?? DEFAULT_SHEET_MIXER;
+                        const next: SheetMixer = {
+                          ...m,
+                          chordVolume: Number(e.target.value),
+                        };
+                        updateMeta("mixer", next);
+                        sheetPlayback.applyMixer(next);
+                      }}
+                      className="w-full accent-emerald-500"
+                      aria-label="Chord volume"
+                    />
+                    <span className="text-[10px] text-muted-foreground">
+                      {(sheet.mixer ?? DEFAULT_SHEET_MIXER).chordVolume} dB
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* Melody voice + mixer */}
+              <div className="flex flex-col gap-2 rounded-md border border-border/40 bg-card/40 p-3">
+                <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Melody
+                </h4>
+                <label className="flex flex-col gap-1 text-xs">
+                  Voice
+                  <select
+                    value={sheet.melodyVoice ?? "piano"}
+                    onChange={(e) =>
+                      updateMeta(
+                        "melodyVoice",
+                        e.target.value as MelodyVoice,
+                      )
+                    }
+                    className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  >
+                    {MELODY_VOICES.map((v) => (
+                      <option key={v} value={v}>
+                        {MELODY_VOICE_LABELS[v]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const m = sheet.mixer ?? DEFAULT_SHEET_MIXER;
+                      const next: SheetMixer = {
+                        ...m,
+                        melodyMuted: !m.melodyMuted,
+                      };
+                      updateMeta("mixer", next);
+                      sheetPlayback.applyMixer(next);
+                    }}
+                    className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                      (sheet.mixer ?? DEFAULT_SHEET_MIXER).melodyMuted
+                        ? "border-rose-500/60 bg-rose-500/10 text-rose-500"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="Mute melody voice"
+                    aria-label="Mute melody voice"
+                  >
+                    {(sheet.mixer ?? DEFAULT_SHEET_MIXER).melodyMuted ? (
+                      <VolumeX className="h-3.5 w-3.5" />
+                    ) : (
+                      <Volume2 className="h-3.5 w-3.5" />
+                    )}
+                    {(sheet.mixer ?? DEFAULT_SHEET_MIXER).melodyMuted
+                      ? "Muted"
+                      : "On"}
+                  </button>
+                  <div className="flex-1 flex flex-col gap-0.5">
+                    <input
+                      type="range"
+                      min={-30}
+                      max={6}
+                      step={1}
+                      value={
+                        (sheet.mixer ?? DEFAULT_SHEET_MIXER).melodyVolume
+                      }
+                      onChange={(e) => {
+                        const m = sheet.mixer ?? DEFAULT_SHEET_MIXER;
+                        const next: SheetMixer = {
+                          ...m,
+                          melodyVolume: Number(e.target.value),
+                        };
+                        updateMeta("mixer", next);
+                        sheetPlayback.applyMixer(next);
+                      }}
+                      className="w-full accent-emerald-500"
+                      aria-label="Melody volume"
+                    />
+                    <span className="text-[10px] text-muted-foreground">
+                      {(sheet.mixer ?? DEFAULT_SHEET_MIXER).melodyVolume} dB
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Title + meta */}
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-card/40 p-5">
