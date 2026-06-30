@@ -315,9 +315,30 @@ type SoundVoices = {
 };
 
 /**
+ * Per-sound loudness trim in dB. Calibrated by ear so each preset
+ * sounds roughly the same perceived loudness at the same master
+ * volume. Necessary because raw dB doesn't map to perceived loudness:
+ * pure sines (electronic) read quieter than equivalent triangles
+ * (tonal), MembraneSynth + bandpass (wood) is naturally percussive
+ * and reads loud, filtered noise (stick) is harsh and reads loud.
+ *
+ * Reference point: tonal click at -8 dB is the baseline; others are
+ * trimmed relative to that. Tune these values if a particular sound
+ * still pokes out — they're the single tuning knob for loudness
+ * normalization.
+ */
+const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
+  tonal: -8,
+  wood: -16, // MembraneSynth is the hottest source — biggest trim
+  electronic: -4, // Pure sine is the quietest perceptually — boost
+  stick: -14, // Filtered noise reads loud + harsh — significant trim
+};
+
+/**
  * Build the synth voices for a given sound preset. Each preset uses a
  * different synth flavor; intensity (accent / normal / sub) controls
- * pitch and velocity so the listener can hear which beat is which.
+ * pitch + velocity so the listener can hear which beat is which.
+ * Loudness across the four presets is normalized via SOUND_VOLUME_DB.
  */
 function makeSoundVoices(
   sound: MetronomeSound,
@@ -329,7 +350,7 @@ function makeSoundVoices(
       const synth = new Tone.MonoSynth({
         oscillator: { type: "triangle" },
         envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.05 },
-        volume: -4,
+        volume: SOUND_VOLUME_DB.tonal,
       }).connect(destination);
       return {
         trigger: (time, intensity) => {
@@ -345,14 +366,14 @@ function makeSoundVoices(
       };
     }
     case "wood": {
-      // Wood block via short PolySynth + bandpass filter for a percussive tone.
+      // Wood block via MembraneSynth + bandpass filter for a percussive tone.
       const filter = new Tone.Filter(900, "bandpass", -24).connect(destination);
       filter.Q.value = 8;
       const synth = new Tone.MembraneSynth({
         pitchDecay: 0.005,
         octaves: 2,
         envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 },
-        volume: -2,
+        volume: SOUND_VOLUME_DB.wood,
       }).connect(filter);
       return {
         trigger: (time, intensity) => {
@@ -371,11 +392,13 @@ function makeSoundVoices(
       };
     }
     case "electronic": {
-      // Pure sine pulse — modern electronic metronome flavor.
+      // Pure sine pulse — modern electronic metronome flavor. Sine
+      // waves are the QUIETEST perceptually because they have no
+      // harmonic content, so this gets the loudest trim setting.
       const synth = new Tone.Synth({
         oscillator: { type: "sine" },
         envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
-        volume: -3,
+        volume: SOUND_VOLUME_DB.electronic,
       }).connect(destination);
       return {
         trigger: (time, intensity) => {
@@ -397,7 +420,7 @@ function makeSoundVoices(
       const noise = new Tone.NoiseSynth({
         noise: { type: "white" },
         envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
-        volume: -8,
+        volume: SOUND_VOLUME_DB.stick,
       }).connect(filter);
       return {
         trigger: (time, intensity) => {
