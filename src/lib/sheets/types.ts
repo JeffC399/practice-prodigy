@@ -258,6 +258,22 @@ export type Sheet = {
    * by ___". When only one is set, plain name.
    */
   lyricist?: string;
+  /**
+   * Phase 27.1.3 — Arranger credit. Renders as "arr. by ___" below the
+   * composer / lyricist credit. Common on jazz charts.
+   */
+  arranger?: string;
+  /**
+   * Phase 27.1.3 — Source attribution. Renders as a small italic
+   * subtitle below the title (e.g. "from the musical Carousel" or
+   * "from the album Kind of Blue").
+   */
+  source?: string;
+  /**
+   * Phase 27.1.3 — Copyright line. Renders small at the bottom-right
+   * of the title block (e.g. "© 2026 Smith Music Co.").
+   */
+  copyright?: string;
   /** Free-text style indicator. */
   style?: SheetStyle;
   /** Optional explicit tempo. */

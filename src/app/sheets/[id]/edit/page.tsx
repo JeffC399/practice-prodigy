@@ -1268,6 +1268,45 @@ export default function SheetEditorPage() {
                 placeholder="If different from composer"
               />
             </label>
+            {/* Phase 27.1.3 — Arranger (renders as "arr. by ___"). */}
+            <label className="flex flex-col gap-1 text-xs">
+              Arranger
+              <input
+                type="text"
+                value={sheet.arranger ?? ""}
+                onChange={(e) =>
+                  updateMeta("arranger", e.target.value || undefined)
+                }
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                placeholder="e.g. Quincy Jones"
+              />
+            </label>
+            {/* Phase 27.1.3 — Source (renders as italic subtitle). */}
+            <label className="flex flex-col gap-1 text-xs">
+              Source
+              <input
+                type="text"
+                value={sheet.source ?? ""}
+                onChange={(e) =>
+                  updateMeta("source", e.target.value || undefined)
+                }
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                placeholder='e.g. "from Kind of Blue"'
+              />
+            </label>
+            {/* Phase 27.1.3 — Copyright (renders small at bottom-right). */}
+            <label className="flex flex-col gap-1 text-xs sm:col-span-2">
+              Copyright
+              <input
+                type="text"
+                value={sheet.copyright ?? ""}
+                onChange={(e) =>
+                  updateMeta("copyright", e.target.value || undefined)
+                }
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                placeholder="e.g. © 2026 Smith Music Co."
+              />
+            </label>
             <label className="flex flex-col gap-1 text-xs">
               Style
               <input

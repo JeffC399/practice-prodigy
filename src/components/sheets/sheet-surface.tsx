@@ -832,9 +832,9 @@ export function SheetSurface({
       >
         <header className="mb-7 border-b border-black/10 pb-4">
           <h1
-            className={`mb-3 text-center tracking-tight text-3xl ${
+            className={`text-center tracking-tight text-3xl ${
               fontStyle === "handwritten" ? "" : "font-bold"
-            }`}
+            } ${sheet.source?.trim() ? "mb-1" : "mb-3"}`}
             style={{
               fontFamily: titleFont,
               color: "#1a1a1a",
@@ -842,6 +842,20 @@ export function SheetSurface({
           >
             {sheet.title || "Untitled"}
           </h1>
+          {/* Phase 27.1.3 — Source attribution as italic subtitle. */}
+          {sheet.source?.trim() && (
+            <p
+              className={`mb-3 text-center text-sm ${
+                fontStyle === "handwritten" ? "" : "italic"
+              }`}
+              style={{
+                fontFamily: titleFont,
+                color: "#555",
+              }}
+            >
+              {sheet.source}
+            </p>
+          )}
           <div
             className="flex items-end justify-between text-sm"
             style={{ fontFamily: titleFont, color: "#333" }}
@@ -873,46 +887,70 @@ export function SheetSurface({
               {(() => {
                 const composer = sheet.composer?.trim();
                 const lyricist = sheet.lyricist?.trim();
+                const arranger = sheet.arranger?.trim();
                 const italicClass =
                   fontStyle === "handwritten" ? "" : "italic";
+                const lines: React.ReactNode[] = [];
                 if (composer && lyricist) {
                   if (
                     composer.toLowerCase() === lyricist.toLowerCase()
                   ) {
-                    return (
-                      <span className={italicClass}>
+                    lines.push(
+                      <span
+                        key="composer-lyricist"
+                        className={italicClass}
+                      >
                         Music and Lyrics by {composer}
-                      </span>
+                      </span>,
+                    );
+                  } else {
+                    lines.push(
+                      <span key="music" className={italicClass}>
+                        Music by {composer}
+                      </span>,
+                      <span key="words" className={italicClass}>
+                        Words by {lyricist}
+                      </span>,
                     );
                   }
-                  return (
-                    <>
-                      <span className={italicClass}>
-                        Music by {composer}
-                      </span>
-                      <span className={italicClass}>
-                        Words by {lyricist}
-                      </span>
-                    </>
+                } else if (composer) {
+                  lines.push(
+                    <span key="composer" className={italicClass}>
+                      {composer}
+                    </span>,
+                  );
+                } else if (lyricist) {
+                  lines.push(
+                    <span key="lyricist" className={italicClass}>
+                      {lyricist}
+                    </span>,
                   );
                 }
-                if (composer) {
-                  return (
-                    <span className={italicClass}>{composer}</span>
+                if (arranger) {
+                  lines.push(
+                    <span key="arranger" className={italicClass}>
+                      arr. by {arranger}
+                    </span>,
                   );
                 }
-                if (lyricist) {
-                  return (
-                    <span className={italicClass}>{lyricist}</span>
-                  );
-                }
-                return null;
+                return lines.length > 0 ? <>{lines}</> : null;
               })()}
               <span className="text-xs text-black/50">
                 {sheet.keyTonic} {sheet.keyMode}
               </span>
             </div>
           </div>
+          {/* Phase 27.1.3 — Copyright line. Bottom-right of the title
+              block, very small (not italic — matches engraving
+              convention for copyright notices). */}
+          {sheet.copyright?.trim() && (
+            <p
+              className="mt-2 text-right text-[10px] text-black/50"
+              style={{ fontFamily: titleFont }}
+            >
+              {sheet.copyright}
+            </p>
+          )}
         </header>
         <div ref={musicRef} />
       </div>
