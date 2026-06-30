@@ -855,7 +855,8 @@ export default function SheetEditorPage() {
                       onEnded: () => setIsPlaying(false),
                     });
                     setIsPlaying(true);
-                  } catch {
+                  } catch (err) {
+                    console.error("[sheet-playback] play() failed", err);
                     setIsPlaying(false);
                   } finally {
                     setIsLoadingAudio(false);
@@ -950,7 +951,7 @@ export default function SheetEditorPage() {
                 <label className="flex flex-col gap-1 text-xs">
                   Voice
                   <select
-                    value={sheet.chordVoice ?? "piano"}
+                    value={sheet.chordVoice ?? "synth"}
                     onChange={(e) =>
                       updateMeta("chordVoice", e.target.value as ChordVoice)
                     }
@@ -1027,7 +1028,7 @@ export default function SheetEditorPage() {
                 <label className="flex flex-col gap-1 text-xs">
                   Voice
                   <select
-                    value={sheet.melodyVoice ?? "piano"}
+                    value={sheet.melodyVoice ?? "synth"}
                     onChange={(e) =>
                       updateMeta(
                         "melodyVoice",

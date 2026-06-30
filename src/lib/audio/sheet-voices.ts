@@ -266,12 +266,24 @@ async function buildMelodySampleVoice(
   return wrapSmplr(instrument);
 }
 
+/**
+ * Phase 27.1.1 — synth fallback. Wrap smplr loads in a catch so a CDN
+ * failure or runtime API mismatch falls back to the built-in synth
+ * voice instead of leaving the user with no audio at all. Errors are
+ * logged so we can diagnose what broke without burying the user.
+ */
 export async function loadChordVoice(voice: ChordVoice): Promise<VoiceHandle> {
   if (chordVoiceCache[voice]) return chordVoiceCache[voice]!;
   const promise: Promise<VoiceHandle> =
     voice === "synth"
       ? Promise.resolve(buildChordSynthVoice())
-      : buildChordSampleVoice(voice);
+      : buildChordSampleVoice(voice).catch((err) => {
+          console.error(
+            `[sheet-voices] chord voice "${voice}" failed to load — falling back to synth.`,
+            err,
+          );
+          return buildChordSynthVoice();
+        });
   chordVoiceCache[voice] = promise;
   return promise;
 }
@@ -283,7 +295,13 @@ export async function loadMelodyVoice(
   const promise: Promise<VoiceHandle> =
     voice === "synth"
       ? Promise.resolve(buildMelodySynthVoice())
-      : buildMelodySampleVoice(voice);
+      : buildMelodySampleVoice(voice).catch((err) => {
+          console.error(
+            `[sheet-voices] melody voice "${voice}" failed to load — falling back to synth.`,
+            err,
+          );
+          return buildMelodySynthVoice();
+        });
   melodyVoiceCache[voice] = promise;
   return promise;
 }
