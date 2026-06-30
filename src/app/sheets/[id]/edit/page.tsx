@@ -1,6 +1,14 @@
 "use client";
 
-import { ArrowLeft, Eye, Plus, Trash2, Type, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  MousePointerClick,
+  Plus,
+  Trash2,
+  Type,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -30,6 +38,7 @@ import {
   type SheetSurfaceLayout,
 } from "@/components/sheets/sheet-surface";
 import { LyricOverlay } from "@/components/sheets/lyric-overlay";
+import { MelodyEntryOverlay } from "@/components/sheets/melody-entry-overlay";
 import {
   firstLyricPosition,
   formatLyricForInput,
@@ -40,6 +49,11 @@ import {
   setLyricAt,
   type LyricCursor,
 } from "@/lib/sheets/lyric-cursor";
+import {
+  appendMelodyNote,
+  buildPitchedNote,
+  buildRestNote,
+} from "@/lib/sheets/melody-entry";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -83,25 +97,45 @@ export default function SheetEditorPage() {
   const [editingMelodyIdx, setEditingMelodyIdx] = useState<number | null>(
     null,
   );
-  // Phase 24c — Lyric editing mode state. The toggle below the Preview
-  // header flips lyricMode on; when on, the SheetSurface emits per-note
-  // pixel positions via onLayout, and the LyricOverlay renders click
-  // regions + a floating input over the paper.
-  const [lyricMode, setLyricMode] = useState(false);
+  // Phase 24c / 25 — Editor mode state. Mutually exclusive interactive
+  // modes that take over the live Preview. "none" = static preview;
+  // "lyrics" = click-on-note typing flow; "click-entry" = click-on-staff
+  // melody authoring (Phase 25.0 — Dorico-style sequential snap-entry).
+  // The SheetSurface emits layout (per-note positions + per-measure
+  // rects) whenever any interactive mode is on.
+  const [editorMode, setEditorMode] = useState<
+    "none" | "lyrics" | "click-entry"
+  >("none");
   const [lyricCursor, setLyricCursor] = useState<LyricCursor | null>(null);
   const [lyricDraft, setLyricDraft] = useState("");
-  const [lyricLayout, setLyricLayout] = useState<SheetSurfaceLayout | null>(
-    null,
-  );
+  const [surfaceLayout, setSurfaceLayout] =
+    useState<SheetSurfaceLayout | null>(null);
   const handleLayout = useCallback((layout: SheetSurfaceLayout) => {
-    setLyricLayout(layout);
+    setSurfaceLayout(layout);
   }, []);
+  // Phase 25.0 — Side-panel state for click-on-staff melody entry.
+  const [entryDuration, setEntryDuration] = useState<MelodyDuration>("q");
+  const [entryDotted, setEntryDotted] = useState(false);
+  const [entryRest, setEntryRest] = useState(false);
+  // Phase 25.0 — Window-level Escape handler for click-entry mode. The
+  // overlay div doesn't auto-focus, so a window listener catches Esc.
+  useEffect(() => {
+    if (editorMode !== "click-entry") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setEditorMode("none");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editorMode]);
   // Phase 24c — Lyric overlay click positions: pitched notes that are
   // NOT tied followers. Computed here (above the early returns) so the
   // useMemo hook order stays stable across renders.
   const eligibleLyricPositions = useMemo(() => {
-    if (!sheet || !lyricLayout) return [];
-    return lyricLayout.positions.filter((p) => {
+    if (!sheet || !surfaceLayout) return [];
+    return surfaceLayout.positions.filter((p) => {
       if (!p.isPitched) return false;
       const melody = sheet.measures[p.measureIdx]?.melody ?? [];
       const note = melody[p.noteIdx];
@@ -118,7 +152,7 @@ export default function SheetEditorPage() {
       }
       return true;
     });
-  }, [lyricLayout, sheet]);
+  }, [surfaceLayout, sheet]);
 
   if (!mounted) {
     return (
@@ -233,12 +267,12 @@ export default function SheetEditorPage() {
       // No pitched notes — nothing to lyric-edit. Still flip mode on so
       // the overlay shows the (empty) state; user-facing helper text
       // covers this case.
-      setLyricMode(true);
+      setEditorMode("lyrics");
       setLyricCursor(null);
       setLyricDraft("");
       return;
     }
-    setLyricMode(true);
+    setEditorMode("lyrics");
     setLyricCursor(first);
     const existing = getLyricAt(sheet, first);
     setLyricDraft(existing ? formatLyricForInput(existing) : "");
@@ -246,9 +280,24 @@ export default function SheetEditorPage() {
 
   const exitLyricMode = () => {
     if (lyricCursor) commitDraftAt(lyricCursor, lyricDraft);
-    setLyricMode(false);
+    setEditorMode("none");
     setLyricCursor(null);
     setLyricDraft("");
+  };
+
+  // Phase 25.0 — Click-on-staff melody entry handlers.
+  const enterClickEntryMode = () => {
+    setEditorMode("click-entry");
+  };
+  const exitClickEntryMode = () => {
+    setEditorMode("none");
+  };
+  const onPlaceNoteAtClick = (measureIdx: number, pitch: string) => {
+    const note = entryRest
+      ? buildRestNote(entryDuration, entryDotted)
+      : buildPitchedNote(pitch, entryDuration, entryDotted);
+    const measures = appendMelodyNote(sheet, measureIdx, note);
+    updateSheet(id, { measures });
   };
 
   const moveCursorTo = (next: LyricCursor) => {
@@ -273,7 +322,7 @@ export default function SheetEditorPage() {
     const next = nextLyricPosition(fresh, lyricCursor);
     if (!next) {
       // End of sheet — exit lyric mode after committing.
-      setLyricMode(false);
+      setEditorMode("none");
       setLyricCursor(null);
       setLyricDraft("");
       return;
@@ -429,35 +478,65 @@ export default function SheetEditorPage() {
         {/* Live preview — same engraving as the View / Print page so the
             user sees their work in its final form as they edit.
             Phase 24c: "Edit lyrics" toggle turns the preview into an
-            interactive lyric authoring surface — click a note, type the
-            syllable, space to advance, hyphen for continuation,
-            underscore for melisma, esc to exit. */}
+            interactive lyric authoring surface.
+            Phase 25.0: "Click entry" toggle turns the preview into a
+            Dorico-style click-on-staff melody authoring surface. The
+            two modes are mutually exclusive. */}
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               Preview
             </h2>
-            <button
-              type="button"
-              onClick={() =>
-                lyricMode ? exitLyricMode() : enterLyricMode()
-              }
-              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
-                lyricMode
-                  ? "border-amber-500/60 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
-                  : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              }`}
-              title={
-                lyricMode
-                  ? "Exit lyric editing"
-                  : "Click notes and type lyrics under the staff"
-              }
-            >
-              <Type className="h-3.5 w-3.5" />
-              {lyricMode ? "Done editing lyrics" : "Edit lyrics"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  editorMode === "click-entry"
+                    ? exitClickEntryMode()
+                    : enterClickEntryMode()
+                }
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  editorMode === "click-entry"
+                    ? "border-sky-500/60 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+                title={
+                  editorMode === "click-entry"
+                    ? "Exit click-entry mode"
+                    : "Click on a staff to place a melody note (Dorico-style)"
+                }
+              >
+                <MousePointerClick className="h-3.5 w-3.5" />
+                {editorMode === "click-entry"
+                  ? "Done click-entry"
+                  : "Click entry"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  editorMode === "lyrics"
+                    ? exitLyricMode()
+                    : enterLyricMode()
+                }
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  editorMode === "lyrics"
+                    ? "border-amber-500/60 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+                title={
+                  editorMode === "lyrics"
+                    ? "Exit lyric editing"
+                    : "Click notes and type lyrics under the staff"
+                }
+              >
+                <Type className="h-3.5 w-3.5" />
+                {editorMode === "lyrics"
+                  ? "Done editing lyrics"
+                  : "Edit lyrics"}
+              </button>
+            </div>
           </div>
-          {lyricMode && (
+          {editorMode === "lyrics" && (
             <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-muted-foreground">
               <span className="font-medium text-amber-500">
                 Lyric mode.
@@ -481,13 +560,64 @@ export default function SheetEditorPage() {
               to exit. Rests + tied follower notes are skipped.
             </p>
           )}
+          {editorMode === "click-entry" && (
+            <div className="flex flex-col gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-2">
+              <p className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-sky-500">
+                  Click entry mode.
+                </span>{" "}
+                Click anywhere on a staff to append a note at that pitch.
+                Notes use the rhythm value below. Beat-targeting + keyboard
+                pitch entry land in 25.1 / 25.2.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                  Rhythm
+                </span>
+                {(["w", "h", "q", "8", "16"] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setEntryDuration(d)}
+                    className={`rounded border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+                      entryDuration === d
+                        ? "border-sky-500/60 bg-sky-500/15 text-sky-500"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {MELODY_DURATION_LABELS[d]}
+                  </button>
+                ))}
+                <label className="ml-2 flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={entryDotted}
+                    onChange={(e) => setEntryDotted(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-sky-500"
+                  />
+                  Dotted
+                </label>
+                <label className="ml-2 flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={entryRest}
+                    onChange={(e) => setEntryRest(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-sky-500"
+                  />
+                  Rest
+                </label>
+              </div>
+            </div>
+          )}
           <div className="relative" style={{ width: 720 }}>
             <SheetSurface
               sheet={sheet}
               width={720}
-              onLayout={lyricMode ? handleLayout : undefined}
+              onLayout={
+                editorMode !== "none" ? handleLayout : undefined
+              }
             />
-            {lyricMode && (
+            {editorMode === "lyrics" && (
               <LyricOverlay
                 positions={eligibleLyricPositions}
                 cursor={lyricCursor}
@@ -499,8 +629,16 @@ export default function SheetEditorPage() {
                 onExit={exitLyricMode}
               />
             )}
+            {editorMode === "click-entry" && surfaceLayout && (
+              <MelodyEntryOverlay
+                measureRects={surfaceLayout.measureRects}
+                paperHeight={surfaceLayout.paperHeight}
+                onPlaceNote={onPlaceNoteAtClick}
+                onExit={exitClickEntryMode}
+              />
+            )}
           </div>
-          {lyricMode && eligibleLyricPositions.length === 0 && (
+          {editorMode === "lyrics" && eligibleLyricPositions.length === 0 && (
             <p className="rounded-md border border-border bg-card/40 px-3 py-2 text-[11px] text-muted-foreground">
               No pitched notes to lyric-edit yet. Add a melody to a
               measure below, then re-enter lyric mode.

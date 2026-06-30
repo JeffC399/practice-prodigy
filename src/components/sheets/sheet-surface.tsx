@@ -64,8 +64,29 @@ export type SheetNotePosition = {
   isPitched: boolean;
 };
 
+/**
+ * Phase 25 — per-measure pixel rect within the paper-div coord space.
+ * Used by the click-on-staff melody-entry overlay to map click X → which
+ * measure was clicked, and click Y → pitch via the topLineY anchor.
+ */
+export type SheetMeasureRect = {
+  measureIdx: number;
+  /** Note-area X start (after clef/keysig/timesig for first-of-line measures). */
+  noteStartX: number;
+  /** Note-area X end (before the right barline). */
+  noteEndX: number;
+  /** Stave top Y. */
+  staveTopY: number;
+  /** Y of the top staff line (F5 in treble clef). Used for pitch math. */
+  topLineY: number;
+  /** Y of the bottom staff line (E4 in treble clef). */
+  bottomLineY: number;
+};
+
 export type SheetSurfaceLayout = {
   positions: SheetNotePosition[];
+  /** Phase 25: per-measure rects for click-on-staff overlay. */
+  measureRects: SheetMeasureRect[];
   paperWidth: number;
   paperHeight: number;
 };
@@ -389,6 +410,9 @@ export function SheetSurface({
     const localPositions: Array<
       SheetNotePosition & { _measureFirstIdx: number }
     > = [];
+    /** Phase 25: per-measure rects, also in music-ref coord space until
+     *  translation. Used by the click-on-staff overlay. */
+    const localMeasureRects: SheetMeasureRect[] = [];
 
     lines.forEach((lineMeasures, lineIdx) => {
       const showTimeSig = lineIdx === 0;
@@ -444,6 +468,19 @@ export function SheetSurface({
         // Phase 24c.1: chord baseline tightened from -6 to -3 above
         // staff top so chord symbols sit closer to the staff.
         const chordY = staveY - 3;
+
+        // Phase 25: capture this measure's rect for the click-on-staff
+        // overlay. topLineY / bottomLineY are computed via VexFlow's
+        // line-Y helper so pitch math stays accurate even if the stave
+        // is positioned differently in future layouts.
+        localMeasureRects.push({
+          measureIdx,
+          noteStartX,
+          noteEndX,
+          staveTopY: staveY,
+          topLineY: stave.getYForLine(0),
+          bottomLineY: stave.getYForLine(4),
+        });
 
         if (measure.chords.length > 0) {
           ctx.save();
@@ -594,8 +631,19 @@ export function SheetSurface({
         width: p.width,
         isPitched: p.isPitched,
       }));
+      const measureRects: SheetMeasureRect[] = localMeasureRects.map(
+        (r) => ({
+          measureIdx: r.measureIdx,
+          noteStartX: r.noteStartX + musicOffsetLeft,
+          noteEndX: r.noteEndX + musicOffsetLeft,
+          staveTopY: r.staveTopY + musicOffsetTop,
+          topLineY: r.topLineY + musicOffsetTop,
+          bottomLineY: r.bottomLineY + musicOffsetTop,
+        }),
+      );
       onLayout({
         positions,
+        measureRects,
         paperWidth: width,
         paperHeight: musicOffsetTop + totalHeight + PAPER_PADDING_Y,
       });
