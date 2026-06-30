@@ -5,8 +5,10 @@ import {
   Eye,
   Music,
   MousePointerClick,
+  Play,
   Plus,
   Redo2,
+  Square,
   Trash2,
   Type,
   Undo2,
@@ -66,6 +68,7 @@ import {
   buildPitchedNote,
   buildRestNote,
 } from "@/lib/sheets/melody-entry";
+import { sheetPlayback } from "@/lib/audio/sheet-playback";
 import {
   advanceCaret,
   caretAtEndOfMeasure,
@@ -139,6 +142,14 @@ export default function SheetEditorPage() {
   const [chordCursor, setChordCursor] = useState<ChordCursor | null>(null);
   const [chordDraft, setChordDraft] = useState("");
   const [recentChords, setRecentChords] = useState<string[]>([]);
+  // Phase 27 — Live audio playback state.
+  const [isPlaying, setIsPlaying] = useState(false);
+  useEffect(() => {
+    // Stop any in-flight playback when leaving the editor.
+    return () => {
+      sheetPlayback.cancel();
+    };
+  }, []);
   const [lyricCursor, setLyricCursor] = useState<LyricCursor | null>(null);
   const [lyricDraft, setLyricDraft] = useState("");
   const [surfaceLayout, setSurfaceLayout] =
@@ -803,6 +814,41 @@ export default function SheetEditorPage() {
             All sheets
           </Link>
           <div className="flex items-center gap-2">
+            {/* Phase 27 — Play / Stop. Plays the sheet aloud via Tone.js
+                (chord comping + melody synth). */}
+            <button
+              type="button"
+              onClick={async () => {
+                if (isPlaying) {
+                  sheetPlayback.cancel();
+                  setIsPlaying(false);
+                } else {
+                  if (!sheet) return;
+                  setIsPlaying(true);
+                  try {
+                    await sheetPlayback.play(sheet, {
+                      onEnded: () => setIsPlaying(false),
+                    });
+                  } catch {
+                    setIsPlaying(false);
+                  }
+                }
+              }}
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                isPlaying
+                  ? "border-rose-500/60 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
+                  : "border-emerald-500/40 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/15"
+              }`}
+              title={isPlaying ? "Stop playback" : "Play this sheet aloud"}
+              aria-label={isPlaying ? "Stop playback" : "Play"}
+            >
+              {isPlaying ? (
+                <Square className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {isPlaying ? "Stop" : "Play"}
+            </button>
             {/* Phase 26 — Undo / Redo. Keyboard: Cmd/Ctrl+Z (undo),
                 Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y (redo). */}
             <button
