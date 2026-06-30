@@ -463,11 +463,11 @@ export default function MetronomePage() {
                       Numerator 1–{CUSTOM_TIME_SIGNATURE_NUMERATOR_MAX}
                     </span>
                   </div>
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-center gap-3 pt-1">
                     <button
                       type="button"
                       onClick={() => setAddingCustom(false)}
-                      className="h-8 rounded-md border border-border bg-background px-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      className="h-9 min-w-[6rem] rounded-md border border-border bg-background px-4 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                     >
                       Cancel
                     </button>
@@ -485,7 +485,7 @@ export default function MetronomePage() {
                         setBeatUnit(customDenominator);
                         setAddingCustom(false);
                       }}
-                      className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                      className="h-9 min-w-[6rem] rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
                     >
                       Save & use
                     </button>
@@ -501,37 +501,58 @@ export default function MetronomePage() {
                   Add custom time signature
                 </button>
               )}
-              {/* Manage saved customs — small inline list with delete affordance. */}
+              {/* Manage saved customs — chip row with prominent delete
+                  buttons. Each chip shows the time-sig in a readable
+                  size + an explicit X icon (larger than before so the
+                  delete affordance is impossible to miss). Click the
+                  sig text to use it; click the X to delete. */}
               {customTimeSignatures.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
-                    Saved:
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Your saved time signatures
                   </span>
-                  {customTimeSignatures.map((ts) => {
-                    const isActive =
-                      ts.beatsPerMeasure === beatsPerMeasure &&
-                      ts.beatUnit === beatUnit;
-                    return (
-                      <span
-                        key={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
-                        className={`inline-flex items-center gap-1 rounded-full border pl-2 pr-0.5 py-0 text-[10px] font-mono ${
-                          isActive
-                            ? "border-primary/50 bg-primary/10 text-primary"
-                            : "border-border bg-background/30 text-muted-foreground"
-                        }`}
-                      >
-                        {ts.beatsPerMeasure}/{ts.beatUnit}
-                        <button
-                          type="button"
-                          onClick={() => removeCustomTimeSignature(ts)}
-                          className="rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors"
-                          aria-label={`Remove custom ${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {customTimeSignatures.map((ts) => {
+                      const isActive =
+                        ts.beatsPerMeasure === beatsPerMeasure &&
+                        ts.beatUnit === beatUnit;
+                      return (
+                        <div
+                          key={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                          className={`inline-flex items-center gap-1 rounded-md border ${
+                            isActive
+                              ? "border-primary bg-primary/15"
+                              : "border-border bg-background hover:border-primary/40"
+                          }`}
                         >
-                          <X className="h-2.5 w-2.5" />
-                        </button>
-                      </span>
-                    );
-                  })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBeatsPerMeasure(ts.beatsPerMeasure);
+                              setBeatUnit(ts.beatUnit);
+                            }}
+                            className={`px-3 py-1.5 text-sm font-mono ${
+                              isActive
+                                ? "text-primary"
+                                : "text-foreground hover:text-primary"
+                            }`}
+                            title="Use this time signature"
+                          >
+                            {ts.beatsPerMeasure}/{ts.beatUnit}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeCustomTimeSignature(ts)}
+                            className="border-l border-border/60 px-2 py-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-r-md"
+                            aria-label={`Delete custom ${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                            title={`Delete ${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

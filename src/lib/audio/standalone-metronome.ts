@@ -321,7 +321,7 @@ type SoundVoices = {
  */
 const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
   tonal: 2,
-  wood: 8, // Bumped 0 → +8 — narrow bandpass eats most of the signal so it needs a big trim-up
+  wood: 12, // Bumped to +12; also widened the filter Q so more signal passes through
   electronic: -4, // Reference, unchanged
   stick: -2,
 };
@@ -358,9 +358,13 @@ function makeSoundVoices(
       };
     }
     case "wood": {
-      // Wood block via MembraneSynth + bandpass filter for a percussive tone.
-      const filter = new Tone.Filter(900, "bandpass", -24).connect(destination);
-      filter.Q.value = 8;
+      // Wood block via MembraneSynth + bandpass filter. The previous
+      // narrow Q=8 was choking most of the signal — wider Q (2) lets
+      // more of the membrane synth's body through while still
+      // shaping it into a wood-like timbre. Centered higher (1200 Hz)
+      // for better cut through the mix.
+      const filter = new Tone.Filter(1200, "bandpass", -12).connect(destination);
+      filter.Q.value = 2;
       const synth = new Tone.MembraneSynth({
         pitchDecay: 0.005,
         octaves: 2,
