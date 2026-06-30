@@ -320,8 +320,8 @@ type SoundVoices = {
  * pass; the others got further boosts so they match.
  */
 const SOUND_VOLUME_DB: Record<MetronomeSound, number> = {
-  tonal: 2,
-  wood: 12, // Bumped to +12; also widened the filter Q so more signal passes through
+  tonal: 8, // Bumped +2 → +8 for more presence
+  wood: 12,
   electronic: -4, // Reference, unchanged
   stick: -2,
 };
@@ -338,21 +338,24 @@ function makeSoundVoices(
 ): SoundVoices {
   switch (sound) {
     case "tonal": {
-      // Pitched click via short MonoSynth burst.
+      // Pitched click via short MonoSynth burst. Accent is a full
+      // octave higher than normal AND triggered with full velocity
+      // (vs 0.6 for normal) so the downbeat is unmissable — both a
+      // pitch jump AND a level jump distinguish accent from normal.
       const synth = new Tone.MonoSynth({
         oscillator: { type: "triangle" },
-        envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.05 },
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
         volume: SOUND_VOLUME_DB.tonal,
       }).connect(destination);
       return {
         trigger: (time, intensity) => {
-          const freq =
-            intensity === "accent"
-              ? "C6"
-              : intensity === "sub"
-                ? "E5"
-                : "G5";
-          synth.triggerAttackRelease(freq, "32n", time);
+          if (intensity === "accent") {
+            synth.triggerAttackRelease("C7", "32n", time, 1.0);
+          } else if (intensity === "sub") {
+            synth.triggerAttackRelease("E5", "32n", time, 0.4);
+          } else {
+            synth.triggerAttackRelease("G5", "32n", time, 0.6);
+          }
         },
         dispose: () => synth.dispose(),
       };
@@ -413,10 +416,12 @@ function makeSoundVoices(
       // Two-voice stick / rim:
       //   STICK (normal beat) = bright filtered-noise click — short,
       //   dry, sharp. Sounds like a stick hit on a drum head.
-      //   RIM (accent beat)   = the same noise burst PLUS a layered
-      //   metallic "ping" from a short MetalSynth burst — sounds
-      //   like a wood-on-rim shot. The pitched ping is what makes
-      //   the rim shot audibly distinct from a plain stick hit.
+      //   RIM (accent beat)   = lower-filtered noise burst PLUS a
+      //   short pitched "tock" — a quick sine burst at 900 Hz with
+      //   ultra-short envelope (decay 0.015s) so the pitched
+      //   element decays completely before the next beat lands.
+      //   The previous MetalSynth had a 170ms tail that bled into
+      //   beat 2 and colored it differently from beats 3 + 4.
       //   SUB-BEAT            = very bright, very short noise burst —
       //   spitty / quiet so it doesn't compete with the main beats.
       const filter = new Tone.Filter(3000, "highpass").connect(destination);
@@ -425,28 +430,31 @@ function makeSoundVoices(
         envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
         volume: SOUND_VOLUME_DB.stick,
       }).connect(filter);
-      // Metallic ping for rim-shot accents.
-      const ping = new Tone.MetalSynth({
-        envelope: { attack: 0.001, decay: 0.12, release: 0.05 },
-        harmonicity: 8.5,
-        modulationIndex: 32,
-        resonance: 4000,
-        octaves: 1.5,
-        volume: SOUND_VOLUME_DB.stick - 8,
+      // Pitched "tock" for rim-shot accents — extremely short
+      // envelope so the next beat starts on a clean slate.
+      const tock = new Tone.Synth({
+        oscillator: { type: "sine" },
+        envelope: {
+          attack: 0.0005,
+          decay: 0.015,
+          sustain: 0,
+          release: 0.01,
+        },
+        volume: SOUND_VOLUME_DB.stick - 2,
       }).connect(destination);
       return {
         trigger: (time, intensity) => {
           if (intensity === "accent") {
-            // RIM: low-mid filtered noise + metallic ping
+            // RIM: low-mid filtered noise + quick pitched tock
             filter.frequency.value = 1500;
             noise.triggerAttackRelease("16n", time);
-            ping.triggerAttackRelease("C5", "32n", time);
+            tock.triggerAttackRelease("A4", "64n", time, 1.0);
           } else if (intensity === "sub") {
             // SUB: thin, spitty
             filter.frequency.value = 5000;
             noise.triggerAttackRelease("64n", time);
           } else {
-            // STICK: bright, dry, mid-range click — no metallic ping
+            // STICK: bright, dry, mid-range click — no pitched element
             filter.frequency.value = 3500;
             noise.triggerAttackRelease("32n", time);
           }
@@ -454,7 +462,7 @@ function makeSoundVoices(
         dispose: () => {
           noise.dispose();
           filter.dispose();
-          ping.dispose();
+          tock.dispose();
         },
       };
     }
