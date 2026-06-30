@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Eye,
+  Music,
   MousePointerClick,
   Plus,
   Trash2,
@@ -40,6 +41,14 @@ import {
 } from "@/components/sheets/sheet-surface";
 import { LyricOverlay } from "@/components/sheets/lyric-overlay";
 import { MelodyEntryOverlay } from "@/components/sheets/melody-entry-overlay";
+import {
+  ChordEntryOverlay,
+  type ChordCursor,
+} from "@/components/sheets/chord-entry-overlay";
+import {
+  parseChordText,
+  suggestChords,
+} from "@/lib/sheets/chord-parser";
 import {
   firstLyricPosition,
   formatLyricForInput,
@@ -114,8 +123,12 @@ export default function SheetEditorPage() {
   // The SheetSurface emits layout (per-note positions + per-measure
   // rects) whenever any interactive mode is on.
   const [editorMode, setEditorMode] = useState<
-    "none" | "lyrics" | "click-entry"
+    "none" | "lyrics" | "click-entry" | "chord-entry"
   >("none");
+  // Phase 25.2 — Chord entry mode state.
+  const [chordCursor, setChordCursor] = useState<ChordCursor | null>(null);
+  const [chordDraft, setChordDraft] = useState("");
+  const [recentChords, setRecentChords] = useState<string[]>([]);
   const [lyricCursor, setLyricCursor] = useState<LyricCursor | null>(null);
   const [lyricDraft, setLyricDraft] = useState("");
   const [surfaceLayout, setSurfaceLayout] =
@@ -332,13 +345,20 @@ export default function SheetEditorPage() {
     });
   };
 
+  /**
+   * Phase 25.2 — chord helpers updated for the ChordBeat model.
+   * Existing chord-chip UI keeps working: first chord lands on beat 1,
+   * second on the half-bar. The new ChordEntryOverlay lets users
+   * choose any beat directly.
+   */
   const addChordToMeasure = (measureIdx: number, chord: Chord) => {
     const next = sheet.measures.map((m, i) => {
       if (i !== measureIdx) return m;
-      // Cap at 2 chords per measure for v0.1 (matches the renderer's
-      // split-the-bar-in-half assumption).
       if (m.chords.length >= 2) return m;
-      return { ...m, chords: [...m.chords, chord] };
+      const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
+      const halfBarBeat = Math.floor(beatsPerMeasure / 2) + 1;
+      const beat = m.chords.length === 0 ? 1 : halfBarBeat;
+      return { ...m, chords: [...m.chords, { chord, beat }] };
     });
     updateSheet(id, { measures: next });
   };
@@ -352,7 +372,9 @@ export default function SheetEditorPage() {
       if (i !== measureIdx) return m;
       return {
         ...m,
-        chords: m.chords.map((c, ci) => (ci === chordIdx ? chord : c)),
+        chords: m.chords.map((c, ci) =>
+          ci === chordIdx ? { ...c, chord } : c,
+        ),
       };
     });
     updateSheet(id, { measures: next });
@@ -364,6 +386,197 @@ export default function SheetEditorPage() {
       return { ...m, chords: m.chords.filter((_, ci) => ci !== chordIdx) };
     });
     updateSheet(id, { measures: next });
+  };
+
+  /**
+   * Phase 25.2 — Chord-entry mode helpers.
+   *
+   * Lifecycle:
+   *   enter → cursor lands on measure 0 beat 1, draft loads existing
+   *     chord text if there is one.
+   *   click hit region → commit current draft (if dirty), move cursor
+   *     to clicked beat, load that beat's existing chord into draft.
+   *   commit-advance / commit-retreat (Tab / Shift+Tab / Enter) →
+   *     parse + write current draft, then advance / retreat to the
+   *     next / previous beat.
+   *   exit → commit current draft + clear state.
+   */
+
+  /** Find the ChordBeat at a given measure + beat, or null. */
+  const chordAtBeat = (measureIdx: number, beat: number) => {
+    const m = sheet.measures[measureIdx];
+    if (!m) return null;
+    return m.chords.find((cb) => cb.beat === beat) ?? null;
+  };
+
+  /** Format a ChordBeat back to text for the input draft. */
+  const chordToText = (
+    cb: { chord: Chord; bass?: PitchClass } | null,
+  ): string => {
+    if (!cb) return "";
+    const base = renderChord(cb.chord, notationStyle);
+    return cb.bass ? `${base}/${cb.bass}` : base;
+  };
+
+  /** Commit the current draft to the cursor's beat. Empty draft removes
+   *  any existing chord at that beat. */
+  const commitChordDraftAt = (cursor: ChordCursor, draft: string) => {
+    const trimmed = draft.trim();
+    const existing = chordAtBeat(cursor.measureIdx, cursor.beat);
+    if (trimmed.length === 0) {
+      // Empty: remove existing if any.
+      if (existing) {
+        const next = sheet.measures.map((m, i) =>
+          i === cursor.measureIdx
+            ? { ...m, chords: m.chords.filter((cb) => cb.beat !== cursor.beat) }
+            : m,
+        );
+        updateSheet(id, { measures: next });
+      }
+      return;
+    }
+    const parsed = parseChordText(trimmed);
+    if (!parsed) return; // unparseable — leave existing intact
+    const newCb = parsed.bass
+      ? { chord: parsed.chord, beat: cursor.beat, bass: parsed.bass }
+      : { chord: parsed.chord, beat: cursor.beat };
+    const next = sheet.measures.map((m, i) => {
+      if (i !== cursor.measureIdx) return m;
+      const existingIdx = m.chords.findIndex((cb) => cb.beat === cursor.beat);
+      if (existingIdx >= 0) {
+        return {
+          ...m,
+          chords: m.chords.map((cb, ci) =>
+            ci === existingIdx ? newCb : cb,
+          ),
+        };
+      }
+      return { ...m, chords: [...m.chords, newCb] };
+    });
+    updateSheet(id, { measures: next });
+    // Track recently-used chord text.
+    setRecentChords((prev) => {
+      const filtered = prev.filter((c) => c !== trimmed);
+      return [trimmed, ...filtered].slice(0, 12);
+    });
+  };
+
+  const enterChordMode = () => {
+    setEditorMode("chord-entry");
+    const initialCursor: ChordCursor = { measureIdx: 0, beat: 1 };
+    setChordCursor(initialCursor);
+    const existing = chordAtBeat(0, 1);
+    setChordDraft(chordToText(existing));
+  };
+
+  const exitChordMode = () => {
+    if (chordCursor) commitChordDraftAt(chordCursor, chordDraft);
+    setEditorMode("none");
+    setChordCursor(null);
+    setChordDraft("");
+  };
+
+  const moveChordCursorTo = (next: ChordCursor) => {
+    if (chordCursor) commitChordDraftAt(chordCursor, chordDraft);
+    setChordCursor(next);
+    // Read freshest from store after potential write.
+    const fresh = useSheetsLibrary
+      .getState()
+      .sheets.find((s) => s.id === id);
+    const existing = fresh
+      ? fresh.measures[next.measureIdx]?.chords.find(
+          (cb) => cb.beat === next.beat,
+        )
+      : null;
+    setChordDraft(chordToText(existing ?? null));
+  };
+
+  const advanceChordCursor = (current: ChordCursor): ChordCursor | null => {
+    const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
+    let nextBeat = current.beat + 1;
+    let nextMeasure = current.measureIdx;
+    if (nextBeat > beatsPerMeasure) {
+      nextBeat = 1;
+      nextMeasure += 1;
+      if (nextMeasure >= sheet.measures.length) return null;
+    }
+    return { measureIdx: nextMeasure, beat: nextBeat };
+  };
+
+  const retreatChordCursor = (current: ChordCursor): ChordCursor | null => {
+    const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
+    let prevBeat = current.beat - 1;
+    let prevMeasure = current.measureIdx;
+    if (prevBeat < 1) {
+      prevMeasure -= 1;
+      if (prevMeasure < 0) return null;
+      prevBeat = beatsPerMeasure;
+    }
+    return { measureIdx: prevMeasure, beat: prevBeat };
+  };
+
+  const onChordCommitAdvance = () => {
+    if (!chordCursor) return;
+    commitChordDraftAt(chordCursor, chordDraft);
+    const next = advanceChordCursor(chordCursor);
+    if (!next) {
+      setEditorMode("none");
+      setChordCursor(null);
+      setChordDraft("");
+      return;
+    }
+    setChordCursor(next);
+    const fresh = useSheetsLibrary
+      .getState()
+      .sheets.find((s) => s.id === id);
+    const existing = fresh
+      ? fresh.measures[next.measureIdx]?.chords.find(
+          (cb) => cb.beat === next.beat,
+        )
+      : null;
+    setChordDraft(chordToText(existing ?? null));
+  };
+
+  const onChordCommitRetreat = () => {
+    if (!chordCursor) return;
+    commitChordDraftAt(chordCursor, chordDraft);
+    const prev = retreatChordCursor(chordCursor);
+    if (!prev) return;
+    setChordCursor(prev);
+    const fresh = useSheetsLibrary
+      .getState()
+      .sheets.find((s) => s.id === id);
+    const existing = fresh
+      ? fresh.measures[prev.measureIdx]?.chords.find(
+          (cb) => cb.beat === prev.beat,
+        )
+      : null;
+    setChordDraft(chordToText(existing ?? null));
+  };
+
+  const onChordPickSuggestion = (text: string) => {
+    setChordDraft(text);
+    if (chordCursor) {
+      // Commit immediately + advance to mimic "click a suggestion to lock in."
+      commitChordDraftAt(chordCursor, text);
+      const next = advanceChordCursor(chordCursor);
+      if (next) {
+        setChordCursor(next);
+        const fresh = useSheetsLibrary
+          .getState()
+          .sheets.find((s) => s.id === id);
+        const existing = fresh
+          ? fresh.measures[next.measureIdx]?.chords.find(
+              (cb) => cb.beat === next.beat,
+            )
+          : null;
+        setChordDraft(chordToText(existing ?? null));
+      } else {
+        setEditorMode("none");
+        setChordCursor(null);
+        setChordDraft("");
+      }
+    }
   };
 
   const updateMeasureMelody = (measureIdx: number, melody: MelodyNote[]) => {
@@ -691,6 +904,29 @@ export default function SheetEditorPage() {
               <button
                 type="button"
                 onClick={() =>
+                  editorMode === "chord-entry"
+                    ? exitChordMode()
+                    : enterChordMode()
+                }
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  editorMode === "chord-entry"
+                    ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+                title={
+                  editorMode === "chord-entry"
+                    ? "Exit chord-entry mode"
+                    : "Click a beat above the staff to enter / edit chords"
+                }
+              >
+                <Music className="h-3.5 w-3.5" />
+                {editorMode === "chord-entry"
+                  ? "Done chord-entry"
+                  : "Chord entry"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
                   editorMode === "click-entry"
                     ? exitClickEntryMode()
                     : enterClickEntryMode()
@@ -758,6 +994,43 @@ export default function SheetEditorPage() {
                 esc
               </kbd>{" "}
               to exit. Rests + tied follower notes are skipped.
+            </p>
+          )}
+          {editorMode === "chord-entry" && (
+            <p className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-[11px] text-muted-foreground">
+              <span className="font-medium text-emerald-500">
+                Chord entry mode.
+              </span>{" "}
+              Click any beat hit-region above a staff to anchor the
+              cursor. Type a chord (e.g.{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                Cmaj7
+              </kbd>{" "}
+              ,{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                Bm7b5
+              </kbd>{" "}
+              ,{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                C/E
+              </kbd>
+              );{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                Tab
+              </kbd>{" "}
+              or{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                Enter
+              </kbd>{" "}
+              commit + advance to next beat,{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                Shift+Tab
+              </kbd>{" "}
+              retreat,{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                esc
+              </kbd>{" "}
+              exit. Pick a suggestion to commit it instantly.
             </p>
           )}
           {editorMode === "click-entry" && (
@@ -868,6 +1141,22 @@ export default function SheetEditorPage() {
                 onExit={exitClickEntryMode}
               />
             )}
+            {editorMode === "chord-entry" && surfaceLayout && (
+              <ChordEntryOverlay
+                measureRects={surfaceLayout.measureRects}
+                paperHeight={surfaceLayout.paperHeight}
+                beatsPerMeasure={sheet.timeSignature.beatsPerMeasure}
+                cursor={chordCursor}
+                draft={chordDraft}
+                suggestions={suggestChords(chordDraft, recentChords, 8)}
+                onDraftChange={setChordDraft}
+                onSetCursor={moveChordCursorTo}
+                onCommitAdvance={onChordCommitAdvance}
+                onCommitRetreat={onChordCommitRetreat}
+                onPickSuggestion={onChordPickSuggestion}
+                onExit={exitChordMode}
+              />
+            )}
           </div>
           {editorMode === "lyrics" && eligibleLyricPositions.length === 0 && (
             <p className="rounded-md border border-border bg-card/40 px-3 py-2 text-[11px] text-muted-foreground">
@@ -931,7 +1220,7 @@ export default function SheetEditorPage() {
                       Add chord
                     </button>
                   ) : (
-                    measure.chords.map((chord, cIdx) => (
+                    measure.chords.map((cb, cIdx) => (
                       <button
                         key={cIdx}
                         type="button"
@@ -942,8 +1231,9 @@ export default function SheetEditorPage() {
                           })
                         }
                         className="flex items-center gap-0.5 rounded bg-primary/15 px-1.5 py-1 font-mono text-sm font-medium text-primary hover:bg-primary/25 transition-colors"
+                        title={`Beat ${cb.beat}`}
                       >
-                        {renderChord(chord, notationStyle)}
+                        {renderChord(cb.chord, notationStyle)}
                       </button>
                     ))
                   )}
@@ -993,7 +1283,7 @@ export default function SheetEditorPage() {
             initial={
               sheet.measures[editingChord.measureIdx].chords[
                 editingChord.chordIdx
-              ]
+              ].chord
             }
             onClose={() => setEditingChord(null)}
             onSave={(chord) => {

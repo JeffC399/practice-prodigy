@@ -531,31 +531,23 @@ export function SheetSurface({
             chordSize,
             fontStyle === "handwritten" ? "" : "bold",
           );
-          if (measure.chords.length === 1) {
-            ctx.fillText(
-              renderChord(measure.chords[0], notationStyle),
-              noteStartX,
-              chordY,
-            );
-          } else {
-            // Phase 24c.1: two-chord measure. First chord on the
-            // downbeat (noteStartX), second past the half-bar (55% of
-            // measure width). The naive slot/2 placement was rendering
-            // the 2nd chord at exactly the midpoint, which left the
-            // 1st chord's tail crashing into it for typical chord
-            // widths (Dmaj7 ≈ 50px).
-            ctx.fillText(
-              renderChord(measure.chords[0], notationStyle),
-              noteStartX,
-              chordY,
-            );
-            const halfX = noteStartX + (noteEndX - noteStartX) * 0.55;
-            ctx.fillText(
-              renderChord(measure.chords[1], notationStyle),
-              halfX,
-              chordY,
-            );
-          }
+          // Phase 25.2: render each ChordBeat at its beat-derived X
+          // position. Sorted by beat so visual order matches musical
+          // order. Slash chord bass override renders as "Chord/Bass".
+          const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
+          const measureWidth = noteEndX - noteStartX;
+          const sortedChords = [...measure.chords].sort(
+            (a, b) => a.beat - b.beat,
+          );
+          sortedChords.forEach((cb) => {
+            const fraction =
+              Math.max(0, Math.min(beatsPerMeasure - 0.001, cb.beat - 1)) /
+              beatsPerMeasure;
+            const x = noteStartX + fraction * measureWidth;
+            const base = renderChord(cb.chord, notationStyle);
+            const text = cb.bass ? `${base}/${cb.bass}` : base;
+            ctx.fillText(text, x, chordY);
+          });
           ctx.restore();
         }
 

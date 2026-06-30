@@ -65,7 +65,7 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
     {
       name: "practice-prodigy:sheets-library:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         if (!persistedState || typeof persistedState !== "object") {
           return persistedState;
@@ -102,6 +102,40 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
         // of MelodyNote. Optional + additive — no data migration needed.
         if (version <= 3) {
           void next; // explicit no-op
+        }
+        // v4 → v5: Phase 25.2 — chord model shifted from flat Chord[]
+        // to ChordBeat[] (per-beat positioning). Convert existing
+        // measure.chords entries to ChordBeat entries, assigning beat
+        // positions per the previous implicit convention: 1st chord on
+        // the downbeat (beat 1), 2nd chord at the half-bar (beat
+        // floor(beatsPerMeasure/2) + 1 ≈ beat 3 in 4/4).
+        if (version <= 4) {
+          const sheets = Array.isArray(next.sheets)
+            ? (next.sheets as Array<Record<string, unknown>>)
+            : [];
+          next.sheets = sheets.map((s) => {
+            const ts = s.timeSignature as
+              | { beatsPerMeasure?: number }
+              | undefined;
+            const beatsPerMeasure = ts?.beatsPerMeasure ?? 4;
+            const halfBarBeat = Math.floor(beatsPerMeasure / 2) + 1;
+            const measures = Array.isArray(s.measures)
+              ? (s.measures as Array<Record<string, unknown>>)
+              : [];
+            return {
+              ...s,
+              measures: measures.map((m) => {
+                const oldChords = Array.isArray(m.chords)
+                  ? (m.chords as Array<Record<string, unknown>>)
+                  : [];
+                const newChords = oldChords.map((c, idx) => ({
+                  chord: c,
+                  beat: idx === 0 ? 1 : halfBarBeat,
+                }));
+                return { ...m, chords: newChords };
+              }),
+            };
+          });
         }
         return next;
       },

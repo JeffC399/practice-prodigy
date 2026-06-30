@@ -121,18 +121,35 @@ export type MelodyNote =
     };
 
 /**
+ * Phase 25.2 — chord at a specific beat position within a measure.
+ *
+ * Replaces the flat `Chord[]` model (which capped at 1-2 chords per
+ * measure with an implicit downbeat / half-bar split). Per-beat
+ * positioning lets users author real jazz harmonies (every beat = a
+ * different chord) and matches standard engraving / Sibelius / Dorico
+ * conventions.
+ */
+export type ChordBeat = {
+  chord: Chord;
+  /** 1-indexed beat position within the measure (1 = downbeat). */
+  beat: number;
+  /** Optional slash-chord bass override (e.g. C/E → bass: "E"). */
+  bass?: PitchClass;
+};
+
+/**
  * One measure of the sheet. Carries chords + an optional melody line.
  */
 export type SheetMeasure = {
   /** Stable id for drag-reorder / animation. */
   id: string;
   /**
-   * Chords played during this measure. v0.1 allows 1 or 2 chords per
-   * measure (most common cases); the renderer splits the bar in half
-   * for 2-chord measures. Future versions extend to N chords with
-   * explicit beat positions.
+   * Phase 25.2: per-beat chord positions. Each ChordBeat carries the
+   * chord and the 1-indexed beat it starts on. Multiple chords per
+   * measure with explicit beats supports full jazz harmonic vocabulary.
+   * Sorted by beat at render time.
    */
-  chords: Chord[];
+  chords: ChordBeat[];
   /**
    * Optional melody line (Phase 24b). Empty array = no melody for
    * this measure (renderer draws an empty staff). Notes + rests
