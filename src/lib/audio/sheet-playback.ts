@@ -37,7 +37,12 @@ import {
  * defaults). Voices lazy-load on first play and cache.
  */
 
-const LEAD_IN_SECONDS = 0.1;
+/**
+ * Phase 27.2.1: bumped 0.1 → 0.4 to give samplers (especially
+ * slow-attack ones like flute) enough warmup time so the first note
+ * lands at the start of measure 1, not slightly clipped.
+ */
+const LEAD_IN_SECONDS = 0.4;
 const CHORD_OCTAVE = 3;
 
 const PITCH_CLASS_TO_SEMITONE: Record<PitchClass, number> = {

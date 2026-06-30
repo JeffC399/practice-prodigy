@@ -205,6 +205,7 @@ export const MELODY_VOICES = [
   "sax",
   "flute",
   "strings",
+  "guitar",
   "synth",
 ] as const;
 export type MelodyVoice = (typeof MELODY_VOICES)[number];
@@ -224,6 +225,7 @@ export const MELODY_VOICE_LABELS: Record<MelodyVoice, string> = {
   sax: "Saxophone",
   flute: "Flute",
   strings: "Strings",
+  guitar: "Acoustic Guitar",
   synth: "Synth",
 };
 
