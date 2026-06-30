@@ -270,6 +270,8 @@ export type Sheet = {
   melodyVoice?: MelodyVoice;
   /** Phase 27.1: per-voice mixer state (volume + mute). */
   mixer?: SheetMixer;
+  /** Phase 27.1b: schedule 1 measure of count-in clicks before playback. */
+  countIn?: boolean;
   createdAt: number;
   updatedAt: number;
   /** Last time the sheet was opened. */

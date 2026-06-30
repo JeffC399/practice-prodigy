@@ -107,11 +107,27 @@ function beatsForDuration(
 class SheetPlayback {
   private chordVoice: VoiceHandle | null = null;
   private melodyVoice: VoiceHandle | null = null;
+  /** Phase 27.1b — soft click synth for count-in. */
+  private clickSynth: Tone.Synth | null = null;
   private scheduledEvents: number[] = [];
   private endEvent: number | null = null;
   private endCallback: (() => void) | null = null;
   private _isPlaying = false;
   private _isLoading = false;
+
+  private ensureClickSynth(): void {
+    if (this.clickSynth) return;
+    this.clickSynth = new Tone.Synth({
+      oscillator: { type: "triangle" },
+      envelope: {
+        attack: 0.001,
+        decay: 0.04,
+        sustain: 0,
+        release: 0.02,
+      },
+      volume: -12,
+    }).toDestination();
+  }
 
   isPlaying(): boolean {
     return this._isPlaying;
@@ -135,7 +151,16 @@ class SheetPlayback {
 
   async play(
     sheet: Sheet,
-    options?: { bpmOverride?: number; onEnded?: () => void },
+    options?: {
+      /** Multiply the sheet's bpm; 1.0 = full tempo, 0.5 = half. */
+      tempoPercent?: number;
+      /** Schedule 1 measure of count-in clicks before chords + melody. */
+      countIn?: boolean;
+      /** 1-indexed measure range to loop. When unset, plays whole sheet once. */
+      loopStartMeasure?: number;
+      loopEndMeasure?: number;
+      onEnded?: () => void;
+    },
   ): Promise<void> {
     await Tone.start();
     this.cancel();
@@ -156,29 +181,73 @@ class SheetPlayback {
     }
     this.applyMixer(mixer);
 
-    const bpm = options?.bpmOverride ?? sheet.bpm ?? 120;
+    const baseBpm = sheet.bpm ?? 120;
+    const tempoPct = options?.tempoPercent ?? 1;
+    const bpm = Math.max(20, Math.round(baseBpm * tempoPct));
     const transport = Tone.getTransport();
     transport.bpm.value = bpm;
     transport.position = 0;
 
     const beatSeconds = 60 / bpm;
     const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
-    const totalMeasureBeats = sheet.measures.length * beatsPerMeasure;
 
-    // 1) Chord events: each ChordBeat sustains until the NEXT chord
-    // change in time order, or end-of-sheet.
+    // Phase 27.1b — Count-in. Schedule 1 measure of soft ticks before
+    // the music starts. The chord + melody event scheduling that
+    // follows is offset by the count-in duration so transport time 0
+    // sits at the first count-in click.
+    const countInBeats = options?.countIn ? beatsPerMeasure : 0;
+    const countInSeconds = countInBeats * beatSeconds;
+    const musicStart = LEAD_IN_SECONDS + countInSeconds;
+
+    if (options?.countIn) {
+      this.ensureClickSynth();
+      for (let i = 0; i < beatsPerMeasure; i++) {
+        const isDownbeat = i === 0;
+        const id = transport.schedule((time) => {
+          this.clickSynth?.triggerAttackRelease(
+            isDownbeat ? "C6" : "G5",
+            0.04,
+            time,
+          );
+        }, LEAD_IN_SECONDS + i * beatSeconds);
+        this.scheduledEvents.push(id);
+      }
+    }
+
+    // Phase 27.1b — Loop region. Default range = whole sheet.
+    const totalMeasureCount = sheet.measures.length;
+    const loopStart = Math.max(
+      1,
+      Math.min(totalMeasureCount, options?.loopStartMeasure ?? 1),
+    );
+    const loopEnd = Math.max(
+      loopStart,
+      Math.min(totalMeasureCount, options?.loopEndMeasure ?? totalMeasureCount),
+    );
+    const isLooping =
+      options?.loopStartMeasure !== undefined ||
+      options?.loopEndMeasure !== undefined;
+    const startMeasureIdx = isLooping ? loopStart - 1 : 0;
+    const endMeasureIdxExclusive = isLooping ? loopEnd : totalMeasureCount;
+    const measuresToPlay = endMeasureIdxExclusive - startMeasureIdx;
+    const totalMeasureBeats = measuresToPlay * beatsPerMeasure;
+
+    // 1) Chord events. Walk only the [startMeasureIdx, endMeasureIdxExclusive)
+    // window; relative beat positions are offset to 0 at the loop start.
     type FlatChord = { startBeat: number; midi: number[] };
     const flatChords: FlatChord[] = [];
-    sheet.measures.forEach((m, mi) => {
+    for (let mi = startMeasureIdx; mi < endMeasureIdxExclusive; mi++) {
+      const m = sheet.measures[mi];
       const sorted: ChordBeat[] = [...m.chords].sort(
         (a, b) => a.beat - b.beat,
       );
       for (const cb of sorted) {
-        const start = mi * beatsPerMeasure + (cb.beat - 1);
+        const relMeasure = mi - startMeasureIdx;
+        const start = relMeasure * beatsPerMeasure + (cb.beat - 1);
         const midi = chordToMidiNotes(cb.chord, CHORD_OCTAVE, cb.bass);
         flatChords.push({ startBeat: start, midi });
       }
-    });
+    }
     flatChords.sort((a, b) => a.startBeat - b.startBeat);
 
     for (let i = 0; i < flatChords.length; i++) {
@@ -191,17 +260,19 @@ class SheetPlayback {
       const sustainSeconds = durBeats * beatSeconds * 0.95;
       const id = transport.schedule((time) => {
         this.chordVoice?.play(fc.midi, time, sustainSeconds, 0.7);
-      }, LEAD_IN_SECONDS + fc.startBeat * beatSeconds);
+      }, musicStart + fc.startBeat * beatSeconds);
       this.scheduledEvents.push(id);
     }
 
-    // 2) Melody events.
-    sheet.measures.forEach((m, mi) => {
+    // 2) Melody events (same windowing).
+    for (let mi = startMeasureIdx; mi < endMeasureIdxExclusive; mi++) {
+      const m = sheet.measures[mi];
       const melody: MelodyNote[] = m.melody ?? [];
       let cursor = 0;
       melody.forEach((n, ni) => {
         const beats = beatsForDuration(n.duration, n.dotted);
-        const startBeat = mi * beatsPerMeasure + cursor;
+        const relMeasure = mi - startMeasureIdx;
+        const startBeat = relMeasure * beatsPerMeasure + cursor;
         if (n.kind === "note") {
           const prev = melody[ni - 1];
           const isTiedFollower =
@@ -228,23 +299,36 @@ class SheetPlayback {
               );
               const id = transport.schedule((time) => {
                 this.melodyVoice?.play(midi, time, sustainSeconds, 0.85);
-              }, LEAD_IN_SECONDS + startBeat * beatSeconds);
+              }, musicStart + startBeat * beatSeconds);
               this.scheduledEvents.push(id);
             }
           }
         }
         cursor += beats;
       });
-    });
+    }
 
-    // 3) End-of-sheet stop.
-    const totalSeconds =
-      LEAD_IN_SECONDS + totalMeasureBeats * beatSeconds + 0.8;
-    this.endCallback = options?.onEnded ?? null;
-    this.endEvent = transport.scheduleOnce(() => {
-      this.cancel();
-      this.endCallback?.();
-    }, totalSeconds);
+    // 3) Phase 27.1b — Loop region. If a loop range was set, configure
+    // the transport to loop the music region after count-in. The
+    // count-in does NOT replay on each loop iteration — only the music
+    // does. Standard practice convention.
+    if (isLooping) {
+      transport.loop = true;
+      transport.loopStart = musicStart;
+      transport.loopEnd = musicStart + totalMeasureBeats * beatSeconds;
+      // No auto-end while looping — user must explicitly Stop.
+      this.endCallback = null;
+      this.endEvent = null;
+    } else {
+      transport.loop = false;
+      const totalSeconds =
+        musicStart + totalMeasureBeats * beatSeconds + 0.8;
+      this.endCallback = options?.onEnded ?? null;
+      this.endEvent = transport.scheduleOnce(() => {
+        this.cancel();
+        this.endCallback?.();
+      }, totalSeconds);
+    }
 
     this._isPlaying = true;
     transport.start();
@@ -260,8 +344,10 @@ class SheetPlayback {
     }
     transport.stop();
     transport.position = 0;
+    transport.loop = false;
     this.chordVoice?.releaseAll();
     this.melodyVoice?.releaseAll();
+    this.clickSynth?.triggerRelease();
     this._isPlaying = false;
   }
 }

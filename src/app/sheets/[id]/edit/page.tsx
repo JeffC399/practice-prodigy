@@ -159,6 +159,11 @@ export default function SheetEditorPage() {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   // Phase 27.1 — instrument picker + mixer panel toggle.
   const [audioPanelOpen, setAudioPanelOpen] = useState(false);
+  // Phase 27.1b — session-only tempo % and loop range.
+  const [tempoPercent, setTempoPercent] = useState(100); // 50..150
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const [loopStart, setLoopStart] = useState(1);
+  const [loopEnd, setLoopEnd] = useState(1);
   useEffect(() => {
     // Stop any in-flight playback when leaving the editor.
     return () => {
@@ -843,6 +848,10 @@ export default function SheetEditorPage() {
                   setIsLoadingAudio(true);
                   try {
                     await sheetPlayback.play(sheet, {
+                      tempoPercent: tempoPercent / 100,
+                      countIn: sheet.countIn ?? false,
+                      loopStartMeasure: loopEnabled ? loopStart : undefined,
+                      loopEndMeasure: loopEnabled ? loopEnd : undefined,
                       onEnded: () => setIsPlaying(false),
                     });
                     setIsPlaying(true);
@@ -1088,6 +1097,132 @@ export default function SheetEditorPage() {
                       {(sheet.mixer ?? DEFAULT_SHEET_MIXER).melodyVolume} dB
                     </span>
                   </div>
+                </div>
+              </div>
+            </div>
+            {/* Phase 27.1b — Practice controls: count-in, tempo %, loop. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 border-t border-emerald-500/20 pt-4">
+              {/* Count-in toggle */}
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Count-in
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateMeta("countIn", !(sheet.countIn ?? false))
+                  }
+                  className={`flex items-center justify-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    sheet.countIn
+                      ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Play 1 measure of clicks before the music starts"
+                >
+                  {sheet.countIn
+                    ? "1 measure → music"
+                    : "Off"}
+                </button>
+              </div>
+              {/* Tempo slider */}
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Tempo
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={50}
+                    max={150}
+                    step={5}
+                    value={tempoPercent}
+                    onChange={(e) =>
+                      setTempoPercent(Number(e.target.value))
+                    }
+                    className="flex-1 accent-emerald-500"
+                    aria-label="Playback tempo percent"
+                  />
+                  <span className="font-mono text-xs text-foreground min-w-[3.5rem] text-right">
+                    {tempoPercent}%
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {Math.round(((sheet.bpm ?? 120) * tempoPercent) / 100)}{" "}
+                  BPM
+                </span>
+              </div>
+              {/* Loop region */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Loop
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !loopEnabled;
+                      if (next && sheet.measures.length > 0) {
+                        setLoopStart(1);
+                        setLoopEnd(sheet.measures.length);
+                      }
+                      setLoopEnabled(next);
+                    }}
+                    className={`text-[10px] font-medium ${
+                      loopEnabled
+                        ? "text-emerald-500"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {loopEnabled ? "On" : "Off"}
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    value={loopStart}
+                    onChange={(e) =>
+                      setLoopStart(
+                        Math.max(
+                          1,
+                          Math.min(
+                            sheet.measures.length,
+                            Number(e.target.value) || 1,
+                          ),
+                        ),
+                      )
+                    }
+                    disabled={!loopEnabled}
+                    min={1}
+                    max={sheet.measures.length}
+                    className="w-14 rounded-md border border-border bg-background px-1.5 py-1 text-xs disabled:opacity-50"
+                    aria-label="Loop start measure"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    →
+                  </span>
+                  <input
+                    type="number"
+                    value={loopEnd}
+                    onChange={(e) =>
+                      setLoopEnd(
+                        Math.max(
+                          loopStart,
+                          Math.min(
+                            sheet.measures.length,
+                            Number(e.target.value) || loopStart,
+                          ),
+                        ),
+                      )
+                    }
+                    disabled={!loopEnabled}
+                    min={loopStart}
+                    max={sheet.measures.length}
+                    className="w-14 rounded-md border border-border bg-background px-1.5 py-1 text-xs disabled:opacity-50"
+                    aria-label="Loop end measure"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    measures
+                  </span>
                 </div>
               </div>
             </div>
