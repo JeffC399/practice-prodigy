@@ -197,32 +197,60 @@ export function MelodyStaff({
 
     // Phase 24c — Lyrics. Render syllables below the staff. Matches
     // the SheetSurface engraving so the modal preview is faithful.
+    // Phase 24c.1.2: same two-pass collision-avoidance layout as
+    // SheetSurface so syllables don't run together on closely-spaced
+    // eighth notes within the modal preview.
     const lyricY = STAVE_TOP_PAD + STAVE_VISUAL_HEIGHT + LYRIC_OFFSET_BELOW_STAFF;
     context.save();
     context.setFont("Georgia, 'Times New Roman', serif", 11, "");
     const noteAbsoluteXs = staveNotes.map((sn) => sn.getAbsoluteX());
+    type SyllableLayout = {
+      noteIdx: number;
+      text: string;
+      centerX: number;
+      width: number;
+      continuation: "none" | "hyphen" | "underscore";
+    };
+    const syllables: SyllableLayout[] = [];
     melody.forEach((mn, idx) => {
       if (mn.kind !== "note") return;
       if (!mn.lyric || mn.lyric.text.length === 0) return;
-      const noteX = noteAbsoluteXs[idx];
       const displayText =
         mn.lyric.continuation === "hyphen"
           ? `${mn.lyric.text}-`
           : mn.lyric.text;
-      const approxTextWidth = displayText.length * 6.2;
-      const textX = noteX - approxTextWidth / 2;
-      context.fillText(displayText, textX, lyricY);
-      if (mn.lyric.continuation === "underscore") {
-        let lastMelismaIdx = idx;
-        for (let q = idx + 1; q < melody.length; q++) {
+      const w = displayText.length * 6.8;
+      syllables.push({
+        noteIdx: idx,
+        text: displayText,
+        centerX: noteAbsoluteXs[idx],
+        width: w,
+        continuation: mn.lyric.continuation,
+      });
+    });
+    const MIN_LYRIC_GAP = 3;
+    let prevRight = -Infinity;
+    syllables.forEach((s) => {
+      const leftEdge = s.centerX - s.width / 2;
+      if (leftEdge < prevRight + MIN_LYRIC_GAP) {
+        s.centerX = prevRight + MIN_LYRIC_GAP + s.width / 2;
+      }
+      prevRight = s.centerX + s.width / 2;
+    });
+    syllables.forEach((s) => {
+      const textX = s.centerX - s.width / 2;
+      context.fillText(s.text, textX, lyricY);
+      if (s.continuation === "underscore") {
+        let lastMelismaIdx = s.noteIdx;
+        for (let q = s.noteIdx + 1; q < melody.length; q++) {
           const nq = melody[q];
           if (nq.kind === "note") {
             if (nq.lyric && nq.lyric.text.length > 0) break;
             lastMelismaIdx = q;
           }
         }
-        if (lastMelismaIdx > idx) {
-          const lineStartX = textX + approxTextWidth + 2;
+        if (lastMelismaIdx > s.noteIdx) {
+          const lineStartX = s.centerX + s.width / 2 + 2;
           const lineEndX = noteAbsoluteXs[lastMelismaIdx] + 6;
           const lineY = lyricY - 3;
           context.beginPath();

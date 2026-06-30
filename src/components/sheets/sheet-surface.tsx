@@ -545,6 +545,10 @@ export function SheetSurface({
 
         // Phase 24c — Lyrics. Render syllable text below the staff and
         // collect note positions for the editor's interactive layer.
+        // Phase 24c.1.2: two-pass layout. Pass 1 computes wanted X /
+        // width for each syllable; pass 2 walks left-to-right and
+        // SHIFTS overlapping syllables right so closely-spaced eighth
+        // notes (e.g. "know" + "where") don't collide into "knowwhere".
         const lyricY = staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET;
         ctx.save();
         ctx.setFont("Georgia, 'Times New Roman', serif", 11, "");
@@ -553,42 +557,64 @@ export function SheetSurface({
           sn.getAbsoluteX(),
         );
 
-        // For each pitched note with a lyric, draw the text. For
-        // hyphen continuation: append a trailing dash. For underscore
-        // continuation: draw a horizontal line from this note's right
-        // edge to the right edge of the last melisma note within this
-        // measure (boundary = next note with its own lyric, or end of
-        // measure).
+        type SyllableLayout = {
+          noteIdx: number;
+          text: string;
+          centerX: number;
+          width: number;
+          continuation: "none" | "hyphen" | "underscore";
+        };
+        // Pass 1: collect syllable positions + widths.
+        const syllables: SyllableLayout[] = [];
         melody.forEach((mn, noteIdxInMeasure) => {
           if (mn.kind !== "note") return;
           if (!mn.lyric || mn.lyric.text.length === 0) return;
-          const noteX = noteAbsoluteXs[noteIdxInMeasure];
           const displayText =
             mn.lyric.continuation === "hyphen"
               ? `${mn.lyric.text}-`
               : mn.lyric.text;
-          // Crude width approximation — VexFlow's context doesn't
-          // expose measureText in a portable way across backends.
-          // 6.2px per char @ 11pt serif is a workable estimate.
-          const approxTextWidth = displayText.length * 6.2;
-          const textX = noteX - approxTextWidth / 2;
-          ctx.fillText(displayText, textX, lyricY);
-
-          if (mn.lyric.continuation === "underscore") {
-            // Find the next pitched note in this measure that has its
-            // own lyric (or end of measure). The line draws to the
-            // right edge of the LAST melisma note before that
-            // boundary.
-            let lastMelismaIdx = noteIdxInMeasure;
-            for (let q = noteIdxInMeasure + 1; q < melody.length; q++) {
+          // Width approximation tuned to Georgia 11pt serif. 6.8px/char
+          // is closer to the real avg than the previous 6.2 — and the
+          // collision pass below catches any remaining underestimate.
+          const width = displayText.length * 6.8;
+          syllables.push({
+            noteIdx: noteIdxInMeasure,
+            text: displayText,
+            centerX: noteAbsoluteXs[noteIdxInMeasure],
+            width,
+            continuation: mn.lyric.continuation,
+          });
+        });
+        // Pass 2: collision avoidance — if a syllable's left edge would
+        // collide with the previous syllable's right edge, shift this
+        // one right. Engraving convention: lyrics CAN drift off their
+        // note when the notes are too close, in service of readability.
+        const MIN_LYRIC_GAP = 3;
+        let prevRight = -Infinity;
+        syllables.forEach((s) => {
+          const leftEdge = s.centerX - s.width / 2;
+          if (leftEdge < prevRight + MIN_LYRIC_GAP) {
+            s.centerX = prevRight + MIN_LYRIC_GAP + s.width / 2;
+          }
+          prevRight = s.centerX + s.width / 2;
+        });
+        // Pass 3: draw + melisma lines.
+        syllables.forEach((s) => {
+          const textX = s.centerX - s.width / 2;
+          ctx.fillText(s.text, textX, lyricY);
+          if (s.continuation === "underscore") {
+            // Melisma extends from this syllable's right edge to the
+            // last melisma note's right edge within this measure.
+            let lastMelismaIdx = s.noteIdx;
+            for (let q = s.noteIdx + 1; q < melody.length; q++) {
               const nq = melody[q];
               if (nq.kind === "note") {
                 if (nq.lyric && nq.lyric.text.length > 0) break;
                 lastMelismaIdx = q;
               }
             }
-            if (lastMelismaIdx > noteIdxInMeasure) {
-              const lineStartX = textX + approxTextWidth + 2;
+            if (lastMelismaIdx > s.noteIdx) {
+              const lineStartX = s.centerX + s.width / 2 + 2;
               const lineEndX = noteAbsoluteXs[lastMelismaIdx] + 6;
               const lineY = lyricY - 3;
               ctx.beginPath();
