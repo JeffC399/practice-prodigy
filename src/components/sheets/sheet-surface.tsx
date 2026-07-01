@@ -21,6 +21,7 @@ import type {
   MelodyNote,
   Sheet,
   SheetMeasure,
+  SheetOctavaShift,
 } from "@/lib/sheets/types";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 
@@ -236,6 +237,46 @@ const ACCIDENTAL_COUNT: Record<string, number> = {
 function accidentalCount(spec: string): number {
   const key = spec.endsWith("m") ? spec.slice(0, -1) : spec;
   return ACCIDENTAL_COUNT[key] ?? 0;
+}
+
+/**
+ * Phase 30.3 — apply an ottava shift to a VexFlow pitch string for
+ * DISPLAY purposes. `8va` written above notes means "sound one octave
+ * higher than written," so a note stored at its sounding pitch is
+ * drawn one octave LOWER on the staff. `8vb` is the mirror. Returns
+ * the original string unchanged when `shift` is undefined or the pitch
+ * doesn't parse.
+ */
+function applyOctavaShiftToPitch(
+  pitch: string,
+  shift: SheetOctavaShift | undefined,
+): string {
+  if (!shift) return pitch;
+  const slash = pitch.lastIndexOf("/");
+  if (slash < 0) return pitch;
+  const letter = pitch.slice(0, slash);
+  const octaveNum = parseInt(pitch.slice(slash + 1), 10);
+  if (Number.isNaN(octaveNum)) return pitch;
+  const shifted = shift === "8va" ? octaveNum - 1 : octaveNum + 1;
+  return `${letter}/${shifted}`;
+}
+
+/**
+ * Phase 30.3 — return a display version of a measure's melody where
+ * every pitched note's pitch is shifted per the measure's ottava
+ * setting. Rests are unchanged. When `shift` is undefined this is a
+ * no-op that returns the same array reference.
+ */
+function melodyForDisplay(
+  melody: MelodyNote[],
+  shift: SheetOctavaShift | undefined,
+): MelodyNote[] {
+  if (!shift) return melody;
+  return melody.map((n) =>
+    n.kind === "note"
+      ? { ...n, pitch: applyOctavaShiftToPitch(n.pitch, shift) }
+      : n,
+  );
 }
 
 function buildStaveNotesForMelody(melody: MelodyNote[]): StaveNote[] {
@@ -586,6 +627,51 @@ export function SheetSurface({
           });
         }
       }
+
+      // Phase 30.3 — ottava-span detection. Same contiguous-run pattern
+      // as volta detection above. One dashed bracket per span; 8va sits
+      // above the staff, 8vb below.
+      type OctavaSpan = {
+        shift: SheetOctavaShift;
+        startMeasureIdx: number;
+        endMeasureIdx: number;
+      };
+      const octavaSpansForLine: OctavaSpan[] = [];
+      {
+        let currentShift: SheetOctavaShift | undefined = undefined;
+        let shiftStartIdx = 0;
+        for (let mi = 0; mi < lineMeasures.length; mi++) {
+          const m = lineMeasures[mi];
+          if (m.octavaShift) {
+            if (currentShift !== m.octavaShift) {
+              if (currentShift !== undefined) {
+                octavaSpansForLine.push({
+                  shift: currentShift,
+                  startMeasureIdx: shiftStartIdx,
+                  endMeasureIdx: mi - 1,
+                });
+              }
+              currentShift = m.octavaShift;
+              shiftStartIdx = mi;
+            }
+          } else if (currentShift !== undefined) {
+            octavaSpansForLine.push({
+              shift: currentShift,
+              startMeasureIdx: shiftStartIdx,
+              endMeasureIdx: mi - 1,
+            });
+            currentShift = undefined;
+          }
+        }
+        if (currentShift !== undefined) {
+          octavaSpansForLine.push({
+            shift: currentShift,
+            startMeasureIdx: shiftStartIdx,
+            endMeasureIdx: lineMeasures.length - 1,
+          });
+        }
+      }
+
       // Track per-measure note-area X bounds so we can draw voltas
       // after the loop.
       const measureXBounds: Array<{ noteStartX: number; noteEndX: number }> =
@@ -800,7 +886,16 @@ export function SheetSurface({
           pendingCrossMeasureTie = null;
           return;
         }
-        const staveNotes = buildStaveNotesForMelody(melody);
+        // Phase 30.3 — apply per-measure ottava shift as a DISPLAY
+        // transformation. Storage pitches are the sounding pitches
+        // (from MIDI / click / keyboard entry); the renderer shifts
+        // each pitched note by ±1 octave so the notes sit near the
+        // staff instead of far above or below on many ledger lines.
+        // All downstream renderer helpers (ties, slurs, tuplets,
+        // lyric layout) see the same shifted melody, so pitch-
+        // equality checks (used by ties + slurs) stay consistent.
+        const displayMelody = melodyForDisplay(melody, measure.octavaShift);
+        const staveNotes = buildStaveNotesForMelody(displayMelody);
         const voice = new Voice({
           numBeats: sheet.timeSignature.beatsPerMeasure,
           beatValue: sheet.timeSignature.beatUnit,
@@ -808,9 +903,9 @@ export function SheetSurface({
         voice.setStrict(false);
         voice.addTickables(staveNotes);
 
-        const tuplets = collectTuplets(melody, staveNotes);
-        const ties = collectTies(melody, staveNotes);
-        const slurs = collectSlurs(melody, staveNotes);
+        const tuplets = collectTuplets(displayMelody, staveNotes);
+        const ties = collectTies(displayMelody, staveNotes);
+        const slurs = collectSlurs(displayMelody, staveNotes);
 
         // Phase 29 — cross-measure tie IN. If the previous measure
         // ended with a tieToNext-flagged pitched note AND this
@@ -823,14 +918,14 @@ export function SheetSurface({
           // Find the first PITCHED note in this measure. Leading rests
           // don't break a tie — the tie lands on the first pitched note.
           let firstPitchedIdx = -1;
-          for (let ki = 0; ki < melody.length; ki++) {
-            if (melody[ki].kind === "note") {
+          for (let ki = 0; ki < displayMelody.length; ki++) {
+            if (displayMelody[ki].kind === "note") {
               firstPitchedIdx = ki;
               break;
             }
           }
           if (firstPitchedIdx >= 0) {
-            const firstMel = melody[firstPitchedIdx];
+            const firstMel = displayMelody[firstPitchedIdx];
             if (
               firstMel.kind === "note" &&
               firstMel.pitch === pendingCrossMeasureTie.pitch
@@ -867,7 +962,7 @@ export function SheetSurface({
         // Tuplet bracket + numeral; auto-beaming them would suppress
         // the bracket and push the numeral off-canvas.
         const beamableNotes = staveNotes.filter(
-          (_, i) => !melody[i].tupletGroup,
+          (_, i) => !displayMelody[i].tupletGroup,
         );
         const beams = Beam.generateBeams(beamableNotes);
 
@@ -888,14 +983,14 @@ export function SheetSurface({
         // in the sheet, arm the pendingCrossMeasureTie so the next
         // measure's render draws the connecting arc.
         let lastPitchedIdx = -1;
-        for (let ki = melody.length - 1; ki >= 0; ki--) {
-          if (melody[ki].kind === "note") {
+        for (let ki = displayMelody.length - 1; ki >= 0; ki--) {
+          if (displayMelody[ki].kind === "note") {
             lastPitchedIdx = ki;
             break;
           }
         }
         if (lastPitchedIdx >= 0) {
-          const lastMel = melody[lastPitchedIdx];
+          const lastMel = displayMelody[lastPitchedIdx];
           const isLastMeasureInSheet =
             measureIdx === sheet.measures.length - 1;
           if (
@@ -1074,6 +1169,63 @@ export function SheetSurface({
         // Number label.
         ctx.setFont("Georgia, 'Times New Roman', serif", 11, "bold");
         ctx.fillText(`${span.number}.`, xL + 4, bracketY + 11);
+        ctx.restore();
+      });
+
+      // Phase 30.3 — ottava-bracket render pass. One bracket per
+      // contiguous same-shift span. Standard engraving convention:
+      //   - "8" italic serif label at the LEFT edge (or "8va" / "8vb")
+      //   - Dashed horizontal line across the span
+      //   - A short vertical hook at the RIGHT end (down for 8va sitting
+      //     above notes, up for 8vb sitting below notes)
+      // 8va sits above the chord row (well above the notes). 8vb sits
+      // below the staff, near / among any lyrics. Positioning is
+      // conservative — a fully-featured coordinator would also push
+      // the line spacing outward when a big ottava bracket appears,
+      // but for a first pass a fixed offset works.
+      octavaSpansForLine.forEach((span) => {
+        const startBounds = measureXBounds[span.startMeasureIdx];
+        const endBounds = measureXBounds[span.endMeasureIdx];
+        if (!startBounds || !endBounds) return;
+        const xL = startBounds.noteStartX - 2;
+        const xR = endBounds.noteEndX + 2;
+        const label = span.shift === "8va" ? "8va" : "8vb";
+        // 8va: above the chord row. 8vb: below the staff bottom line.
+        const bracketY =
+          span.shift === "8va"
+            ? lineY + CHORD_BAND_HEIGHT - 4
+            : staveY + STAVE_HEIGHT + 30;
+        const hookHeight = 8;
+        const hookSign = span.shift === "8va" ? 1 : -1; // hook DOWN for 8va, UP for 8vb
+        ctx.save();
+        // Italic serif label at the left edge, vertically centered
+        // on the bracket line.
+        ctx.setFont(
+          "Georgia, 'Times New Roman', serif",
+          11,
+          "bold italic",
+        );
+        ctx.fillText(label, xL, bracketY + 4);
+        // Dashed line from just after the label to xR.
+        const labelWidth = ctx.measureText
+          ? (ctx.measureText(label)?.width ?? 20) + 3
+          : 22;
+        ctx.beginPath();
+        const dashStartX = xL + labelWidth;
+        const dashLen = 4;
+        const gapLen = 3;
+        let x = dashStartX;
+        while (x < xR) {
+          const segEnd = Math.min(x + dashLen, xR);
+          ctx.moveTo(x, bracketY);
+          ctx.lineTo(segEnd, bracketY);
+          x = segEnd + gapLen;
+        }
+        // Right hook (short vertical stroke away from the notes).
+        ctx.moveTo(xR, bracketY);
+        ctx.lineTo(xR, bracketY + hookSign * hookHeight);
+        ctx.setLineWidth(1.1);
+        ctx.stroke();
         ctx.restore();
       });
     });

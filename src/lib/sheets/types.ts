@@ -176,6 +176,35 @@ export const MARK_LABELS: Record<SheetMark, string> = {
 };
 
 /**
+ * Phase 30.3 — ottava markings.
+ *
+ * `8va` (ottava alta): the notes below are RENDERED an octave lower on
+ * the staff and played an octave HIGHER than written. Standard use:
+ * a high-register passage that would otherwise sit on many ledger
+ * lines above the staff.
+ *
+ * `8vb` (ottava bassa): notes RENDERED an octave higher on the staff
+ * and played an octave LOWER than written. Use case: a bass-range
+ * melody that would otherwise sit on many ledger lines below.
+ *
+ * Data-model convention (matches how MIDI + click-entry populate
+ * pitches): the `pitch` stored on each `MelodyNote` is the SOUNDING
+ * pitch — what the note plays back as. The renderer applies the
+ * ottava shift as a display transformation and draws the dashed
+ * bracket. Audio playback plays the stored pitch unchanged.
+ *
+ * Consecutive same-shift measures render as one continuous bracket
+ * span (mirrors the volta bracket pattern).
+ */
+export const SHEET_OCTAVA_SHIFTS = ["8va", "8vb"] as const;
+export type SheetOctavaShift = (typeof SHEET_OCTAVA_SHIFTS)[number];
+
+export const OCTAVA_SHIFT_LABELS: Record<SheetOctavaShift, string> = {
+  "8va": "8va — play 1 octave up",
+  "8vb": "8vb — play 1 octave down",
+};
+
+/**
  * One measure of the sheet. Carries chords + an optional melody line.
  */
 export type SheetMeasure = {
@@ -216,6 +245,13 @@ export type SheetMeasure = {
    * section (e.g. "A", "Verse", "Chorus", "Bridge", custom).
    */
   sectionLabel?: string;
+  /**
+   * Phase 30.3: ottava marking. Consecutive measures with the same
+   * shift form one continuous dashed bracket in the renderer. The
+   * stored melody `pitch` is the sounding pitch; the renderer shifts
+   * the display Y by ±1 octave and draws the bracket.
+   */
+  octavaShift?: SheetOctavaShift;
 };
 
 /**

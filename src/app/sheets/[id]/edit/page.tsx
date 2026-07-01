@@ -759,6 +759,7 @@ export default function SheetEditorPage() {
         | "mark"
         | "instruction"
         | "sectionLabel"
+        | "octavaShift"
       >
     >,
   ) => {
@@ -2052,6 +2053,29 @@ export default function SheetEditorPage() {
                       <option value="ds-al-coda">D.S. al Coda</option>
                       <option value="to-coda">To Coda</option>
                       <option value="fine">Fine</option>
+                    </select>
+                    {/* Phase 30.3 — Ottava (8va / 8vb). Consecutive
+                        same-shift measures render as one dashed
+                        bracket. Use when a note range would sit on
+                        many ledger lines above (8va) or below (8vb)
+                        the staff. */}
+                    <select
+                      value={measure.octavaShift ?? ""}
+                      onChange={(e) =>
+                        updateMeasureForm(mIdx, {
+                          octavaShift: (e.target.value || undefined) as
+                            | "8va"
+                            | "8vb"
+                            | undefined,
+                        })
+                      }
+                      className="rounded border border-border bg-background px-1 py-0.5 text-[10px]"
+                      aria-label="Ottava"
+                      title="Ottava marking — display notes an octave closer to the staff and add a dashed 8va (above) or 8vb (below) bracket"
+                    >
+                      <option value="">— Ottava —</option>
+                      <option value="8va">8va (up)</option>
+                      <option value="8vb">8vb (down)</option>
                     </select>
                   </div>
                 </div>
