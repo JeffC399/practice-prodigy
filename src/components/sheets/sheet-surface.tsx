@@ -572,11 +572,19 @@ export function SheetSurface({
 
       const lineOverhead =
         CLEF_PX + keyAccidentalPx + (showTimeSig ? TIME_SIG_PX : 0);
-      const noteAreaTotal = Math.max(
-        MIN_MEASURE_NOTE_WIDTH * lineMeasures.length,
-        contentWidth - lineOverhead,
+      // Phase 31.9 — Under-filled last-line fix. Previously divided
+      // the full page width by `lineMeasures.length`, which stretched
+      // a 2-measure last line as wide as a 4-measure line above it.
+      // Standard engraving convention keeps the per-measure width
+      // consistent and lets the last line be visually shorter with
+      // trailing whitespace.
+      const perMeasureWidth =
+        (contentWidth - lineOverhead) / measuresPerLine;
+      const noteAreaPer = Math.max(
+        MIN_MEASURE_NOTE_WIDTH,
+        perMeasureWidth,
       );
-      const noteAreaPer = noteAreaTotal / lineMeasures.length;
+      const noteAreaTotal = noteAreaPer * lineMeasures.length;
 
       // Measure-number label above the first measure of this line.
       ctx.save();
