@@ -2,9 +2,9 @@
 
 > Module design doc for the **Lead Sheet Builder**. v1-scope module shipped after the v1 Bass Arpeggios polish closes out. Lives in PROJECT-DESIGN.md §9 vision as one of the 9 platform modules; promoted from "Later" to "Next" once this design is locked.
 
-**Doc status:** v0.1 design pass — 2026-06-29
-**Target ship:** v2 milestone (after Bass Arpeggios v1 → v1.x cloud sync + native wrappers complete)
-**Estimated build:** 8–12 weeks
+**Doc status:** v0.3 — live build in progress — last updated 2026-06-30
+**Target ship:** v2 milestone (build opened ahead of schedule 2026-06-30; Basic Tier ~8-11 sessions remaining)
+**Estimated build:** originally 8–12 weeks; actual pace running much faster (28 sub-phases shipped in the first sprint)
 
 ---
 
@@ -287,19 +287,35 @@ This roadmap is the source of truth for what ships next. Each phase is independe
 | 24b.2 | 2026-06-30 | Triplets + intra-measure ties. |
 | 24b.3 | 2026-06-30 | Professional engraving rework (continuous multi-measure paper surface, chord symbols, key sig on every line, end barline, serif title block, auto-beamed eighths/sixteenths). |
 | 24c | 2026-06-30 | Lyrics via inline Sibelius-style click-on-staff typing (syllables + hyphen continuation + melisma line). |
+| 24c.1 | 2026-06-30 | Engraving polish: chord band height, collision fix, end-barline clipping, lyric baseline offset, ledger-line-aware chord Y. |
+| 24c.1.1 | 2026-06-30 | Additional lyric offset bump to clear stem flags. |
+| 24c.1.2 | 2026-06-30 | Two-pass lyric collision detection (adjacent syllables no longer run together). |
+| 24c.1.3 | 2026-06-30 | Lyric gap bumped to visible breathing room; `MIN_LYRIC_GAP` 3 → 8. |
+| 24c.2 | 2026-06-30 | WYSIWYG US Letter paper (816×1056 @ 96 DPI, 0.75" margins) + measureText-accurate lyric widths. |
+| 25.0 | 2026-06-30 | Click-on-staff melody entry MVP (click Y → pitch, side panel rhythm/rest/dotted). |
+| 25.0.2 | 2026-06-30 | Standard / Handwritten font style toggle (Georgia serif vs. Patrick Hand). |
+| 25.0.3 | 2026-06-30 | Handwritten typography polish (drop italics, tighter sizing). |
+| 25.1 | 2026-06-30 | Visible caret + keyboard entry (A–G pitch, R rest, arrows nudge/move, number keys rhythm, `.` dotted). |
+| 25.2 | 2026-06-30 | Click-on-staff **chord** entry — per-beat hit regions, autocomplete, parser handling all 20 qualities + slash chords. `Chord[]` → `ChordBeat[]` refactor (v4 → v5). |
+| 25.2.1 | 2026-06-30 | Click-outside closes chord autocomplete. |
+| 26 | 2026-06-30 | Undo / redo at sheet level — bounded 100-action stacks, Cmd/Ctrl+Z / Shift+Z / Ctrl+Y. |
+| 26.1 | 2026-06-30 | Chord collision avoidance on dense bars (two-pass shift, `MIN_CHORD_GAP` 6px). |
+| 26.1.1 | 2026-06-30 | Chord font auto-shrink when collision-shifted chords would overflow measure (9pt floor). |
+| 27 | 2026-06-30 | Live audio playback — chord comping (PolySynth) + melody (MonoSynth) via Tone.js, ties respected, auto-stop with tail. |
+| 27.1a | 2026-06-30 | Instrument picker + mixer — 6 chord voices + 6 melody voices via `smplr`, per-voice volume (dB) + mute. |
+| 27.1b | 2026-06-30 | Per-sheet count-in + session tempo slider (50–150%) + loop region (start/end measures). |
+| 27.1.1 | 2026-06-30 | Synth fallback when `smplr` fails to load (defaults flipped to synth so playback works out of the box). |
+| 27.1.2 | 2026-06-30 | Lyricist field + smart credit display ("Music and Lyrics by X" / "Music by X / Words by Y" / etc.). |
+| 27.1.3 | 2026-06-30 | Arranger ("arr. by") + copyright (bottom-right) + source ("from Kind of Blue" italic subtitle) fields. |
+| 27.2 | 2026-06-30 | Audio quality overhaul: `smplr` → `Tone.Sampler` + curated CDNs (Salamander piano, nbrosowsky guitar/sax/flute/cello/vibes). One consistent routing, no more silent-fail voices. |
+| 27.2.1 | 2026-06-30 | Instrument quality polish bundle: string-ensemble pad, FM Rhodes, guitar lowpass tame, vibes +10 dB, choir-pad voice, refreshed synth presets, timing bump for slow-attack samplers. |
+| 28.0 | 2026-06-30 | Form markings **visual** — repeat barlines, volta brackets (1./2. endings), Coda/Segno glyphs, D.C./D.S./To Coda/Fine text, section labels. Editor per-measure panel. Audio still plays linearly (28.1 will fix). |
 
 **In flight / queued:**
 
 | Phase | Scope | Est. | Why here |
 |---|---|---|---|
-| **24c.1** | **Engraving polish:** chord band height, chord collision fix, end-barline clipping fix, lyric baseline offset fix, ledger-line-aware chord Y. | 1 session | Hard prerequisite. Compounding new rendering on broken rendering is a trap. |
-| 25 | **Click-on-staff melody entry** — Dorico-style sequential snap-entry. Persistent caret marks "next note position." Click staff → places note at caret + advances. Keyboard pitch entry (A-G + accidental + octave). Arrow keys nudge pitch / move cursor. Side panel: rhythm value, dotted, accidentals (♯ ♮ ♭ 𝄪 𝄫), articulations (staccato, accent, fermata, slur). Modal entry stays as "Advanced edit" until 25 proves itself. | 2-3 sessions | The big architectural rewrite. Closes the loop on "the staff IS the workspace." |
-| 25.0 | **Click-on-staff MVP.** "Click entry" mode toggle next to "Edit lyrics" (mutually exclusive). Side panel: rhythm value (1/2/4/8/16), dotted toggle, rest toggle. Click anywhere on a staff → places a note at the clicked measure with pitch derived from click Y. Notes APPEND to the clicked measure's melody (beat-targeting comes in 25.2). Crosshair cursor in paper bounds; escape exits. Modal entry untouched. | 1 session | Get something working end-to-end. Proves the click-Y-to-pitch math + overlay architecture + side-panel UX before adding more inputs. |
-| 25.1 | **Keyboard pitch entry + arrows + accidentals.** A-G letter keys place at current octave (inferred from last placed note). Arrow Up/Down nudge last-placed pitch. Arrow Right/Left advance/retreat caret. Number keys 1/2/4/8/16 change rhythm. `=` sharp, `-` flat, `0` natural. R for rest. | 1 session | Power-user inputs. Now the tool is keyboard-driven the way Sibelius / Dorico / MuseScore are. |
-| 25.2 | **Beat-targeting clicks + visual caret + replacement.** Click X → snap to nearest beat slot. Vertical caret line shows next placement position. Click on a beat that's already occupied = replace. | 1 session | Full Dorico parity. |
-| 26 | **Undo / redo at sheet level** — action-log pattern, bounded ~100 actions. Per LEAD-SHEET-DESIGN §10 open question. | 1 session | Becomes mandatory the moment click-entry lands — a misclick on a 32-bar sheet is currently irrecoverable. |
-| 27 | **Live audio playback** — chord comping + melody playback. Uses existing Tone.js plumbing from Bass Arpeggios. | 1-2 sessions | Highest single-feature tester impact. Closes the authoring loop. |
-| 28 | **Form markings** — repeats 𝄆 𝄇, first / second endings, D.C. al Fine, D.S. al Coda, Coda, Segno, To Coda, Fine. Section labels (A / B / Intro / Verse / Chorus / Bridge / Outro). | 2 sessions | Real songs need these. Was originally Phase 24d. |
+| **28.1** | **Form markings — audio.** Make the playback engine obey repeats (𝄆 𝄇), first/second endings, D.C. al Fine, D.S. al Coda, Coda, Segno, To Coda, Fine. Requires a scheduler-level "expanded playlist" pass that walks the linear measures + form graph and emits a repeat-aware event list. | 1-2 sessions | Direct closeout of 28.0. Right now the visual jumps are honest markings on the page but the audio ignores them, which is the biggest expectation mismatch during playback. |
 | 29 | **Cross-measure ties + slurs.** Multi-line render coordinator that knows about the previous line's last note. | 1-2 sessions | Engraving completeness. Was originally Phase 24b.4. |
 | 30 | **MIDI input** for melody entry via the Web MIDI API. Plug in keyboard → notes appear at the caret. | 1-2 sessions | Power-user differentiator — makes serious musicians take the tool seriously. |
 | 31 | **Selection model** — drag-select multiple notes, then delete / transpose / copy / paste. | 1-2 sessions | Indispensable for revising. Currently no multi-note operations exist. |
@@ -308,7 +324,7 @@ This roadmap is the source of truth for what ships next. Each phase is independe
 | 34 | **Print polish** — page numbers, copyright footer line, page-break controls for multi-page sheets. | 0.5 session | Final professional touches before pro engraving is fully done. |
 | 35 | **Library polish** — search / filter, live-rendered thumbnails on cards, mobile / touch tab-strip layout, accessibility pass. | 1 session | Was originally Slice 8. |
 
-Total remaining: ~16 sessions to complete the LSB Basic Tier as a Dorico-class authoring tool. Phases may re-prioritize based on tester feedback once the build is in user hands.
+Total remaining: ~8-11 sessions to complete the LSB Basic Tier as a Dorico-class authoring tool. Phases may re-prioritize based on tester feedback once the build is in user hands.
 
 The Advanced Tier (mid-piece key/time changes, multi-voice, MusicXML import/export, multi-page layout with manual page breaks, real-time collab, audio playback of full chart with comping) stays in `bucket: "later"` until the Basic Tier is shipped and in production use.
 
@@ -341,6 +357,6 @@ Each hook is a small button in the lead sheet editor toolbar, surfacing in which
 ## 11. Status & Roadmap Position
 
 - **2026-06-29**: design pass complete (this doc). Module promoted from `bucket: "later"` / `status: "sketch"` to `bucket: "next"` / `status: "designed"` in `src/lib/modules/registry.ts`.
-- **2026-06-30**: build window opened ahead of schedule. Phases 24a (chord chart MVP), 24b (melody via VexFlow), 24b.2 (intra-measure ties + triplets), 24b.3 (pro engraving rework — continuous multi-measure paper surface), and **24c (lyrics — inline Sibelius-style typing on the staff)** have all shipped to production. Registry status flipped `designed → live`.
-- **Remaining slices to close out Basic Tier:** 24b.4 (cross-measure ties + slurs), 24d (form markings: repeats / endings / D.C. / D.S. / Coda / Segno / Fine), 24e (share via URL-encoded JSON), Slice 8 polish (library search / thumbnails / mobile tab-strip).
+- **2026-06-30**: build window opened ahead of schedule and moved fast. **28 sub-phases shipped in the first sprint** covering: chord-chart MVP + view/print (24a) → melody via VexFlow (24b–24b.3) → lyrics via inline click-on-staff typing (24c) with engraving polish (24c.1.x) → WYSIWYG Letter paper (24c.2) → click-on-staff **melody** entry with visible caret + keyboard shortcuts (25.0–25.1) → click-on-staff **chord** entry with autocomplete parser (25.2–25.2.1) → Standard / Handwritten font style (25.0.2–25.0.3) → **undo / redo** (26–26.1.1) → **live audio playback** with instrument picker + mixer + count-in + tempo slider + loop region (27–27.2.1) → author-credit metadata (lyricist / arranger / copyright / source, 27.1.2–27.1.3) → **form markings visual** (28.0). Registry status flipped `designed → live`.
+- **Remaining Basic Tier work** (see §8.5 for the phase table): 28.1 (form markings playback), 29 (cross-measure ties + slurs), 30 (MIDI input), 31 (selection model), 32 (pickup + bars-per-line), 33 (share via URL), 34 (print polish), 35 (library polish). ~8-11 sessions.
 - **Advanced Tier**: stays in `bucket: "later"` / `status: "sketch"` until basic ships and is in production use.
