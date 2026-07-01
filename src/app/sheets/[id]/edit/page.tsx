@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CHORD_QUALITIES,
   PITCH_CLASSES,
@@ -81,6 +81,11 @@ import {
   buildPitchedNote,
   buildRestNote,
 } from "@/lib/sheets/melody-entry";
+import {
+  connectMidiInput,
+  midiNumberToVexPitch,
+  type MidiConnectionStatus,
+} from "@/lib/sheets/midi-input";
 import { sheetPlayback } from "@/lib/audio/sheet-playback";
 import {
   advanceCaret,
@@ -187,6 +192,18 @@ export default function SheetEditorPage() {
   // overlay reads from this; keyboard handlers advance / retreat /
   // place notes at this position.
   const [caret, setCaret] = useState<MelodyCaret | null>(null);
+  // Phase 30 — MIDI input. `midiEnabled` is the user's toggle; the
+  // engine only actually attaches to devices when both `midiEnabled`
+  // AND `editorMode === "click-entry"` are true.
+  const [midiEnabled, setMidiEnabled] = useState(false);
+  const [midiStatus, setMidiStatus] = useState<MidiConnectionStatus>(
+    "disconnected",
+  );
+  const [midiDeviceCount, setMidiDeviceCount] = useState(0);
+  const caretRef = useRef<MelodyCaret | null>(null);
+  useEffect(() => {
+    caretRef.current = caret;
+  }, [caret]);
   // Phase 24c — Lyric overlay click positions: pitched notes that are
   // NOT tied followers. Computed here (above the early returns) so the
   // useMemo hook order stays stable across renders.
@@ -801,6 +818,54 @@ export default function SheetEditorPage() {
     );
     placeAtCaret(newCaret, pitch);
   };
+
+  // Phase 30 — Keep a stable ref to the latest `placeAtCaret` closure
+  // so the MIDI subscription effect can invoke it without needing to
+  // re-attach when unrelated state changes.
+  const placeAtCaretRef = useRef<
+    ((c: MelodyCaret, p: string) => void) | null
+  >(null);
+  useEffect(() => {
+    placeAtCaretRef.current = placeAtCaret;
+  });
+
+  // Phase 30 — MIDI input subscription. Attaches while both the
+  // click-entry mode and the user's MIDI toggle are on; auto-detaches
+  // otherwise. Uses the caret + placeAtCaret refs so hot state updates
+  // don't churn the subscription.
+  useEffect(() => {
+    if (!midiEnabled || editorMode !== "click-entry") {
+      setMidiStatus("disconnected");
+      setMidiDeviceCount(0);
+      return;
+    }
+    let cancelled = false;
+    let cleanup: () => void = () => {};
+    connectMidiInput({
+      onNote: (midiNumber) => {
+        const pitch = midiNumberToVexPitch(midiNumber);
+        const c = caretRef.current;
+        const place = placeAtCaretRef.current;
+        if (!pitch || !c || !place) return;
+        place(c, pitch);
+      },
+      onStatusChange: (status, count) => {
+        if (cancelled) return;
+        setMidiStatus(status);
+        setMidiDeviceCount(count);
+      },
+    }).then((res) => {
+      if (cancelled) {
+        res.disconnect();
+        return;
+      }
+      cleanup = res.disconnect;
+    });
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [midiEnabled, editorMode]);
 
   const moveCursorTo = (next: LyricCursor) => {
     if (lyricCursor) commitDraftAt(lyricCursor, lyricDraft);
@@ -1666,6 +1731,46 @@ export default function SheetEditorPage() {
                   />
                   Rest
                 </label>
+              </div>
+              {/* Phase 30 — MIDI input toggle + status. Only meaningful
+                  in click-entry mode; the caret is what MIDI note-ons
+                  land on. */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-sky-500/20 pt-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setMidiEnabled((v) => !v)}
+                  className={`rounded border px-2 py-0.5 font-mono transition-colors ${
+                    midiEnabled
+                      ? "border-sky-500/60 bg-sky-500/15 text-sky-500"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Toggle MIDI keyboard input"
+                >
+                  MIDI {midiEnabled ? "on" : "off"}
+                </button>
+                {midiEnabled && (
+                  <span
+                    className={`text-[10px] ${
+                      midiStatus === "connected" && midiDeviceCount > 0
+                        ? "text-sky-500"
+                        : midiStatus === "denied" ||
+                            midiStatus === "unsupported"
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {midiStatus === "requesting" && "Requesting access…"}
+                    {midiStatus === "connected" && midiDeviceCount === 0 &&
+                      "No devices connected — plug in a MIDI keyboard"}
+                    {midiStatus === "connected" && midiDeviceCount > 0 &&
+                      `${midiDeviceCount} device${midiDeviceCount === 1 ? "" : "s"} — play to place notes at the caret`}
+                    {midiStatus === "denied" &&
+                      "Access denied — allow MIDI in the browser prompt"}
+                    {midiStatus === "unsupported" &&
+                      "Not supported in this browser (try Chrome / Edge)"}
+                    {midiStatus === "disconnected" && "Disconnected"}
+                  </span>
+                )}
               </div>
             </div>
           )}
