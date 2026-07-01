@@ -110,7 +110,10 @@ import {
   pasteToSheet,
   transposeSelection,
 } from "@/lib/sheets/selection";
-import { suggestOttavaForMeasure } from "@/lib/sheets/ottava-suggest";
+import {
+  computeIdealOttava,
+  suggestOttavaForMeasure,
+} from "@/lib/sheets/ottava-suggest";
 import { SelectionOverlay } from "@/components/sheets/selection-overlay";
 import { ShareModal } from "@/components/sheets/share-modal";
 import { ShortcutsOverlay } from "@/components/sheets/shortcuts-overlay";
@@ -251,6 +254,35 @@ export default function SheetEditorPage() {
   useEffect(() => {
     caretRef.current = caret;
   }, [caret]);
+  // Phase 31.7.1 — Automatic ottava. After every measures mutation
+  // we walk each measure through `computeIdealOttava` (which respects
+  // hysteresis so it doesn't flicker when a note hovers right at the
+  // range boundary) and apply the delta silently. `trackUndo: false`
+  // keeps this out of the user's undo history — it's a display-only
+  // decision they can always override manually via the ottava
+  // dropdown in the Measures list.
+  useEffect(() => {
+    if (!sheet) return;
+    let changed = false;
+    const nextMeasures = sheet.measures.map((m) => {
+      const ideal = computeIdealOttava(m);
+      // Only touch a measure when the ideal shift differs from what's
+      // stored — including the case where ideal is null and the
+      // measure carries an unnecessary shift (auto-remove).
+      const current = m.octavaShift;
+      if (ideal === (current ?? null)) return m;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { octavaShift: _drop, ...rest } = m;
+      void _drop;
+      changed = true;
+      return ideal
+        ? ({ ...rest, octavaShift: ideal } as typeof m)
+        : (rest as typeof m);
+    });
+    if (changed) {
+      updateSheet(id, { measures: nextMeasures }, { trackUndo: false });
+    }
+  }, [sheet, id]);
   // Phase 31.3 — Watch sheet.updatedAt. On the first mount we take a
   // baseline (no flash). Every subsequent bump = an actual save;
   // trigger the "Saved" indicator.
