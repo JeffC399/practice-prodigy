@@ -101,8 +101,11 @@ import {
   type MelodyCaret,
 } from "@/lib/sheets/melody-caret";
 import {
+  applyOctavaToSelection,
   copySelection,
   deleteSelection,
+  lastSelectedRef,
+  pasteToSheet,
   transposeSelection,
 } from "@/lib/sheets/selection";
 import { SelectionOverlay } from "@/components/sheets/selection-overlay";
@@ -484,21 +487,50 @@ export default function SheetEditorPage() {
         updateSheet(id, { measures });
         return;
       }
-      const modC =
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        e.key.toLowerCase() === "c";
-      if (modC) {
+      const mod = e.metaKey || e.ctrlKey;
+      const isModC =
+        mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "c";
+      if (isModC) {
         if (selection.size === 0) return;
         e.preventDefault();
         setClipboardNotes(copySelection(fresh, selection));
         return;
       }
+      // Phase 31.4.1 — Cut = copy + delete.
+      const isModX =
+        mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "x";
+      if (isModX) {
+        if (selection.size === 0) return;
+        e.preventDefault();
+        setClipboardNotes(copySelection(fresh, selection));
+        const measures = deleteSelection(fresh, selection);
+        updateSheet(id, { measures });
+        setSelection(new Set());
+        return;
+      }
+      // Phase 31.4.1 — Paste at anchor: immediately AFTER the last
+      // selected note if a selection exists; append to the last
+      // measure of the sheet otherwise.
+      const isModV =
+        mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "v";
+      if (isModV) {
+        if (!clipboardNotes || clipboardNotes.length === 0) return;
+        e.preventDefault();
+        const anchor = lastSelectedRef(selection);
+        const target = anchor
+          ? { measureIdx: anchor.measureIdx, afterNoteIdx: anchor.noteIdx }
+          : null;
+        const measures = pasteToSheet(fresh, clipboardNotes, target);
+        updateSheet(id, { measures });
+        // After paste, clear selection so the user can position the
+        // next action deliberately.
+        setSelection(new Set());
+        return;
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editorMode, selection, id]);
+  }, [editorMode, selection, id, clipboardNotes]);
 
   /**
    * Phase 25.1 — Keyboard handler bound to window while click-entry
@@ -2057,37 +2089,106 @@ export default function SheetEditorPage() {
             </p>
           )}
           {editorMode === "select" && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-[11px]">
-              <span className="font-medium text-sky-500">
-                Select mode.
-              </span>
-              <span className="text-muted-foreground">
-                Click a note to select · Shift+click to toggle · drag
-                for marquee ·{" "}
-                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
-                  Del
-                </kbd>{" "}
-                delete ·{" "}
-                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
-                  ↑↓
-                </kbd>{" "}
-                transpose (Shift = octave) ·{" "}
-                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
-                  Cmd/Ctrl+C
-                </kbd>{" "}
-                copy ·{" "}
-                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
-                  Esc
-                </kbd>{" "}
-                clear.
-              </span>
-              <span className="ml-auto rounded-full bg-sky-500/20 px-2 py-0.5 font-mono text-sky-500">
-                {selection.size} selected
-              </span>
-              {clipboardNotes && clipboardNotes.length > 0 && (
-                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-emerald-500">
-                  {clipboardNotes.length} on clipboard
+            <div className="flex flex-col gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-sky-500">
+                  Select mode.
                 </span>
+                <span className="text-muted-foreground">
+                  Click a note · Shift+click toggles · drag for marquee
+                  ·{" "}
+                  <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                    Del
+                  </kbd>{" "}
+                  ·{" "}
+                  <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                    ↑↓
+                  </kbd>{" "}
+                  transpose (Shift = octave) ·{" "}
+                  <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                    Cmd/Ctrl+C/X/V
+                  </kbd>{" "}
+                  copy/cut/paste ·{" "}
+                  <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                    Esc
+                  </kbd>{" "}
+                  clear.
+                </span>
+                <span className="ml-auto rounded-full bg-sky-500/20 px-2 py-0.5 font-mono text-sky-500">
+                  {selection.size} selected
+                </span>
+                {clipboardNotes && clipboardNotes.length > 0 && (
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-emerald-500">
+                    {clipboardNotes.length} on clipboard
+                  </span>
+                )}
+              </div>
+              {selection.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-sky-500/20 pt-2">
+                  <span className="font-medium text-muted-foreground">
+                    Ottava:
+                  </span>
+                  {/* Phase 31.4.1 — partial-line ottava via selection.
+                      Applies (or clears) the shift on every measure
+                      that contains at least one selected note. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fresh = useSheetsLibrary
+                        .getState()
+                        .sheets.find((s) => s.id === id);
+                      if (!fresh) return;
+                      const measures = applyOctavaToSelection(
+                        fresh,
+                        selection,
+                        "8va",
+                      );
+                      updateSheet(id, { measures });
+                    }}
+                    className="rounded border border-border bg-background px-2 py-0.5 font-mono text-muted-foreground hover:text-foreground transition-colors"
+                    title="Apply 8va (play 1 octave up) to selected measures"
+                  >
+                    8va
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fresh = useSheetsLibrary
+                        .getState()
+                        .sheets.find((s) => s.id === id);
+                      if (!fresh) return;
+                      const measures = applyOctavaToSelection(
+                        fresh,
+                        selection,
+                        "8vb",
+                      );
+                      updateSheet(id, { measures });
+                    }}
+                    className="rounded border border-border bg-background px-2 py-0.5 font-mono text-muted-foreground hover:text-foreground transition-colors"
+                    title="Apply 8vb (play 1 octave down) to selected measures"
+                  >
+                    8vb
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fresh = useSheetsLibrary
+                        .getState()
+                        .sheets.find((s) => s.id === id);
+                      if (!fresh) return;
+                      const measures = applyOctavaToSelection(
+                        fresh,
+                        selection,
+                        undefined,
+                      );
+                      updateSheet(id, { measures });
+                    }}
+                    className="rounded border border-border bg-background px-2 py-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Clear ottava from selected measures"
+                  >
+                    Clear
+                  </button>
+                </div>
               )}
             </div>
           )}

@@ -1,4 +1,8 @@
-import type { MelodyNote, Sheet } from "@/lib/sheets/types";
+import type {
+  MelodyNote,
+  Sheet,
+  SheetOctavaShift,
+} from "@/lib/sheets/types";
 import { nudgePitch } from "@/lib/sheets/melody-caret";
 
 /**
@@ -131,4 +135,73 @@ export function copySelection(
     if (n) out.push(n);
   }
   return out;
+}
+
+/**
+ * Return the last selected note's ref in melody-order, or null when
+ * the selection is empty. Callers use this to anchor paste immediately
+ * after the selection.
+ */
+export function lastSelectedRef(selection: MelodySelection): NoteRef | null {
+  const refs = sortRefs(
+    Array.from(selection)
+      .map(parseRefId)
+      .filter((r): r is NoteRef => r !== null),
+  );
+  return refs.length > 0 ? refs[refs.length - 1] : null;
+}
+
+/**
+ * Insert a list of MelodyNotes into a measure at a specific position.
+ * `target` = null → append to the last measure of the sheet.
+ * Otherwise insert into measures[measureIdx] immediately AFTER
+ * afterNoteIdx (use afterNoteIdx = -1 to prepend).
+ *
+ * This is a literal insert — no beat-fit / auto-split awareness.
+ * The Phase 31.0 beat-count badge will flag any measure that ends up
+ * over- or under-filled; users can split manually via the selection
+ * + delete flow if the paste overflows.
+ */
+export function pasteToSheet(
+  sheet: Sheet,
+  notes: MelodyNote[],
+  target: { measureIdx: number; afterNoteIdx: number } | null,
+): Sheet["measures"] {
+  if (notes.length === 0 || sheet.measures.length === 0) {
+    return sheet.measures;
+  }
+  const targetMi = target?.measureIdx ?? sheet.measures.length - 1;
+  const targetNi = target ? target.afterNoteIdx + 1 : -1;
+  return sheet.measures.map((m, mi) => {
+    if (mi !== targetMi) return m;
+    const melody = [...(m.melody ?? [])];
+    if (targetNi < 0 || targetNi > melody.length) {
+      melody.push(...notes);
+    } else {
+      melody.splice(targetNi, 0, ...notes);
+    }
+    return { ...m, melody };
+  });
+}
+
+/**
+ * Apply (or clear when `shift` is undefined) an ottava marking to
+ * every measure that contains at least one selected note. Phase 31.4.1
+ * lets the user cover partial-line ottava scenarios by selecting only
+ * the notes in the measures that need the shift.
+ */
+export function applyOctavaToSelection(
+  sheet: Sheet,
+  selection: MelodySelection,
+  shift: SheetOctavaShift | undefined,
+): Sheet["measures"] {
+  if (selection.size === 0) return sheet.measures;
+  const measuresToShift = new Set<number>();
+  for (const id of selection) {
+    const ref = parseRefId(id);
+    if (ref) measuresToShift.add(ref.measureIdx);
+  }
+  return sheet.measures.map((m, mi) =>
+    measuresToShift.has(mi) ? { ...m, octavaShift: shift } : m,
+  );
 }
