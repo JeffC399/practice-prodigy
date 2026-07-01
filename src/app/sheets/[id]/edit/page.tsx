@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  BoxSelect,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -99,6 +100,12 @@ import {
   retreatCaret,
   type MelodyCaret,
 } from "@/lib/sheets/melody-caret";
+import {
+  copySelection,
+  deleteSelection,
+  transposeSelection,
+} from "@/lib/sheets/selection";
+import { SelectionOverlay } from "@/components/sheets/selection-overlay";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -157,8 +164,17 @@ export default function SheetEditorPage() {
   // The SheetSurface emits layout (per-note positions + per-measure
   // rects) whenever any interactive mode is on.
   const [editorMode, setEditorMode] = useState<
-    "none" | "lyrics" | "click-entry" | "chord-entry"
+    "none" | "lyrics" | "click-entry" | "chord-entry" | "select"
   >("none");
+  // Phase 31.4 — melody-note selection state. Set of `${mi}:${ni}`
+  // identifiers. Selection is UI-only (not persisted). Operates while
+  // editorMode === "select"; other modes clear it on entry.
+  const [selection, setSelection] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [clipboardNotes, setClipboardNotes] = useState<MelodyNote[] | null>(
+    null,
+  );
   // Phase 25.2 — Chord entry mode state.
   const [chordCursor, setChordCursor] = useState<ChordCursor | null>(null);
   const [chordDraft, setChordDraft] = useState("");
@@ -359,6 +375,72 @@ export default function SheetEditorPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [id]);
+
+  /**
+   * Phase 31.4 — Selection-mode keyboard shortcuts. Active only when
+   * `editorMode === "select"`. Delete / Backspace removes the selected
+   * notes; ↑/↓ transposes each by one staff step (Shift = by octave);
+   * Cmd/Ctrl+C copies the selection to a local clipboard; Escape
+   * clears the selection. Cut and Paste land in a follow-up.
+   */
+  useEffect(() => {
+    if (editorMode !== "select") return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const fresh = useSheetsLibrary
+        .getState()
+        .sheets.find((s) => s.id === id);
+      if (!fresh) return;
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSelection(new Set());
+        return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selection.size === 0) return;
+        e.preventDefault();
+        const measures = deleteSelection(fresh, selection);
+        updateSheet(id, { measures });
+        setSelection(new Set());
+        return;
+      }
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        if (selection.size === 0) return;
+        e.preventDefault();
+        const direction: 1 | -1 = e.key === "ArrowUp" ? 1 : -1;
+        const measures = transposeSelection(
+          fresh,
+          selection,
+          direction,
+          e.shiftKey,
+        );
+        updateSheet(id, { measures });
+        return;
+      }
+      const modC =
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === "c";
+      if (modC) {
+        if (selection.size === 0) return;
+        e.preventDefault();
+        setClipboardNotes(copySelection(fresh, selection));
+        return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editorMode, selection, id]);
 
   /**
    * Phase 25.1 — Keyboard handler bound to window while click-entry
@@ -869,6 +951,17 @@ export default function SheetEditorPage() {
   const exitClickEntryMode = () => {
     setEditorMode("none");
     setCaret(null);
+  };
+
+  // Phase 31.4 — Selection mode enter/exit.
+  const enterSelectMode = () => {
+    setEditorMode("select");
+    setSelection(new Set());
+    setCaret(null);
+  };
+  const exitSelectMode = () => {
+    setEditorMode("none");
+    setSelection(new Set());
   };
 
   /**
@@ -1695,6 +1788,30 @@ export default function SheetEditorPage() {
                   ? "Done click-entry"
                   : "Click entry"}
               </button>
+              {/* Phase 31.4 — Select mode. Click / drag-marquee to
+                  select melody notes; then Delete removes them,
+                  arrows transpose, Cmd/Ctrl+C copies. */}
+              <button
+                type="button"
+                onClick={() =>
+                  editorMode === "select"
+                    ? exitSelectMode()
+                    : enterSelectMode()
+                }
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  editorMode === "select"
+                    ? "border-sky-500/60 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+                title={
+                  editorMode === "select"
+                    ? "Exit selection mode"
+                    : "Select notes to delete, transpose, or copy"
+                }
+              >
+                <BoxSelect className="h-3.5 w-3.5" />
+                {editorMode === "select" ? "Done selecting" : "Select"}
+              </button>
               <button
                 type="button"
                 onClick={() =>
@@ -1780,6 +1897,41 @@ export default function SheetEditorPage() {
               </kbd>{" "}
               exit. Pick a suggestion to commit it instantly.
             </p>
+          )}
+          {editorMode === "select" && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-[11px]">
+              <span className="font-medium text-sky-500">
+                Select mode.
+              </span>
+              <span className="text-muted-foreground">
+                Click a note to select · Shift+click to toggle · drag
+                for marquee ·{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  Del
+                </kbd>{" "}
+                delete ·{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  ↑↓
+                </kbd>{" "}
+                transpose (Shift = octave) ·{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  Cmd/Ctrl+C
+                </kbd>{" "}
+                copy ·{" "}
+                <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                  Esc
+                </kbd>{" "}
+                clear.
+              </span>
+              <span className="ml-auto rounded-full bg-sky-500/20 px-2 py-0.5 font-mono text-sky-500">
+                {selection.size} selected
+              </span>
+              {clipboardNotes && clipboardNotes.length > 0 && (
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-emerald-500">
+                  {clipboardNotes.length} on clipboard
+                </span>
+              )}
+            </div>
           )}
           {editorMode === "click-entry" && (
             <div className="flex flex-col gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-2">
@@ -1944,6 +2096,16 @@ export default function SheetEditorPage() {
                 onPickSuggestion={onChordPickSuggestion}
                 onClickOutside={onChordClickOutside}
                 onExit={exitChordMode}
+              />
+            )}
+            {/* Phase 31.4 — Selection overlay. Highlights selected
+                notes + handles click / shift-click / drag-marquee. */}
+            {editorMode === "select" && surfaceLayout && (
+              <SelectionOverlay
+                positions={surfaceLayout.positions}
+                paperHeight={surfaceLayout.paperHeight}
+                selection={selection}
+                onSelectionChange={setSelection}
               />
             )}
           </div>

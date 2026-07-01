@@ -1,0 +1,134 @@
+import type { MelodyNote, Sheet } from "@/lib/sheets/types";
+import { nudgePitch } from "@/lib/sheets/melody-caret";
+
+/**
+ * Phase 31.4 — Selection model for melody notes.
+ *
+ * Selection is UI-only state (not persisted). Each selected item is
+ * identified by `${measureIdx}:${noteIdx}` — the same coordinate
+ * system used by the SheetSurface's onLayout callback so drag-marquee
+ * and click-to-select share the same identifier space.
+ *
+ * Operations are pure functions over the sheet's measures array: each
+ * returns a NEW measures array with the operation applied. The editor
+ * consumes them via `updateSheet(id, { measures })`, so undo/redo,
+ * autosave, and cross-measure tie renderers all keep working with
+ * zero additional wiring.
+ */
+
+export type NoteRef = { measureIdx: number; noteIdx: number };
+
+export type MelodySelection = Set<string>;
+
+/** Encode a NoteRef as its string id (used as the Set key). */
+export function refId(ref: NoteRef): string {
+  return `${ref.measureIdx}:${ref.noteIdx}`;
+}
+
+/** Decode a string id back into a NoteRef. */
+export function parseRefId(id: string): NoteRef | null {
+  const [m, n] = id.split(":").map((s) => parseInt(s, 10));
+  if (Number.isNaN(m) || Number.isNaN(n)) return null;
+  return { measureIdx: m, noteIdx: n };
+}
+
+/** Sort a list of refs in melody-order (measure, then note within measure). */
+export function sortRefs(refs: NoteRef[]): NoteRef[] {
+  return [...refs].sort(
+    (a, b) =>
+      a.measureIdx - b.measureIdx || a.noteIdx - b.noteIdx,
+  );
+}
+
+/**
+ * Delete every selected note from its measure. Returns a fresh
+ * measures array. Indices in the selection are pre-sorted then walked
+ * in descending order so each splice doesn't invalidate the following
+ * indices.
+ */
+export function deleteSelection(
+  sheet: Sheet,
+  selection: MelodySelection,
+): Sheet["measures"] {
+  if (selection.size === 0) return sheet.measures;
+  // Group by measureIdx to minimize allocations.
+  const perMeasure = new Map<number, number[]>();
+  for (const id of selection) {
+    const ref = parseRefId(id);
+    if (!ref) continue;
+    const arr = perMeasure.get(ref.measureIdx) ?? [];
+    arr.push(ref.noteIdx);
+    perMeasure.set(ref.measureIdx, arr);
+  }
+  return sheet.measures.map((m, mi) => {
+    const idxs = perMeasure.get(mi);
+    if (!idxs || idxs.length === 0) return m;
+    // Walk high-to-low so splice doesn't shift the remaining indexes.
+    const melody = [...(m.melody ?? [])];
+    idxs
+      .slice()
+      .sort((a, b) => b - a)
+      .forEach((i) => melody.splice(i, 1));
+    return { ...m, melody };
+  });
+}
+
+/**
+ * Transpose every selected pitched note by `direction` staff steps
+ * (letter cycle — C → D → E …). Rests unaffected. When `octaves` is
+ * true, shift by 7 letter steps (one full octave).
+ */
+export function transposeSelection(
+  sheet: Sheet,
+  selection: MelodySelection,
+  direction: 1 | -1,
+  octaves: boolean,
+): Sheet["measures"] {
+  if (selection.size === 0) return sheet.measures;
+  const perMeasure = new Map<number, Set<number>>();
+  for (const id of selection) {
+    const ref = parseRefId(id);
+    if (!ref) continue;
+    const set = perMeasure.get(ref.measureIdx) ?? new Set<number>();
+    set.add(ref.noteIdx);
+    perMeasure.set(ref.measureIdx, set);
+  }
+  const steps = octaves ? 7 : 1;
+  return sheet.measures.map((m, mi) => {
+    const idxs = perMeasure.get(mi);
+    if (!idxs || idxs.size === 0) return m;
+    const melody = (m.melody ?? []).map((n, ni) => {
+      if (!idxs.has(ni) || n.kind !== "note") return n;
+      let pitch = n.pitch;
+      for (let s = 0; s < steps; s++) {
+        pitch = nudgePitch(pitch, direction);
+      }
+      return { ...n, pitch };
+    });
+    return { ...m, melody };
+  });
+}
+
+/**
+ * Copy the selected notes into a plain array preserving melody-order.
+ * Cross-measure boundaries are marked by an implicit "measure break"
+ * so paste can restore the shape (v1 flattens — paste inserts all
+ * notes contiguously at the caret without preserving bar boundaries).
+ */
+export function copySelection(
+  sheet: Sheet,
+  selection: MelodySelection,
+): MelodyNote[] {
+  const refs = sortRefs(
+    Array.from(selection)
+      .map(parseRefId)
+      .filter((r): r is NoteRef => r !== null),
+  );
+  const out: MelodyNote[] = [];
+  for (const ref of refs) {
+    const m = sheet.measures[ref.measureIdx];
+    const n = m?.melody?.[ref.noteIdx];
+    if (n) out.push(n);
+  }
+  return out;
+}
