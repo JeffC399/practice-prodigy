@@ -108,6 +108,7 @@ import {
   pasteToSheet,
   transposeSelection,
 } from "@/lib/sheets/selection";
+import { suggestOttavaForMeasure } from "@/lib/sheets/ottava-suggest";
 import { SelectionOverlay } from "@/components/sheets/selection-overlay";
 import { ShortcutsOverlay } from "@/components/sheets/shortcuts-overlay";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
@@ -2468,6 +2469,28 @@ export default function SheetEditorPage() {
                         >
                           {label}
                         </span>
+                      );
+                    })()}
+                    {/* Phase 31.7 — ottava suggestion chip. Shows only
+                        when the measure has notes far outside the
+                        comfortable treble range AND doesn't already
+                        carry an octavaShift. Click to apply. */}
+                    {(() => {
+                      const suggested = suggestOttavaForMeasure(measure);
+                      if (!suggested) return null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateMeasureForm(mIdx, {
+                              octavaShift: suggested,
+                            })
+                          }
+                          className="rounded bg-sky-500/20 px-1.5 py-0.5 font-mono text-[9px] font-medium text-sky-500 hover:bg-sky-500/30 transition-colors"
+                          title={`Suggested: apply ${suggested} to bring notes closer to the staff`}
+                        >
+                          + {suggested}?
+                        </button>
                       );
                     })()}
                   </div>
