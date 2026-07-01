@@ -109,6 +109,7 @@ import {
   transposeSelection,
 } from "@/lib/sheets/selection";
 import { SelectionOverlay } from "@/components/sheets/selection-overlay";
+import { ShortcutsOverlay } from "@/components/sheets/shortcuts-overlay";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -185,6 +186,8 @@ export default function SheetEditorPage() {
   // CSS in globals.css can hide the top nav.
   const [zoom, setZoom] = useState(1);
   const [focusMode, setFocusMode] = useState(false);
+  // Phase 31.6 — Shortcuts overlay.
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // Phase 25.2 — Chord entry mode state.
   const [chordCursor, setChordCursor] = useState<ChordCursor | null>(null);
   const [chordDraft, setChordDraft] = useState("");
@@ -310,6 +313,13 @@ export default function SheetEditorPage() {
       if (!inInput && !mod && !e.altKey && !e.shiftKey && e.key === "f") {
         e.preventDefault();
         setFocusMode((v) => !v);
+      }
+      // Phase 31.6 — `?` opens the shortcuts overlay. Skipped when
+      // focus is in an input so users typing "?" into chord / lyric /
+      // meta text fields aren't hijacked.
+      if (!inInput && !mod && !e.altKey && e.key === "?") {
+        e.preventDefault();
+        setShortcutsOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1152,6 +1162,13 @@ export default function SheetEditorPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-8">
+      {/* Phase 31.6 — keyboard shortcuts help modal. Opens on `?` or
+          via the ? button in the header; closes on Escape or click on
+          the backdrop. */}
+      <ShortcutsOverlay
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
       {/* Phase 24c.2: max-w bumped 3xl → 4xl to fit US Letter
           (816px) sheet preview without horizontal scroll. */}
       <div className="flex w-full max-w-4xl flex-col gap-8">
@@ -1269,6 +1286,16 @@ export default function SheetEditorPage() {
               aria-label="Redo"
             >
               <Redo2 className="h-4 w-4" />
+            </button>
+            {/* Phase 31.6 — Shortcuts help. `?` also opens this. */}
+            <button
+              type="button"
+              onClick={() => setShortcutsOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background font-mono text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              title="Keyboard shortcuts (?)"
+              aria-label="Keyboard shortcuts"
+            >
+              ?
             </button>
             <Link
               href={`/sheets/${id}`}
