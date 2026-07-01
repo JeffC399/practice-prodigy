@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import {
+  Curve,
   Renderer,
   Stave,
   StaveNote,
@@ -187,6 +188,41 @@ export function MelodyStaff({
       }
     }
 
+    // Phase 29.1 — Slurs. Contiguous same-slurGroup runs of 2+ notes
+    // render as a VexFlow Curve arc above the run. Same convention as
+    // the multi-measure SheetSurface renderer so the modal preview
+    // stays faithful to the final engraving.
+    const slurs: Curve[] = [];
+    {
+      let k2 = 0;
+      while (k2 < melody.length) {
+        const gid = melody[k2].slurGroup;
+        if (!gid) {
+          k2++;
+          continue;
+        }
+        const runStart = k2;
+        while (k2 < melody.length && melody[k2].slurGroup === gid) {
+          k2++;
+        }
+        const runEnd = k2 - 1;
+        if (runEnd > runStart) {
+          slurs.push(
+            new Curve(staveNotes[runStart], staveNotes[runEnd], {
+              cps: [
+                { x: 0, y: 15 },
+                { x: 0, y: 15 },
+              ],
+              thickness: 2,
+              position: Curve.Position.NEAR_HEAD,
+              positionEnd: Curve.Position.NEAR_HEAD,
+              invert: false,
+            }),
+          );
+        }
+      }
+    }
+
     // Format + draw.
     const startX = stave.getNoteStartX();
     const availableWidth = width - startX - 12;
@@ -194,6 +230,7 @@ export function MelodyStaff({
     voice.draw(context, stave);
     tuplets.forEach((t) => t.setContext(context).draw());
     ties.forEach((t) => t.setContext(context).draw());
+    slurs.forEach((s) => s.setContext(context).draw());
 
     // Phase 24c — Lyrics. Render syllables below the staff. Matches
     // the SheetSurface engraving so the modal preview is faithful.

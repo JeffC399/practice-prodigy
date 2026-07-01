@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import {
   Barline,
   Beam,
+  Curve,
   Dot,
   Formatter,
   Renderer,
@@ -367,6 +368,49 @@ function collectTies(
     }
   }
   return ties;
+}
+
+/**
+ * Phase 29.1 — collect intra-measure slurs. Walk the melody looking
+ * for contiguous runs of same-`slurGroup` notes and emit one VexFlow
+ * `Curve` per run of 2+ notes. Cross-measure slurs render as one
+ * Curve per measure segment (each measure's chunk of the group draws
+ * its own arc); a proper multi-measure slur coordinator lands later
+ * if tester feedback demands it.
+ */
+function collectSlurs(
+  melody: MelodyNote[],
+  staveNotes: StaveNote[],
+): Curve[] {
+  const slurs: Curve[] = [];
+  let k = 0;
+  while (k < melody.length) {
+    const groupId = melody[k].slurGroup;
+    if (!groupId) {
+      k++;
+      continue;
+    }
+    const runStart = k;
+    while (k < melody.length && melody[k].slurGroup === groupId) {
+      k++;
+    }
+    const runEnd = k - 1;
+    if (runEnd > runStart) {
+      slurs.push(
+        new Curve(staveNotes[runStart], staveNotes[runEnd], {
+          cps: [
+            { x: 0, y: 15 },
+            { x: 0, y: 15 },
+          ],
+          thickness: 2,
+          position: Curve.Position.NEAR_HEAD,
+          positionEnd: Curve.Position.NEAR_HEAD,
+          invert: false,
+        }),
+      );
+    }
+  }
+  return slurs;
 }
 
 export function SheetSurface({
@@ -766,6 +810,7 @@ export function SheetSurface({
 
         const tuplets = collectTuplets(melody, staveNotes);
         const ties = collectTies(melody, staveNotes);
+        const slurs = collectSlurs(melody, staveNotes);
 
         // Phase 29 — cross-measure tie IN. If the previous measure
         // ended with a tieToNext-flagged pitched note AND this
@@ -834,6 +879,9 @@ export function SheetSurface({
         // Tuplets after beams so the bracket + numeral sit on top.
         tuplets.forEach((t) => t.setContext(ctx).draw());
         ties.forEach((t) => t.setContext(ctx).draw());
+        // Phase 29.1 — slur arcs drawn after ties so they sit visually
+        // above them if both are present on the same note.
+        slurs.forEach((s) => s.setContext(ctx).draw());
 
         // Phase 29 — cross-measure tie OUT. If this measure ends with
         // a tieToNext-flagged pitched note AND another measure follows

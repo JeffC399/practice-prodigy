@@ -90,10 +90,9 @@ export type MelodyNote =
       /** Dotted note: duration * 1.5. */
       dotted?: boolean;
       /**
-       * Phase 24b.2: tie this note to the next note. v0.1 only renders
-       * the tie when both notes are within the same measure. Cross-
-       * measure ties land in Phase 24b.4 (multi-measure render
-       * coordination required).
+       * Phase 24b.2: tie this note to the next note. Phase 29 extends
+       * to render cross-measure and cross-line ties (previously the
+       * tie only drew when both notes were in the same measure).
        */
       tieToNext?: boolean;
       /**
@@ -104,6 +103,16 @@ export type MelodyNote =
        * 3); quintuplets / sextuplets land later.
        */
       tupletGroup?: string;
+      /**
+       * Phase 29.1: slur group. Consecutive notes with the same
+       * non-null slur group id form a slur — a curved phrase arc
+       * above the run indicating legato phrasing. Distinct from
+       * `tieToNext` (a tie connects two same-pitch notes and folds
+       * them into one held tone); a slur groups any sequence of
+       * pitched notes to be played smoothly. The renderer draws a
+       * VexFlow `Curve` per contiguous same-slurGroup run.
+       */
+      slurGroup?: string;
       /**
        * Phase 24c: optional lyric syllable attached to this note.
        * Only pitched notes carry lyrics — rests skip the cursor and
@@ -118,6 +127,7 @@ export type MelodyNote =
       duration: MelodyDuration;
       dotted?: boolean;
       tupletGroup?: string;
+      slurGroup?: string;
     };
 
 /**
@@ -361,6 +371,11 @@ export function newMeasureId(): string {
 /** Generate a fresh tuplet group id (Phase 24b.2). */
 export function newTupletGroupId(): string {
   return `tup_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Generate a fresh slur group id (Phase 29.1). */
+export function newSlurGroupId(): string {
+  return `slur_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
 /** Default sheet for the "new sheet" CTA. */

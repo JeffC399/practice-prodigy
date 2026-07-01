@@ -40,6 +40,7 @@ import {
   MELODY_VOICES,
   MELODY_VOICE_LABELS,
   newMeasureId,
+  newSlurGroupId,
   newTupletGroupId,
   SHEET_FONT_STYLES,
   SHEET_KEY_MODES,
@@ -2137,6 +2138,8 @@ function MelodyEditorModal({
   const [pitchOctave, setPitchOctave] = useState<number>(4);
   const [duration, setDuration] = useState<MelodyDuration>("q");
   const [dotted, setDotted] = useState(false);
+  /** Phase 29.1 — how many trailing notes to wrap in a slur group. */
+  const [slurCount, setSlurCount] = useState<number>(3);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -2192,6 +2195,34 @@ function MelodyEditorModal({
       });
     });
   };
+  /**
+   * Phase 29.1 — Wrap the last N notes/rests into a fresh slur group.
+   * Requires 2+ notes and none of the trailing N to already carry a
+   * slurGroup (avoids merging into an existing arc).
+   */
+  const makeSlurFromLast = (n: number) => {
+    setDraft((prev) => {
+      if (prev.length < n || n < 2) return prev;
+      const groupId = newSlurGroupId();
+      const cut = prev.length - n;
+      return prev.map((entry, i) =>
+        i >= cut ? { ...entry, slurGroup: groupId } : entry,
+      );
+    });
+  };
+  /** Remove the slur grouping from a note (and all of its group-mates). */
+  const ungroupSlurAt = (idx: number) => {
+    setDraft((prev) => {
+      const groupId = prev[idx]?.slurGroup;
+      if (!groupId) return prev;
+      return prev.map((entry) => {
+        if (entry.slurGroup !== groupId) return entry;
+        const { slurGroup: _drop, ...rest } = entry;
+        void _drop;
+        return rest as MelodyNote;
+      });
+    });
+  };
   const handleSave = () => {
     onSave(draft);
     onClose();
@@ -2200,6 +2231,11 @@ function MelodyEditorModal({
   const canMakeTriplet =
     draft.length >= 3 &&
     !draft.slice(-3).some((n) => n.tupletGroup);
+  // Phase 29.1 — last-N-or-more notes available to slur?
+  const canMakeSlur =
+    slurCount >= 2 &&
+    draft.length >= slurCount &&
+    !draft.slice(-slurCount).some((n) => n.slurGroup);
 
   return (
     <div
@@ -2333,6 +2369,34 @@ function MelodyEditorModal({
           >
             Triplet (last 3)
           </button>
+          {/* Phase 29.1 — Slur (last N). Number input picks the run
+              length; button wraps the tail-N entries into a fresh
+              slur group. */}
+          <div className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs">
+            <span className="text-muted-foreground">Slur (last</span>
+            <input
+              type="number"
+              min={2}
+              max={32}
+              value={slurCount}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (!Number.isNaN(n)) setSlurCount(Math.max(2, Math.min(32, n)));
+              }}
+              className="w-10 rounded border border-border bg-background px-1 text-center text-xs"
+              aria-label="Number of trailing notes to slur"
+            />
+            <span className="text-muted-foreground">)</span>
+            <button
+              type="button"
+              onClick={() => makeSlurFromLast(slurCount)}
+              disabled={!canMakeSlur}
+              className="ml-1 rounded px-2 py-0.5 font-medium text-sky-500 hover:text-sky-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title={`Group the last ${slurCount} notes/rests into a slur arc`}
+            >
+              Apply
+            </button>
+          </div>
         </div>
 
         {/* Sequence list. Each chip now shows tie + tuplet state and
@@ -2346,14 +2410,19 @@ function MelodyEditorModal({
                 const isNote = n.kind === "note";
                 const hasTie = isNote && n.tieToNext === true && !isLast;
                 const isTuplet = !!n.tupletGroup;
+                const isSlur = !!n.slurGroup;
+                // Border prefers slur styling (sky) over tuplet
+                // (amber) when both apply; both are semantically
+                // present but only one visual accent renders.
+                const borderClass = isSlur
+                  ? "border-sky-400/60 bg-sky-400/10"
+                  : isTuplet
+                    ? "border-amber-400/60 bg-amber-400/10"
+                    : "border-border bg-card";
                 return (
                   <span
                     key={i}
-                    className={`inline-flex items-center gap-1 rounded-full border pl-2.5 pr-1 py-0.5 text-xs font-mono ${
-                      isTuplet
-                        ? "border-amber-400/60 bg-amber-400/10"
-                        : "border-border bg-card"
-                    }`}
+                    className={`inline-flex items-center gap-1 rounded-full border pl-2.5 pr-1 py-0.5 text-xs font-mono ${borderClass}`}
                   >
                     <span>
                       {n.kind === "rest"
@@ -2362,6 +2431,7 @@ function MelodyEditorModal({
                       {n.dotted && "."}
                       {hasTie && " ⌣"}
                       {isTuplet && " ³"}
+                      {isSlur && " ⌒"}
                     </span>
                     {isNote && !isLast && (
                       <button
@@ -2387,6 +2457,16 @@ function MelodyEditorModal({
                         ungroup
                       </button>
                     )}
+                    {isSlur && (
+                      <button
+                        type="button"
+                        onClick={() => ungroupSlurAt(i)}
+                        className="rounded-full px-1 text-[10px] font-medium text-sky-500 hover:text-sky-400 transition-colors"
+                        title="Remove this note's slur grouping"
+                      >
+                        unslur
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => removeAt(i)}
@@ -2403,7 +2483,9 @@ function MelodyEditorModal({
               <span className="font-mono">⌣</span> = tied to next note
               (renders only when next note is the same pitch).{" "}
               <span className="font-mono">³</span> = part of a tuplet
-              group.
+              group.{" "}
+              <span className="font-mono">⌒</span> = part of a slur
+              (curved phrase arc drawn above the run).
             </p>
           </div>
         )}
