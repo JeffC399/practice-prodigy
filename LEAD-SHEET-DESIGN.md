@@ -310,12 +310,12 @@ This roadmap is the source of truth for what ships next. Each phase is independe
 | 27.2 | 2026-06-30 | Audio quality overhaul: `smplr` → `Tone.Sampler` + curated CDNs (Salamander piano, nbrosowsky guitar/sax/flute/cello/vibes). One consistent routing, no more silent-fail voices. |
 | 27.2.1 | 2026-06-30 | Instrument quality polish bundle: string-ensemble pad, FM Rhodes, guitar lowpass tame, vibes +10 dB, choir-pad voice, refreshed synth presets, timing bump for slow-attack samplers. |
 | 28.0 | 2026-06-30 | Form markings **visual** — repeat barlines, volta brackets (1./2. endings), Coda/Segno glyphs, D.C./D.S./To Coda/Fine text, section labels. Editor per-measure panel. Audio still plays linearly (28.1 will fix). |
+| 28.1 | 2026-06-30 | Form markings **audio** — new `expandFormPlayOrder(measures)` pure helper walks the form graph and emits a `PlayStep[]` of source-measure indices. Playback engine schedules chord + melody events against the expanded sequence, so repeats, 1st/2nd endings, D.C. al Fine, D.S. al Coda, To Coda, Fine, Coda, and Segno all play correctly. Loop-region playback intentionally stays linear. |
 
 **In flight / queued:**
 
 | Phase | Scope | Est. | Why here |
 |---|---|---|---|
-| **28.1** | **Form markings — audio.** Make the playback engine obey repeats (𝄆 𝄇), first/second endings, D.C. al Fine, D.S. al Coda, Coda, Segno, To Coda, Fine. Requires a scheduler-level "expanded playlist" pass that walks the linear measures + form graph and emits a repeat-aware event list. | 1-2 sessions | Direct closeout of 28.0. Right now the visual jumps are honest markings on the page but the audio ignores them, which is the biggest expectation mismatch during playback. |
 | 29 | **Cross-measure ties + slurs.** Multi-line render coordinator that knows about the previous line's last note. | 1-2 sessions | Engraving completeness. Was originally Phase 24b.4. |
 | 30 | **MIDI input** for melody entry via the Web MIDI API. Plug in keyboard → notes appear at the caret. | 1-2 sessions | Power-user differentiator — makes serious musicians take the tool seriously. |
 | 31 | **Selection model** — drag-select multiple notes, then delete / transpose / copy / paste. | 1-2 sessions | Indispensable for revising. Currently no multi-note operations exist. |
@@ -324,7 +324,7 @@ This roadmap is the source of truth for what ships next. Each phase is independe
 | 34 | **Print polish** — page numbers, copyright footer line, page-break controls for multi-page sheets. | 0.5 session | Final professional touches before pro engraving is fully done. |
 | 35 | **Library polish** — search / filter, live-rendered thumbnails on cards, mobile / touch tab-strip layout, accessibility pass. | 1 session | Was originally Slice 8. |
 
-Total remaining: ~8-11 sessions to complete the LSB Basic Tier as a Dorico-class authoring tool. Phases may re-prioritize based on tester feedback once the build is in user hands.
+Total remaining: ~7-10 sessions to complete the LSB Basic Tier as a Dorico-class authoring tool. Phases may re-prioritize based on tester feedback once the build is in user hands.
 
 The Advanced Tier (mid-piece key/time changes, multi-voice, MusicXML import/export, multi-page layout with manual page breaks, real-time collab, audio playback of full chart with comping) stays in `bucket: "later"` until the Basic Tier is shipped and in production use.
 
@@ -358,5 +358,5 @@ Each hook is a small button in the lead sheet editor toolbar, surfacing in which
 
 - **2026-06-29**: design pass complete (this doc). Module promoted from `bucket: "later"` / `status: "sketch"` to `bucket: "next"` / `status: "designed"` in `src/lib/modules/registry.ts`.
 - **2026-06-30**: build window opened ahead of schedule and moved fast. **28 sub-phases shipped in the first sprint** covering: chord-chart MVP + view/print (24a) → melody via VexFlow (24b–24b.3) → lyrics via inline click-on-staff typing (24c) with engraving polish (24c.1.x) → WYSIWYG Letter paper (24c.2) → click-on-staff **melody** entry with visible caret + keyboard shortcuts (25.0–25.1) → click-on-staff **chord** entry with autocomplete parser (25.2–25.2.1) → Standard / Handwritten font style (25.0.2–25.0.3) → **undo / redo** (26–26.1.1) → **live audio playback** with instrument picker + mixer + count-in + tempo slider + loop region (27–27.2.1) → author-credit metadata (lyricist / arranger / copyright / source, 27.1.2–27.1.3) → **form markings visual** (28.0). Registry status flipped `designed → live`.
-- **Remaining Basic Tier work** (see §8.5 for the phase table): 28.1 (form markings playback), 29 (cross-measure ties + slurs), 30 (MIDI input), 31 (selection model), 32 (pickup + bars-per-line), 33 (share via URL), 34 (print polish), 35 (library polish). ~8-11 sessions.
+- **Remaining Basic Tier work** (see §8.5 for the phase table): 29 (cross-measure ties + slurs), 30 (MIDI input), 31 (selection model), 32 (pickup + bars-per-line), 33 (share via URL), 34 (print polish), 35 (library polish). ~7-10 sessions.
 - **Advanced Tier**: stays in `bucket: "later"` / `status: "sketch"` until basic ships and is in production use.

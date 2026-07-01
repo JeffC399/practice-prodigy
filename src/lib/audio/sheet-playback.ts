@@ -19,10 +19,14 @@ import {
   loadMelodyVoice,
   type VoiceHandle,
 } from "@/lib/audio/sheet-voices";
+import { expandFormPlayOrder } from "@/lib/sheets/form-expansion";
 
 /**
  * Phase 27 — Lead-sheet live audio playback.
  * Phase 27.1 — sample-based instruments + per-voice mixer.
+ * Phase 28.1 — playback obeys form markings (repeats, endings,
+ *              D.C. al Fine, D.S. al Coda, Coda, Segno, To Coda,
+ *              Fine).
  *
  * Plays a Sheet aloud through two configurable voices:
  *   - Chord comping: holds each ChordBeat for the duration until the
@@ -35,6 +39,17 @@ import {
  * Voice choice + mixer (volume + mute per voice) comes from the
  * Sheet's `chordVoice` / `melodyVoice` / `mixer` fields (with sensible
  * defaults). Voices lazy-load on first play and cache.
+ *
+ * Form markings (Phase 28.1): when playing the whole sheet (no loop
+ * region), `expandFormPlayOrder(measures)` walks the form graph and
+ * returns a `PlayStep[]` sequence of source-measure indices. All
+ * event scheduling iterates that sequence, so a section with a
+ * `𝄆 ... 𝄇` bracket plays twice, a D.C. al Fine jumps back to the
+ * top and plays until Fine, etc.
+ *
+ * When a loop region IS set, expansion is intentionally skipped —
+ * loop region is for practice woodshedding where "just repeat this
+ * bar range" is what the user wants, not full form navigation.
  */
 
 /**
@@ -235,23 +250,36 @@ class SheetPlayback {
     const isLooping =
       options?.loopStartMeasure !== undefined ||
       options?.loopEndMeasure !== undefined;
-    const startMeasureIdx = isLooping ? loopStart - 1 : 0;
-    const endMeasureIdxExclusive = isLooping ? loopEnd : totalMeasureCount;
-    const measuresToPlay = endMeasureIdxExclusive - startMeasureIdx;
-    const totalMeasureBeats = measuresToPlay * beatsPerMeasure;
 
-    // 1) Chord events. Walk only the [startMeasureIdx, endMeasureIdxExclusive)
-    // window; relative beat positions are offset to 0 at the loop start.
+    // Phase 28.1 — Build the play order.
+    //   - Loop region set: linear range [loopStart-1, loopEnd) so
+    //     woodshedding a section stays predictable (no repeat/D.C.
+    //     inside a practice loop).
+    //   - Otherwise: expand form markings via `expandFormPlayOrder`
+    //     so repeats, endings, D.C., D.S., Coda, Segno, To Coda, and
+    //     Fine all play the way the chart reads.
+    type PlayStep = { sourceMeasureIdx: number };
+    const playOrder: PlayStep[] = isLooping
+      ? Array.from({ length: loopEnd - (loopStart - 1) }, (_, k) => ({
+          sourceMeasureIdx: loopStart - 1 + k,
+        }))
+      : expandFormPlayOrder(sheet.measures);
+    const totalPlaySteps = playOrder.length;
+    const totalMeasureBeats = totalPlaySteps * beatsPerMeasure;
+
+    // 1) Chord events. Iterate the expanded play order so a section
+    // played twice via `𝄆 ... 𝄇` schedules its chord events twice
+    // at their respective expanded positions.
     type FlatChord = { startBeat: number; midi: number[] };
     const flatChords: FlatChord[] = [];
-    for (let mi = startMeasureIdx; mi < endMeasureIdxExclusive; mi++) {
+    for (let step = 0; step < totalPlaySteps; step++) {
+      const mi = playOrder[step].sourceMeasureIdx;
       const m = sheet.measures[mi];
       const sorted: ChordBeat[] = [...m.chords].sort(
         (a, b) => a.beat - b.beat,
       );
       for (const cb of sorted) {
-        const relMeasure = mi - startMeasureIdx;
-        const start = relMeasure * beatsPerMeasure + (cb.beat - 1);
+        const start = step * beatsPerMeasure + (cb.beat - 1);
         const midi = chordToMidiNotes(cb.chord, CHORD_OCTAVE, cb.bass);
         flatChords.push({ startBeat: start, midi });
       }
@@ -272,15 +300,15 @@ class SheetPlayback {
       this.scheduledEvents.push(id);
     }
 
-    // 2) Melody events (same windowing).
-    for (let mi = startMeasureIdx; mi < endMeasureIdxExclusive; mi++) {
+    // 2) Melody events. Same expanded iteration.
+    for (let step = 0; step < totalPlaySteps; step++) {
+      const mi = playOrder[step].sourceMeasureIdx;
       const m = sheet.measures[mi];
       const melody: MelodyNote[] = m.melody ?? [];
       let cursor = 0;
       melody.forEach((n, ni) => {
         const beats = beatsForDuration(n.duration, n.dotted);
-        const relMeasure = mi - startMeasureIdx;
-        const startBeat = relMeasure * beatsPerMeasure + cursor;
+        const startBeat = step * beatsPerMeasure + cursor;
         if (n.kind === "note") {
           const prev = melody[ni - 1];
           const isTiedFollower =
