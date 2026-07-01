@@ -89,7 +89,7 @@ export default function SheetViewPage() {
         {/* The printable sheet itself — light paper surface with
             continuous staff engraving (Phase 24b.3 rework). */}
         <div className="sheet-print-wrap">
-          <SheetSurface sheet={sheet} />
+          <SheetSurface sheet={sheet} measuresPerLine={sheet.measuresPerLine} />
         </div>
       </div>
 

@@ -390,6 +390,12 @@ export type Sheet = {
   mixer?: SheetMixer;
   /** Phase 27.1b: schedule 1 measure of count-in clicks before playback. */
   countIn?: boolean;
+  /**
+   * Phase 32 — how many measures per line the renderer packs. Real
+   * Book charts typically use 4 (spacious) or 6 (compact) depending
+   * on note density. When unset the renderer defaults to 4.
+   */
+  measuresPerLine?: 4 | 6 | 8;
   createdAt: number;
   updatedAt: number;
   /** Last time the sheet was opened. */

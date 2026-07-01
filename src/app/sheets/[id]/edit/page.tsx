@@ -2038,6 +2038,34 @@ export default function SheetEditorPage() {
                   +
                 </button>
               </div>
+              {/* Phase 32 — Bars-per-line toggle. Denser charts want
+                  6 or 8 per line; spacious ones stay at 4. Persists
+                  on the sheet so print + view respect the choice. */}
+              <div className="flex items-center gap-0.5 rounded-md border border-border bg-background px-1 py-0.5 text-[11px]">
+                <span className="pl-1 pr-1 text-muted-foreground">
+                  Bars/line
+                </span>
+                {([4, 6, 8] as const).map((n) => {
+                  const active = (sheet.measuresPerLine ?? 4) === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() =>
+                        updateMeta("measuresPerLine", n)
+                      }
+                      className={`min-w-[1.5rem] rounded px-1 py-0.5 font-mono transition-colors ${
+                        active
+                          ? "bg-primary/20 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      title={`${n} measures per line`}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+              </div>
               <button
                 type="button"
                 onClick={() => setFocusMode((v) => !v)}
@@ -2354,6 +2382,7 @@ export default function SheetEditorPage() {
           >
             <SheetSurface
               sheet={sheet}
+              measuresPerLine={sheet.measuresPerLine}
               onLayout={
                 editorMode !== "none" ? handleLayout : undefined
               }
