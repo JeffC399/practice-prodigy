@@ -2,6 +2,8 @@
 
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronRight,
   Eye,
   Loader2,
   Music,
@@ -77,7 +79,7 @@ import {
   type LyricCursor,
 } from "@/lib/sheets/lyric-cursor";
 import {
-  appendMelodyNote,
+  appendMelodyNoteWithSplit,
   buildPitchedNote,
   buildRestNote,
 } from "@/lib/sheets/melody-entry";
@@ -91,6 +93,7 @@ import {
   advanceCaret,
   caretAtEndOfMeasure,
   durationToBeats,
+  existingBeatsInMeasure,
   letterToPitch,
   nudgeLastNoteInMeasure,
   retreatCaret,
@@ -170,6 +173,15 @@ export default function SheetEditorPage() {
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [loopStart, setLoopStart] = useState(1);
   const [loopEnd, setLoopEnd] = useState(1);
+  // Phase 31.2 — collapsible metadata section. Default expanded when
+  // the sheet's title is still the placeholder (so first-time authors
+  // see the fields); collapsed once the user has named the sheet.
+  const [metaExpanded, setMetaExpanded] = useState<boolean | null>(null);
+  // Phase 31.3 — "Saved" indicator. Flashes for ~1.8s after each
+  // store mutation to `updatedAt`. Also triggered by Cmd/Ctrl+S as a
+  // reassurance-flash (saves are already automatic on every edit).
+  const [saveFlashAt, setSaveFlashAt] = useState<number | null>(null);
+  const lastUpdatedRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     // Stop any in-flight playback when leaving the editor.
     return () => {
@@ -204,6 +216,40 @@ export default function SheetEditorPage() {
   useEffect(() => {
     caretRef.current = caret;
   }, [caret]);
+  // Phase 31.3 — Watch sheet.updatedAt. On the first mount we take a
+  // baseline (no flash). Every subsequent bump = an actual save;
+  // trigger the "Saved" indicator.
+  useEffect(() => {
+    if (!sheet) return;
+    if (lastUpdatedRef.current === undefined) {
+      lastUpdatedRef.current = sheet.updatedAt;
+      return;
+    }
+    if (sheet.updatedAt !== lastUpdatedRef.current) {
+      lastUpdatedRef.current = sheet.updatedAt;
+      setSaveFlashAt(Date.now());
+    }
+  }, [sheet]);
+  // Clear the "Saved" flash after 1.8s.
+  useEffect(() => {
+    if (saveFlashAt === null) return;
+    const t = setTimeout(() => setSaveFlashAt(null), 1800);
+    return () => clearTimeout(t);
+  }, [saveFlashAt]);
+  // Cmd/Ctrl+S: reassurance flash. Saves are already automatic on
+  // every mutation, so we just flash the indicator to acknowledge
+  // the muscle-memory shortcut.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isModS =
+        (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === "s";
+      if (!isModS) return;
+      e.preventDefault();
+      setSaveFlashAt(Date.now());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   // Phase 30 — Stable ref to the latest `placeAtCaret` closure so the
   // MIDI subscription effect can invoke it without re-attaching on
   // unrelated state changes. Declared alongside the other hooks
@@ -360,34 +406,34 @@ export default function SheetEditorPage() {
         const note = entryRest
           ? buildRestNote(entryDuration, entryDotted)
           : buildPitchedNote(pitch, entryDuration, entryDotted);
-        const measures = appendMelodyNote(
+        // Phase 31.1 — auto-split overflow into tied pieces.
+        const { measures, beatsPlaced } = appendMelodyNoteWithSplit(
           fresh,
           caret.measureIdx,
           note,
         );
         updateSheet(id, { measures });
-        const beats = durationToBeats(entryDuration, entryDotted);
         const fresher = useSheetsLibrary
           .getState()
           .sheets.find((s) => s.id === id);
-        if (fresher) setCaret(advanceCaret(caret, beats, fresher));
+        if (fresher) setCaret(advanceCaret(caret, beatsPlaced, fresher));
         return;
       }
       if (e.key === "r" || e.key === "R") {
         e.preventDefault();
         if (!caret) return;
         const restNote = buildRestNote(entryDuration, entryDotted);
-        const measures = appendMelodyNote(
+        // Phase 31.1 — rests split too (they distribute but don't tie).
+        const { measures, beatsPlaced } = appendMelodyNoteWithSplit(
           fresh,
           caret.measureIdx,
           restNote,
         );
         updateSheet(id, { measures });
-        const beats = durationToBeats(entryDuration, entryDotted);
         const fresher = useSheetsLibrary
           .getState()
           .sheets.find((s) => s.id === id);
-        if (fresher) setCaret(advanceCaret(caret, beats, fresher));
+        if (fresher) setCaret(advanceCaret(caret, beatsPlaced, fresher));
         return;
       }
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
@@ -834,18 +880,24 @@ export default function SheetEditorPage() {
     const note = entryRest
       ? buildRestNote(entryDuration, entryDotted)
       : buildPitchedNote(pitch, entryDuration, entryDotted);
-    const measures = appendMelodyNote(
+    // Phase 31.1 — Use the auto-splitting variant. If the note fits
+    // in the current measure it delegates to the original
+    // appendMelodyNote; otherwise it splits into tied pieces across
+    // consecutive measures per standard engraving convention.
+    const { measures, beatsPlaced } = appendMelodyNoteWithSplit(
       sheet,
       currentCaret.measureIdx,
       note,
     );
     updateSheet(id, { measures });
-    const beats = durationToBeats(entryDuration, entryDotted);
     const fresh = useSheetsLibrary
       .getState()
       .sheets.find((s) => s.id === id);
     if (fresh) {
-      setCaret(advanceCaret(currentCaret, beats, fresh));
+      // Advance by the beats actually placed. When the split ran out
+      // of measures, beatsPlaced < the note's full duration and the
+      // caret clamps to the end of the sheet.
+      setCaret(advanceCaret(currentCaret, beatsPlaced, fresh));
     }
   };
   // Phase 30 — sync the placeAtCaret ref (declared in the top-of-
@@ -930,6 +982,25 @@ export default function SheetEditorPage() {
             All sheets
           </Link>
           <div className="flex items-center gap-2">
+            {/* Phase 31.3 — "Saved" indicator. Flashes for ~1.8s after
+                each mutation via the effects above. Cmd/Ctrl+S also
+                triggers the flash as a reassurance. */}
+            <div
+              className={`flex items-center gap-1 text-[11px] transition-opacity ${
+                saveFlashAt !== null
+                  ? "text-emerald-500 opacity-100"
+                  : "text-muted-foreground opacity-50"
+              }`}
+              aria-live="polite"
+              title="All changes are saved automatically. Cmd/Ctrl+S flashes this indicator."
+            >
+              <span
+                className={`inline-block h-1.5 w-1.5 rounded-full ${
+                  saveFlashAt !== null ? "bg-emerald-500" : "bg-muted-foreground"
+                }`}
+              />
+              {saveFlashAt !== null ? "Saved" : "Auto-saved"}
+            </div>
             {/* Phase 27 — Play / Stop. Plays the sheet aloud via Tone.js
                 (sample-based chord comping + melody voice). */}
             <button
@@ -1326,17 +1397,61 @@ export default function SheetEditorPage() {
           </section>
         )}
 
-        {/* Title + meta */}
-        <section className="flex flex-col gap-4 rounded-xl border border-border bg-card/40 p-5">
-          <input
-            type="text"
-            value={sheet.title}
-            onChange={(e) => updateMeta("title", e.target.value)}
-            className="bg-transparent text-2xl font-semibold tracking-tight focus:outline-none"
-            placeholder="Untitled lead sheet"
-            aria-label="Sheet title"
-          />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* Phase 31.2 — Title + meta section is now collapsible. Default
+            expanded when the title is unset / still the placeholder;
+            collapsed once the user has named the sheet so the paper
+            surface sits at the top of the viewport instead of below a
+            wall of metadata fields. */}
+        {(() => {
+          const isMetaExpanded =
+            metaExpanded ??
+            (!sheet.title || sheet.title === "Untitled lead sheet");
+          const summaryParts = [
+            sheet.composer,
+            sheet.style,
+            `${sheet.keyTonic} ${sheet.keyMode}`,
+            `${sheet.timeSignature.beatsPerMeasure}/${sheet.timeSignature.beatUnit}`,
+            sheet.bpm ? `♩=${sheet.bpm}` : null,
+            sheet.fontStyle === "handwritten" ? "Handwritten" : null,
+          ].filter(Boolean);
+          return (
+            <section className="flex flex-col gap-4 rounded-xl border border-border bg-card/40 p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex flex-1 flex-col gap-1">
+                  <input
+                    type="text"
+                    value={sheet.title}
+                    onChange={(e) => updateMeta("title", e.target.value)}
+                    className="bg-transparent text-2xl font-semibold tracking-tight focus:outline-none"
+                    placeholder="Untitled lead sheet"
+                    aria-label="Sheet title"
+                  />
+                  {!isMetaExpanded && summaryParts.length > 0 && (
+                    <div className="truncate text-xs text-muted-foreground">
+                      {summaryParts.join(" · ")}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMetaExpanded(!isMetaExpanded)}
+                  className="mt-1.5 flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={isMetaExpanded ? "Hide metadata" : "Show metadata"}
+                  title={
+                    isMetaExpanded
+                      ? "Collapse metadata section"
+                      : "Expand metadata section"
+                  }
+                >
+                  {isMetaExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {isMetaExpanded && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-xs">
               Composer
               <input
@@ -1515,8 +1630,11 @@ export default function SheetEditorPage() {
                 ))}
               </div>
             </label>
-          </div>
-        </section>
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         {/* Live preview — same engraving as the View / Print page so the
             user sees their work in its final form as they edit.
@@ -1859,9 +1977,41 @@ export default function SheetEditorPage() {
                 className="group relative flex flex-col gap-2 rounded-md border border-border bg-card/40 p-3 transition-colors hover:border-primary/40"
               >
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Measure {mIdx + 1}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Measure {mIdx + 1}
+                    </span>
+                    {/* Phase 31.0 — beat-count badge. Shows current /
+                        expected beats. Red = overflow, amber = under,
+                        hidden = exact match. Helps authors catch bars
+                        that don't respect the time signature. */}
+                    {(() => {
+                      const used = existingBeatsInMeasure(measure);
+                      const expected =
+                        sheet.timeSignature.beatsPerMeasure;
+                      if (used === expected) return null;
+                      const isOver = used > expected;
+                      const label = `${
+                        Number.isInteger(used) ? used : used.toFixed(2)
+                      }/${expected}`;
+                      return (
+                        <span
+                          className={`rounded px-1 py-0.5 font-mono text-[9px] font-medium ${
+                            isOver
+                              ? "bg-destructive/20 text-destructive"
+                              : "bg-amber-500/20 text-amber-500"
+                          }`}
+                          title={
+                            isOver
+                              ? `Overflow: ${used} beats in a ${expected}-beat measure`
+                              : `Under-filled: ${used} of ${expected} beats used`
+                          }
+                        >
+                          {label}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   {sheet.measures.length > 1 && (
                     <button
                       type="button"

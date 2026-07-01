@@ -4,6 +4,7 @@ import type {
   MelodyNote,
   Sheet,
 } from "@/lib/sheets/types";
+import { MELODY_DURATION_BEATS } from "@/lib/sheets/types";
 
 /**
  * Phase 25 — click-on-staff melody entry helpers.
@@ -113,4 +114,163 @@ export function buildRestNote(
   dotted: boolean,
 ): MelodyNote {
   return { kind: "rest", duration, dotted };
+}
+
+/**
+ * Phase 31.1 — greedy decomposition of a beat count into a list of
+ * standard note durations (whole / half / quarter / 8th / 16th, plus
+ * dotted variants). Used by `appendMelodyNoteWithSplit` to fit a
+ * multi-beat note into a partial measure using multiple tied pieces.
+ *
+ * Returns pieces in descending duration order. Terminates when the
+ * remaining beats fall below the 16th-note precision (0.25 beats);
+ * any leftover is silently dropped (rare in practice — hits when
+ * the user's rhythm value doesn't align with 16th-note precision).
+ */
+type NotePiece = { duration: MelodyDuration; dotted: boolean };
+
+const DECOMPOSITION_OPTIONS: (NotePiece & { beats: number })[] = [
+  { duration: "w", dotted: false, beats: MELODY_DURATION_BEATS.w },
+  { duration: "h", dotted: true, beats: MELODY_DURATION_BEATS.h * 1.5 },
+  { duration: "h", dotted: false, beats: MELODY_DURATION_BEATS.h },
+  { duration: "q", dotted: true, beats: MELODY_DURATION_BEATS.q * 1.5 },
+  { duration: "q", dotted: false, beats: MELODY_DURATION_BEATS.q },
+  { duration: "8", dotted: true, beats: MELODY_DURATION_BEATS["8"] * 1.5 },
+  { duration: "8", dotted: false, beats: MELODY_DURATION_BEATS["8"] },
+  { duration: "16", dotted: true, beats: MELODY_DURATION_BEATS["16"] * 1.5 },
+  { duration: "16", dotted: false, beats: MELODY_DURATION_BEATS["16"] },
+];
+
+const EPS = 1e-6;
+
+export function decomposeBeatsIntoNotes(beats: number): NotePiece[] {
+  const pieces: NotePiece[] = [];
+  let remaining = beats;
+  while (remaining >= 0.25 - EPS) {
+    const opt = DECOMPOSITION_OPTIONS.find((o) => o.beats <= remaining + EPS);
+    if (!opt) break;
+    pieces.push({ duration: opt.duration, dotted: opt.dotted });
+    remaining -= opt.beats;
+  }
+  return pieces;
+}
+
+function beatsForPiece(p: {
+  duration: MelodyDuration;
+  dotted?: boolean;
+}): number {
+  const base = MELODY_DURATION_BEATS[p.duration] ?? 1;
+  return p.dotted ? base * 1.5 : base;
+}
+
+function measureUsedBeats(m: Sheet["measures"][number]): number {
+  return (m.melody ?? []).reduce(
+    (sum, n) =>
+      sum +
+      (MELODY_DURATION_BEATS[n.duration] ?? 1) * (n.dotted ? 1.5 : 1),
+    0,
+  );
+}
+
+/**
+ * Phase 31.1 — Auto-splitting placement. Extends `appendMelodyNote`
+ * by splitting the incoming note across measure boundaries when it
+ * doesn't fit in the current measure. Emits tied pieces per standard
+ * engraving convention. Only pitched notes tie; rests just distribute.
+ *
+ * Returns:
+ *   - `measures`: the new measures array
+ *   - `beatsPlaced`: total beats actually placed (may be less than
+ *     requested if the sheet ran out of measures; the caller can
+ *     decide whether to auto-add a new measure and retry)
+ *
+ * Handles the common cases only; does NOT auto-add measures at the
+ * end of the sheet, and does not preserve the incoming note's
+ * `slurGroup` / `tupletGroup` / `lyric` across the split (those get
+ * attached to the FIRST piece only — the head of the tie chain — which
+ * matches how professional engraving lays out lyrics and phrasing).
+ */
+export function appendMelodyNoteWithSplit(
+  sheet: Sheet,
+  measureIdx: number,
+  note: MelodyNote,
+): { measures: Sheet["measures"]; beatsPlaced: number } {
+  const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
+  const totalBeats = beatsForPiece(note);
+  const isPitched = note.kind === "note";
+
+  // Fast path: fits entirely in the current measure. Delegates to the
+  // existing appendMelodyNote so we don't duplicate its map logic.
+  const currentMeasure = sheet.measures[measureIdx];
+  if (!currentMeasure) {
+    return { measures: sheet.measures, beatsPlaced: 0 };
+  }
+  const remainingInCurrent =
+    beatsPerMeasure - measureUsedBeats(currentMeasure);
+  if (totalBeats <= remainingInCurrent + EPS) {
+    return {
+      measures: appendMelodyNote(sheet, measureIdx, note),
+      beatsPlaced: totalBeats,
+    };
+  }
+
+  // Slow path: split across measures with ties.
+  const measures = [...sheet.measures];
+  let remaining = totalBeats;
+  let mi = measureIdx;
+  let isFirstPiece = true;
+
+  while (remaining > EPS && mi < measures.length) {
+    const m = measures[mi];
+    const capacity = beatsPerMeasure - measureUsedBeats(m);
+    if (capacity <= EPS) {
+      mi++;
+      continue;
+    }
+    const fit = Math.min(remaining, capacity);
+    const pieces = decomposeBeatsIntoNotes(fit);
+    if (pieces.length === 0) break; // undecomposable remainder — bail
+    // Determine which piece will be THE VERY LAST piece of the whole
+    // split (last piece in this measure AND fit >= remaining). Only
+    // the head lyric / groups attach to the FIRST piece; only the
+    // very-last piece skips tieToNext.
+    const newNotes: MelodyNote[] = pieces.map((p, pi) => {
+      const isLastPieceInThisMeasure = pi === pieces.length - 1;
+      const isVeryLastPieceOverall =
+        isLastPieceInThisMeasure && fit >= remaining - EPS;
+      if (isPitched) {
+        const head = isFirstPiece && pi === 0;
+        return {
+          kind: "note" as const,
+          pitch: note.pitch,
+          duration: p.duration,
+          dotted: p.dotted,
+          tieToNext: !isVeryLastPieceOverall,
+          ...(head && note.lyric ? { lyric: note.lyric } : {}),
+          ...(head && note.slurGroup ? { slurGroup: note.slurGroup } : {}),
+          ...(head && note.tupletGroup
+            ? { tupletGroup: note.tupletGroup }
+            : {}),
+        };
+      } else {
+        // Rests never tie; but slurGroup / tupletGroup can carry.
+        const head = isFirstPiece && pi === 0;
+        return {
+          kind: "rest" as const,
+          duration: p.duration,
+          dotted: p.dotted,
+          ...(head && note.slurGroup ? { slurGroup: note.slurGroup } : {}),
+          ...(head && note.tupletGroup
+            ? { tupletGroup: note.tupletGroup }
+            : {}),
+        };
+      }
+    });
+    measures[mi] = { ...m, melody: [...(m.melody ?? []), ...newNotes] };
+    remaining -= fit;
+    mi++;
+    isFirstPiece = false;
+  }
+
+  return { measures, beatsPlaced: totalBeats - remaining };
 }

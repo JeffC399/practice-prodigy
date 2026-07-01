@@ -1190,11 +1190,15 @@ export function SheetSurface({
         const xL = startBounds.noteStartX - 2;
         const xR = endBounds.noteEndX + 2;
         const label = span.shift === "8va" ? "8va" : "8vb";
-        // 8va: above the chord row. 8vb: below the staff bottom line.
+        // 8va: above the chord row. 8vb: BELOW the lyric band so the
+        // bracket clears descending stems, ledger-line notes below the
+        // staff, AND any lyric syllables on this line. Phase 30.3
+        // shipped with the bracket at staveY + STAVE_HEIGHT + 30 which
+        // sat *above* the lyric baseline and collided with syllables.
         const bracketY =
           span.shift === "8va"
             ? lineY + CHORD_BAND_HEIGHT - 4
-            : staveY + STAVE_HEIGHT + 30;
+            : staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET + 18;
         const hookHeight = 8;
         const hookSign = span.shift === "8va" ? 1 : -1; // hook DOWN for 8va, UP for 8vb
         ctx.save();
