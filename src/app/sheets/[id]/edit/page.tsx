@@ -12,6 +12,7 @@ import {
   Play,
   Plus,
   Redo2,
+  Share2,
   SlidersHorizontal,
   Square,
   Trash2,
@@ -111,6 +112,7 @@ import {
 } from "@/lib/sheets/selection";
 import { suggestOttavaForMeasure } from "@/lib/sheets/ottava-suggest";
 import { SelectionOverlay } from "@/components/sheets/selection-overlay";
+import { ShareModal } from "@/components/sheets/share-modal";
 import { ShortcutsOverlay } from "@/components/sheets/shortcuts-overlay";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
@@ -190,6 +192,8 @@ export default function SheetEditorPage() {
   const [focusMode, setFocusMode] = useState(false);
   // Phase 31.6 — Shortcuts overlay.
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Phase 33 — Share modal.
+  const [shareOpen, setShareOpen] = useState(false);
   // Phase 25.2 — Chord entry mode state.
   const [chordCursor, setChordCursor] = useState<ChordCursor | null>(null);
   const [chordDraft, setChordDraft] = useState("");
@@ -1171,6 +1175,12 @@ export default function SheetEditorPage() {
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
       />
+      {/* Phase 33 — Share modal: shareable link + JSON download. */}
+      <ShareModal
+        sheet={sheet}
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+      />
       {/* Phase 24c.2: max-w bumped 3xl → 4xl to fit US Letter
           (816px) sheet preview without horizontal scroll. */}
       <div className="flex w-full max-w-4xl flex-col gap-8">
@@ -1298,6 +1308,17 @@ export default function SheetEditorPage() {
               aria-label="Keyboard shortcuts"
             >
               ?
+            </button>
+            {/* Phase 33 — Share via URL / JSON download. */}
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              title="Share this sheet"
+              aria-label="Share"
+            >
+              <Share2 className="h-4 w-4" />
+              Share
             </button>
             <Link
               href={`/sheets/${id}`}

@@ -33,6 +33,12 @@ type SheetsLibraryStore = {
   getById: (id: string) => Sheet | undefined;
   createSheet: () => string;
   /**
+   * Phase 33 — clone a Sheet imported from a share URL / JSON file
+   * into the local library. Generates a fresh id + timestamps so the
+   * import doesn't collide with anything already saved.
+   */
+  importSheet: (incoming: Sheet) => string;
+  /**
    * Apply an update to a sheet. By default, pushes the PRIOR snapshot
    * onto the undo stack (and clears the redo stack — new branch).
    * Pass `{ trackUndo: false }` for non-user-driven writes that
@@ -70,6 +76,35 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
             {
               id,
               ...makeDefaultSheet(),
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        }));
+        return id;
+      },
+      importSheet: (incoming) => {
+        const id = newSheetId();
+        const now = Date.now();
+        // Strip the incoming id/timestamps; keep everything else.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const {
+          id: _oldId,
+          createdAt: _oldCreated,
+          updatedAt: _oldUpdated,
+          lastOpenedAt: _oldOpened,
+          ...rest
+        } = incoming;
+        void _oldId;
+        void _oldCreated;
+        void _oldUpdated;
+        void _oldOpened;
+        set((state) => ({
+          sheets: [
+            ...state.sheets,
+            {
+              id,
+              ...rest,
               createdAt: now,
               updatedAt: now,
             },
