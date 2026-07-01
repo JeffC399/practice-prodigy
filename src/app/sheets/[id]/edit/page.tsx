@@ -175,6 +175,13 @@ export default function SheetEditorPage() {
   const [clipboardNotes, setClipboardNotes] = useState<MelodyNote[] | null>(
     null,
   );
+  // Phase 31.5 — Zoom + focus mode. Zoom is applied via the CSS
+  // `zoom` property on the preview wrapper (well-supported in
+  // Chrome / Edge / Safari; Firefox 126+ also supports it). Focus
+  // mode adds a `focus-mode` class to `<html>` so the site-header
+  // CSS in globals.css can hide the top nav.
+  const [zoom, setZoom] = useState(1);
+  const [focusMode, setFocusMode] = useState(false);
   // Phase 25.2 — Chord entry mode state.
   const [chordCursor, setChordCursor] = useState<ChordCursor | null>(null);
   const [chordDraft, setChordDraft] = useState("");
@@ -266,6 +273,57 @@ export default function SheetEditorPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+  // Phase 31.5 — Zoom + focus-mode keyboard shortcuts.
+  //   Cmd/Ctrl + = / +   →  zoom in (10% steps, cap 200%)
+  //   Cmd/Ctrl + -       →  zoom out (10% steps, floor 50%)
+  //   Cmd/Ctrl + 0       →  reset zoom to 100%
+  //   F                  →  toggle focus mode (no modifier — quick)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inInput =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && !e.shiftKey && !e.altKey) {
+        if (e.key === "=" || e.key === "+") {
+          e.preventDefault();
+          setZoom((z) => Math.min(2, Math.round((z + 0.1) * 100) / 100));
+          return;
+        }
+        if (e.key === "-" || e.key === "_") {
+          e.preventDefault();
+          setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 100) / 100));
+          return;
+        }
+        if (e.key === "0") {
+          e.preventDefault();
+          setZoom(1);
+          return;
+        }
+      }
+      if (!inInput && !mod && !e.altKey && !e.shiftKey && e.key === "f") {
+        e.preventDefault();
+        setFocusMode((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // Apply focus-mode class to <html> so globals.css can hide site
+  // chrome. Cleaned up on unmount so leaving the editor page doesn't
+  // strand the class.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (focusMode) root.classList.add("focus-mode");
+    else root.classList.remove("focus-mode");
+    return () => {
+      root.classList.remove("focus-mode");
+    };
+  }, [focusMode]);
   // Phase 30 — Stable ref to the latest `placeAtCaret` closure so the
   // MIDI subscription effect can invoke it without re-attaching on
   // unrelated state changes. Declared alongside the other hooks
@@ -1737,6 +1795,50 @@ export default function SheetEditorPage() {
             Dorico-style click-on-staff melody authoring surface. The
             two modes are mutually exclusive. */}
         <section className="flex flex-col gap-2">
+          {/* Phase 31.5 — Empty-state nudge. Shows when the sheet has
+              no chords AND no melody notes anywhere. Naturally
+              disappears the moment the user adds anything. */}
+          {(() => {
+            const anyChords = sheet.measures.some(
+              (m) => m.chords.length > 0,
+            );
+            const anyNotes = sheet.measures.some(
+              (m) => (m.melody?.length ?? 0) > 0,
+            );
+            if (anyChords || anyNotes) return null;
+            return (
+              <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                <p className="font-medium text-primary">
+                  Fresh sheet — try one of these to get started
+                </p>
+                <ul className="ml-4 flex flex-col gap-1 text-[13px] text-muted-foreground">
+                  <li>
+                    Tap{" "}
+                    <span className="font-medium text-foreground">
+                      Chord entry
+                    </span>{" "}
+                    above the preview, then click beats to type chord
+                    symbols
+                  </li>
+                  <li>
+                    Tap{" "}
+                    <span className="font-medium text-foreground">
+                      Click entry
+                    </span>{" "}
+                    and click the staff to place melody notes, or type
+                    A–G on your keyboard
+                  </li>
+                  <li>
+                    Turn on{" "}
+                    <span className="font-medium text-foreground">
+                      MIDI
+                    </span>{" "}
+                    in click-entry mode and play a keyboard
+                  </li>
+                </ul>
+              </div>
+            );
+          })()}
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               Preview
@@ -1834,6 +1936,62 @@ export default function SheetEditorPage() {
                 {editorMode === "lyrics"
                   ? "Done editing lyrics"
                   : "Edit lyrics"}
+              </button>
+              {/* Phase 31.5 — Zoom + Focus controls. Small icon-only
+                  buttons at the right end of the toolbar. */}
+              <div className="ml-2 flex items-center gap-1 rounded-md border border-border bg-background px-1 py-0.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setZoom((z) =>
+                      Math.max(0.5, Math.round((z - 0.1) * 100) / 100),
+                    )
+                  }
+                  disabled={zoom <= 0.5}
+                  className="rounded px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                  title="Zoom out (Cmd/Ctrl+-)"
+                  aria-label="Zoom out"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom(1)}
+                  className="min-w-[3rem] rounded px-1.5 py-0.5 font-mono text-muted-foreground hover:text-foreground transition-colors"
+                  title="Reset zoom (Cmd/Ctrl+0)"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setZoom((z) =>
+                      Math.min(2, Math.round((z + 0.1) * 100) / 100),
+                    )
+                  }
+                  disabled={zoom >= 2}
+                  className="rounded px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                  title="Zoom in (Cmd/Ctrl+=)"
+                  aria-label="Zoom in"
+                >
+                  +
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFocusMode((v) => !v)}
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  focusMode
+                    ? "border-primary/60 bg-primary/10 text-primary hover:bg-primary/20"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+                title={
+                  focusMode
+                    ? "Exit focus mode (F)"
+                    : "Enter focus mode (F) — hides the top nav"
+                }
+              >
+                {focusMode ? "Exit focus" : "Focus"}
               </button>
             </div>
           </div>
@@ -2051,8 +2209,19 @@ export default function SheetEditorPage() {
           )}
           {/* Phase 24c.2: dropped fixed width override — SheetSurface
               defaults to Letter dimensions (816px) so the editor
-              preview matches the printed output 1:1. */}
-          <div className="relative" style={{ width: 816 }}>
+              preview matches the printed output 1:1.
+              Phase 31.5: `zoom` CSS property scales the whole preview
+              proportionally. Overlay children (selection / caret /
+              lyric) scale together because they're position: absolute
+              inside this wrapper — zoom applies to their coord space
+              as well. */}
+          <div
+            className="relative"
+            style={{
+              width: 816,
+              zoom,
+            }}
+          >
             <SheetSurface
               sheet={sheet}
               onLayout={

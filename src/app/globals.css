@@ -179,6 +179,15 @@
   margin: 0;
 }
 
+/* Phase 31.5 — Focus mode. Editor page toggles `.focus-mode` on
+   <html>; this hides the persistent site header + footer so the
+   sheet fills the viewport. The editor's own toolbar / preview
+   remain visible. */
+.focus-mode header[data-site-header],
+.focus-mode footer[data-site-footer] {
+  display: none !important;
+}
+
 @media print {
   html,
   body {

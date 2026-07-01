@@ -12,7 +12,10 @@ import { FeedbackTrigger } from "./feedback-trigger";
  */
 export function SiteFooter() {
   return (
-    <footer className="sticky bottom-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/85 px-4 py-2 font-mono text-[11px] text-muted-foreground backdrop-blur-md sm:px-6">
+    <footer
+      data-site-footer
+      className="sticky bottom-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/85 px-4 py-2 font-mono text-[11px] text-muted-foreground backdrop-blur-md sm:px-6"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-foreground/70">Practice Prodigy</span>
         <span aria-hidden="true">·</span>
