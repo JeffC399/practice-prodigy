@@ -51,13 +51,21 @@ function pitchToMidi(pitch: string): number | null {
   return 12 * (octave + 1) + semitone;
 }
 
-const HIGH_THRESHOLD = 84; // above ~C6
-const LOW_THRESHOLD = 55; // below ~G3
+const HIGH_THRESHOLD = 84; // above ~C6 -> apply 8va
+const LOW_THRESHOLD = 55; // below ~G3 -> apply 8vb
+// One-octave shift + still out of range → escalate to 15ma / 15mb.
+// After a 12-semitone shift, the effective range is the raw range
+// ±12. So if raw hi > (HIGH_THRESHOLD + 12) = 96, even 8va won't
+// bring it in and we need 15ma.
+const HIGH_15_THRESHOLD = 96; // above ~C7 -> apply 15ma
+const LOW_15_THRESHOLD = 43; // below ~G2 -> apply 15mb
 // Hysteresis: once a shift is applied, we don't remove it until the
 // notes are well INSIDE the staff. Avoids flickering when a note
 // hovers right at the threshold.
 const HIGH_RELEASE = 79; // above ~G5 (top space)
 const LOW_RELEASE = 60; // below ~C4 (middle C, one ledger line below)
+const HIGH_15_RELEASE = 91; // above ~G6
+const LOW_15_RELEASE = 48; // below ~C3
 
 /**
  * Compute the measure's stored-pitch MIDI range. Returns null when
@@ -93,7 +101,9 @@ export function suggestOttavaForMeasure(
   if (measure.octavaShift) return null;
   const range = measureMidiRange(measure);
   if (!range) return null;
+  if (range.hi > HIGH_15_THRESHOLD) return "15ma";
   if (range.hi > HIGH_THRESHOLD) return "8va";
+  if (range.lo < LOW_15_THRESHOLD) return "15mb";
   if (range.lo < LOW_THRESHOLD) return "8vb";
   return null;
 }
@@ -118,16 +128,35 @@ export function computeIdealOttava(
   const range = measureMidiRange(measure);
   if (!range) return null;
   const current = measure.octavaShift;
+
+  // Hysteresis on the current shift: keep it unless the range has
+  // moved well INSIDE the release threshold. Also allow escalation
+  // when notes have moved further out (e.g. 8vb → 15mb).
   if (current === "8va") {
-    // Keep 8va unless the top note has fallen well inside.
+    if (range.hi > HIGH_15_THRESHOLD) return "15ma"; // escalate
     return range.hi > HIGH_RELEASE ? "8va" : null;
   }
+  if (current === "15ma") {
+    // De-escalate to 8va once the top note is inside the 15-release
+    // window but still above the 8va-release window.
+    if (range.hi > HIGH_15_RELEASE) return "15ma";
+    if (range.hi > HIGH_RELEASE) return "8va";
+    return null;
+  }
   if (current === "8vb") {
+    if (range.lo < LOW_15_THRESHOLD) return "15mb"; // escalate
     return range.lo < LOW_RELEASE ? "8vb" : null;
   }
+  if (current === "15mb") {
+    if (range.lo < LOW_15_RELEASE) return "15mb";
+    if (range.lo < LOW_RELEASE) return "8vb";
+    return null;
+  }
   // No shift currently — apply if the notes are outside the
-  // application thresholds.
+  // application thresholds. Escalate straight to 15 when far out.
+  if (range.hi > HIGH_15_THRESHOLD) return "15ma";
   if (range.hi > HIGH_THRESHOLD) return "8va";
+  if (range.lo < LOW_15_THRESHOLD) return "15mb";
   if (range.lo < LOW_THRESHOLD) return "8vb";
   return null;
 }

@@ -257,8 +257,12 @@ function applyOctavaShiftToPitch(
   const letter = pitch.slice(0, slash);
   const octaveNum = parseInt(pitch.slice(slash + 1), 10);
   if (Number.isNaN(octaveNum)) return pitch;
-  const shifted = shift === "8va" ? octaveNum - 1 : octaveNum + 1;
-  return `${letter}/${shifted}`;
+  // 8va / 8vb shift by 1 octave; 15ma / 15mb shift by 2 octaves.
+  // Sign matches the "sounding is above/below written" semantics:
+  // shift-DOWN in display for `va` variants, shift-UP for `vb`.
+  const octaveDelta =
+    shift === "8va" ? -1 : shift === "8vb" ? 1 : shift === "15ma" ? -2 : 2;
+  return `${letter}/${octaveNum + octaveDelta}`;
 }
 
 /**
@@ -1197,18 +1201,17 @@ export function SheetSurface({
         if (!startBounds || !endBounds) return;
         const xL = startBounds.noteStartX - 2;
         const xR = endBounds.noteEndX + 2;
-        const label = span.shift === "8va" ? "8va" : "8vb";
-        // 8va: above the chord row. 8vb: BELOW the lyric band so the
-        // bracket clears descending stems, ledger-line notes below the
-        // staff, AND any lyric syllables on this line. Phase 30.3
-        // shipped with the bracket at staveY + STAVE_HEIGHT + 30 which
-        // sat *above* the lyric baseline and collided with syllables.
-        const bracketY =
-          span.shift === "8va"
-            ? lineY + CHORD_BAND_HEIGHT - 4
-            : staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET + 18;
+        const label = span.shift;
+        // Above (8va / 15ma) sits above the chord row. Below (8vb /
+        // 15mb) sits BELOW the lyric band so the bracket clears
+        // descending stems, ledger-line notes below the staff, AND
+        // any lyric syllables on this line.
+        const isAbove = span.shift === "8va" || span.shift === "15ma";
+        const bracketY = isAbove
+          ? lineY + CHORD_BAND_HEIGHT - 4
+          : staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET + 18;
         const hookHeight = 8;
-        const hookSign = span.shift === "8va" ? 1 : -1; // hook DOWN for 8va, UP for 8vb
+        const hookSign = isAbove ? 1 : -1; // hook DOWN for above, UP for below
         ctx.save();
         // Italic serif label at the left edge, vertically centered
         // on the bracket line.

@@ -2799,16 +2799,20 @@ export default function SheetEditorPage() {
                           octavaShift: (e.target.value || undefined) as
                             | "8va"
                             | "8vb"
+                            | "15ma"
+                            | "15mb"
                             | undefined,
                         })
                       }
                       className="rounded border border-border bg-background px-1 py-0.5 text-[10px]"
                       aria-label="Ottava"
-                      title="Ottava marking — display notes an octave closer to the staff and add a dashed 8va (above) or 8vb (below) bracket"
+                      title="Ottava marking — display notes one or two octaves closer to the staff"
                     >
                       <option value="">— Ottava —</option>
                       <option value="8va">8va (up)</option>
                       <option value="8vb">8vb (down)</option>
+                      <option value="15ma">15ma (2 up)</option>
+                      <option value="15mb">15mb (2 down)</option>
                     </select>
                   </div>
                 </div>

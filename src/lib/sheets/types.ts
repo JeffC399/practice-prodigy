@@ -196,12 +196,14 @@ export const MARK_LABELS: Record<SheetMark, string> = {
  * Consecutive same-shift measures render as one continuous bracket
  * span (mirrors the volta bracket pattern).
  */
-export const SHEET_OCTAVA_SHIFTS = ["8va", "8vb"] as const;
+export const SHEET_OCTAVA_SHIFTS = ["8va", "8vb", "15ma", "15mb"] as const;
 export type SheetOctavaShift = (typeof SHEET_OCTAVA_SHIFTS)[number];
 
 export const OCTAVA_SHIFT_LABELS: Record<SheetOctavaShift, string> = {
   "8va": "8va — play 1 octave up",
   "8vb": "8vb — play 1 octave down",
+  "15ma": "15ma — play 2 octaves up",
+  "15mb": "15mb — play 2 octaves down",
 };
 
 /**
