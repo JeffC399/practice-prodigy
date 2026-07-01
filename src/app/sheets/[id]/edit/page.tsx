@@ -83,6 +83,7 @@ import {
   appendMelodyNoteWithSplit,
   buildPitchedNote,
   buildRestNote,
+  padMeasureWithRests,
 } from "@/lib/sheets/melody-entry";
 import {
   connectMidiInput,
@@ -2454,21 +2455,39 @@ export default function SheetEditorPage() {
                       const label = `${
                         Number.isInteger(used) ? used : used.toFixed(2)
                       }/${expected}`;
+                      // Phase 31.8 — Under-filled bars: badge becomes
+                      // a clickable "pad with rests" action. Overflow
+                      // bars stay as a passive warning (truncating
+                      // would be destructive; users need to decide).
+                      if (isOver) {
+                        return (
+                          <span
+                            className="rounded px-1 py-0.5 font-mono text-[9px] font-medium bg-destructive/20 text-destructive"
+                            title={`Overflow: ${used} beats in a ${expected}-beat measure`}
+                          >
+                            {label}
+                          </span>
+                        );
+                      }
                       return (
-                        <span
-                          className={`rounded px-1 py-0.5 font-mono text-[9px] font-medium ${
-                            isOver
-                              ? "bg-destructive/20 text-destructive"
-                              : "bg-amber-500/20 text-amber-500"
-                          }`}
-                          title={
-                            isOver
-                              ? `Overflow: ${used} beats in a ${expected}-beat measure`
-                              : `Under-filled: ${used} of ${expected} beats used`
-                          }
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const fresh = useSheetsLibrary
+                              .getState()
+                              .sheets.find((s) => s.id === id);
+                            if (!fresh) return;
+                            const measures = padMeasureWithRests(
+                              fresh,
+                              mIdx,
+                            );
+                            updateSheet(id, { measures });
+                          }}
+                          className="rounded px-1 py-0.5 font-mono text-[9px] font-medium bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 transition-colors"
+                          title={`Under-filled: ${used} of ${expected} beats. Click to pad with rests.`}
                         >
                           {label}
-                        </span>
+                        </button>
                       );
                     })()}
                     {/* Phase 31.7 — ottava suggestion chip. Shows only

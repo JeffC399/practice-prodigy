@@ -190,6 +190,41 @@ function measureUsedBeats(m: Sheet["measures"][number]): number {
  * attached to the FIRST piece only — the head of the tie chain — which
  * matches how professional engraving lays out lyrics and phrasing).
  */
+/**
+ * Phase 31.8 — Pad an under-filled measure with rests. Decomposes the
+ * remaining beats via `decomposeBeatsIntoNotes` and appends one rest
+ * per piece. Returns the original measures array unchanged when the
+ * measure is already full or over-filled (we don't truncate — that's
+ * destructive).
+ */
+export function padMeasureWithRests(
+  sheet: Sheet,
+  measureIdx: number,
+): Sheet["measures"] {
+  const m = sheet.measures[measureIdx];
+  if (!m) return sheet.measures;
+  const beatsPerMeasure = sheet.timeSignature.beatsPerMeasure;
+  const used = (m.melody ?? []).reduce(
+    (s, n) =>
+      s + (MELODY_DURATION_BEATS[n.duration] ?? 1) * (n.dotted ? 1.5 : 1),
+    0,
+  );
+  const remaining = beatsPerMeasure - used;
+  if (remaining <= 0.001) return sheet.measures;
+  const pieces = decomposeBeatsIntoNotes(remaining);
+  if (pieces.length === 0) return sheet.measures;
+  const newRests: MelodyNote[] = pieces.map((p) => ({
+    kind: "rest" as const,
+    duration: p.duration,
+    dotted: p.dotted,
+  }));
+  return sheet.measures.map((mm, mi) =>
+    mi === measureIdx
+      ? { ...mm, melody: [...(mm.melody ?? []), ...newRests] }
+      : mm,
+  );
+}
+
 export function appendMelodyNoteWithSplit(
   sheet: Sheet,
   measureIdx: number,
