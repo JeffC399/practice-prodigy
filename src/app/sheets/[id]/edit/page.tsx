@@ -204,6 +204,51 @@ export default function SheetEditorPage() {
   useEffect(() => {
     caretRef.current = caret;
   }, [caret]);
+  // Phase 30 — Stable ref to the latest `placeAtCaret` closure so the
+  // MIDI subscription effect can invoke it without re-attaching on
+  // unrelated state changes. Declared alongside the other hooks
+  // (above the `if (!sheet)` early return) so hook order stays
+  // stable across renders.
+  const placeAtCaretRef = useRef<
+    ((c: MelodyCaret, p: string) => void) | null
+  >(null);
+  // Phase 30 — MIDI subscription. Attaches while both the click-entry
+  // mode AND the MIDI toggle are on; auto-detaches otherwise. Uses
+  // refs to read the latest caret + placeAtCaret so hot state churn
+  // doesn't churn the subscription.
+  useEffect(() => {
+    if (!midiEnabled || editorMode !== "click-entry") {
+      setMidiStatus("disconnected");
+      setMidiDeviceCount(0);
+      return;
+    }
+    let cancelled = false;
+    let cleanup: () => void = () => {};
+    connectMidiInput({
+      onNote: (midiNumber) => {
+        const pitch = midiNumberToVexPitch(midiNumber);
+        const c = caretRef.current;
+        const place = placeAtCaretRef.current;
+        if (!pitch || !c || !place) return;
+        place(c, pitch);
+      },
+      onStatusChange: (status, count) => {
+        if (cancelled) return;
+        setMidiStatus(status);
+        setMidiDeviceCount(count);
+      },
+    }).then((res) => {
+      if (cancelled) {
+        res.disconnect();
+        return;
+      }
+      cleanup = res.disconnect;
+    });
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [midiEnabled, editorMode]);
   // Phase 24c — Lyric overlay click positions: pitched notes that are
   // NOT tied followers. Computed here (above the early returns) so the
   // useMemo hook order stays stable across renders.
@@ -802,6 +847,12 @@ export default function SheetEditorPage() {
       setCaret(advanceCaret(currentCaret, beats, fresh));
     }
   };
+  // Phase 30 — sync the placeAtCaret ref (declared in the top-of-
+  // component hook block above `if (!sheet)`) via direct assignment
+  // rather than a useEffect. useEffect here would break the Rules of
+  // Hooks — this line lives below the early return and only runs on
+  // renders where sheet is truthy. A ref mutation on render is safe.
+  placeAtCaretRef.current = placeAtCaret;
 
   /**
    * Click on the staff: re-anchor the caret to the clicked measure
@@ -819,53 +870,6 @@ export default function SheetEditorPage() {
     placeAtCaret(newCaret, pitch);
   };
 
-  // Phase 30 — Keep a stable ref to the latest `placeAtCaret` closure
-  // so the MIDI subscription effect can invoke it without needing to
-  // re-attach when unrelated state changes.
-  const placeAtCaretRef = useRef<
-    ((c: MelodyCaret, p: string) => void) | null
-  >(null);
-  useEffect(() => {
-    placeAtCaretRef.current = placeAtCaret;
-  });
-
-  // Phase 30 — MIDI input subscription. Attaches while both the
-  // click-entry mode and the user's MIDI toggle are on; auto-detaches
-  // otherwise. Uses the caret + placeAtCaret refs so hot state updates
-  // don't churn the subscription.
-  useEffect(() => {
-    if (!midiEnabled || editorMode !== "click-entry") {
-      setMidiStatus("disconnected");
-      setMidiDeviceCount(0);
-      return;
-    }
-    let cancelled = false;
-    let cleanup: () => void = () => {};
-    connectMidiInput({
-      onNote: (midiNumber) => {
-        const pitch = midiNumberToVexPitch(midiNumber);
-        const c = caretRef.current;
-        const place = placeAtCaretRef.current;
-        if (!pitch || !c || !place) return;
-        place(c, pitch);
-      },
-      onStatusChange: (status, count) => {
-        if (cancelled) return;
-        setMidiStatus(status);
-        setMidiDeviceCount(count);
-      },
-    }).then((res) => {
-      if (cancelled) {
-        res.disconnect();
-        return;
-      }
-      cleanup = res.disconnect;
-    });
-    return () => {
-      cancelled = true;
-      cleanup();
-    };
-  }, [midiEnabled, editorMode]);
 
   const moveCursorTo = (next: LyricCursor) => {
     if (lyricCursor) commitDraftAt(lyricCursor, lyricDraft);
