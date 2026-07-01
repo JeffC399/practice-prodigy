@@ -457,6 +457,23 @@ export function SheetSurface({
      *  translation. Used by the click-on-staff overlay. */
     const localMeasureRects: SheetMeasureRect[] = [];
 
+    /**
+     * Phase 29 — Cross-measure tie tracker. Persists across measures
+     * AND across line boundaries so a tie from the last note of
+     * measure N to the first same-pitch note of measure N+1 draws
+     * even when they're on different lines.
+     *
+     *   `outgoingNote` non-null: measure N is on the current line; the
+     *   next matching note in this line draws a full arc.
+     *   `outgoingNote` null: measure N was on the PREVIOUS line; its
+     *   outgoing half-arc has already been drawn. The next matching
+     *   note draws only the incoming half-arc.
+     */
+    let pendingCrossMeasureTie: {
+      pitch: string;
+      outgoingNote: StaveNote | null;
+    } | null = null;
+
     lines.forEach((lineMeasures, lineIdx) => {
       const showTimeSig = lineIdx === 0;
       const isLastLine = lineIdx === lines.length - 1;
@@ -731,7 +748,14 @@ export function SheetSurface({
         }
 
         const melody = measure.melody ?? [];
-        if (melody.length === 0) return;
+        if (melody.length === 0) {
+          // Empty melody — even so, if a cross-measure tie is pending
+          // it should be cleared here (an empty measure can't be the
+          // tie's landing point). Standard convention: silence breaks
+          // a tie chain.
+          pendingCrossMeasureTie = null;
+          return;
+        }
         const staveNotes = buildStaveNotesForMelody(melody);
         const voice = new Voice({
           numBeats: sheet.timeSignature.beatsPerMeasure,
@@ -742,6 +766,57 @@ export function SheetSurface({
 
         const tuplets = collectTuplets(melody, staveNotes);
         const ties = collectTies(melody, staveNotes);
+
+        // Phase 29 — cross-measure tie IN. If the previous measure
+        // ended with a tieToNext-flagged pitched note AND this
+        // measure's first pitched note matches its pitch, draw the
+        // connecting arc.
+        //   - Full arc (both endpoints): previous measure on same line.
+        //   - Incoming half-arc only: previous measure on previous line
+        //     (its outgoing half-arc was already drawn there).
+        if (pendingCrossMeasureTie) {
+          // Find the first PITCHED note in this measure. Leading rests
+          // don't break a tie — the tie lands on the first pitched note.
+          let firstPitchedIdx = -1;
+          for (let ki = 0; ki < melody.length; ki++) {
+            if (melody[ki].kind === "note") {
+              firstPitchedIdx = ki;
+              break;
+            }
+          }
+          if (firstPitchedIdx >= 0) {
+            const firstMel = melody[firstPitchedIdx];
+            if (
+              firstMel.kind === "note" &&
+              firstMel.pitch === pendingCrossMeasureTie.pitch
+            ) {
+              const firstStaveNote = staveNotes[firstPitchedIdx];
+              if (pendingCrossMeasureTie.outgoingNote) {
+                // Full cross-measure tie within the same line.
+                ties.push(
+                  new StaveTie({
+                    firstNote: pendingCrossMeasureTie.outgoingNote,
+                    lastNote: firstStaveNote,
+                    firstIndexes: [0],
+                    lastIndexes: [0],
+                  }),
+                );
+              } else {
+                // Incoming half-arc from previous line.
+                ties.push(
+                  new StaveTie({
+                    firstNote: undefined,
+                    lastNote: firstStaveNote,
+                    firstIndexes: [0],
+                    lastIndexes: [0],
+                  }),
+                );
+              }
+            }
+          }
+          pendingCrossMeasureTie = null;
+        }
+
         // Auto-beam consecutive eighth/sixteenth notes that are NOT in
         // a tuplet. Tuplets handle their own visual grouping via the
         // Tuplet bracket + numeral; auto-beaming them would suppress
@@ -759,6 +834,56 @@ export function SheetSurface({
         // Tuplets after beams so the bracket + numeral sit on top.
         tuplets.forEach((t) => t.setContext(ctx).draw());
         ties.forEach((t) => t.setContext(ctx).draw());
+
+        // Phase 29 — cross-measure tie OUT. If this measure ends with
+        // a tieToNext-flagged pitched note AND another measure follows
+        // in the sheet, arm the pendingCrossMeasureTie so the next
+        // measure's render draws the connecting arc.
+        let lastPitchedIdx = -1;
+        for (let ki = melody.length - 1; ki >= 0; ki--) {
+          if (melody[ki].kind === "note") {
+            lastPitchedIdx = ki;
+            break;
+          }
+        }
+        if (lastPitchedIdx >= 0) {
+          const lastMel = melody[lastPitchedIdx];
+          const isLastMeasureInSheet =
+            measureIdx === sheet.measures.length - 1;
+          if (
+            lastMel.kind === "note" &&
+            lastMel.tieToNext === true &&
+            !isLastMeasureInSheet
+          ) {
+            const isLastMeasureInLine = i === lineMeasures.length - 1;
+            if (isLastMeasureInLine) {
+              // Draw the outgoing half-arc on THIS line's last note
+              // right now (its context is still current). Then park a
+              // "null-outgoingNote" pending tie so the NEXT line's
+              // first measure draws only the incoming half-arc.
+              new StaveTie({
+                firstNote: staveNotes[lastPitchedIdx],
+                lastNote: undefined,
+                firstIndexes: [0],
+                lastIndexes: [0],
+              })
+                .setContext(ctx)
+                .draw();
+              pendingCrossMeasureTie = {
+                pitch: lastMel.pitch,
+                outgoingNote: null,
+              };
+            } else {
+              // Same-line tie — the next measure's render will emit
+              // the full arc using this measure's last StaveNote as
+              // the outgoing endpoint.
+              pendingCrossMeasureTie = {
+                pitch: lastMel.pitch,
+                outgoingNote: staveNotes[lastPitchedIdx],
+              };
+            }
+          }
+        }
 
         // Phase 24c — Lyrics. Render syllable text below the staff and
         // collect note positions for the editor's interactive layer.

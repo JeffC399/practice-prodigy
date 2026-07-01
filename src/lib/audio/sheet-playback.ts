@@ -300,48 +300,99 @@ class SheetPlayback {
       this.scheduledEvents.push(id);
     }
 
-    // 2) Melody events. Same expanded iteration.
+    // 2) Melody events.
+    //
+    // Phase 29 — cross-measure tie handling. Flatten the melody across
+    // all play steps into a single sequence, then walk it once with
+    // tie awareness. This uniformly handles:
+    //   - intra-measure ties (previous behavior)
+    //   - cross-measure ties (last note of measure N ties into first
+    //     matching-pitch note of measure N+1)
+    //   - multi-note tied chains (A[t]-A[t]-A sustains for all three
+    //     notes' durations — previously only sustained for two)
+    //
+    // A tied chain is a run of adjacent same-pitch pitched notes where
+    // every note except the last has `tieToNext: true`. We schedule
+    // only the head note and skip every follower.
+    //
+    // Form-jump guard: a tie at the tail of a section should NOT fold
+    // into the head of a replay when the section repeats. We require
+    // consecutive flat entries to be in the same source measure OR in
+    // linearly-adjacent source measures for a tie to bridge them.
+    type FlatNote = {
+      note: MelodyNote;
+      startBeat: number;
+      sourceMeasureIdx: number;
+    };
+    const flatMelody: FlatNote[] = [];
     for (let step = 0; step < totalPlaySteps; step++) {
       const mi = playOrder[step].sourceMeasureIdx;
       const m = sheet.measures[mi];
       const melody: MelodyNote[] = m.melody ?? [];
       let cursor = 0;
-      melody.forEach((n, ni) => {
-        const beats = beatsForDuration(n.duration, n.dotted);
-        const startBeat = step * beatsPerMeasure + cursor;
-        if (n.kind === "note") {
-          const prev = melody[ni - 1];
-          const isTiedFollower =
-            prev &&
-            prev.kind === "note" &&
-            prev.tieToNext === true &&
-            prev.pitch === n.pitch;
-          if (!isTiedFollower) {
-            let sustainBeats = beats;
-            const next = melody[ni + 1];
-            if (
-              n.tieToNext &&
-              next &&
-              next.kind === "note" &&
-              next.pitch === n.pitch
-            ) {
-              sustainBeats += beatsForDuration(next.duration, next.dotted);
-            }
-            const midi = vexPitchToMidi(n.pitch);
-            if (midi !== null) {
-              const sustainSeconds = Math.max(
-                0.05,
-                sustainBeats * beatSeconds * 0.92,
-              );
-              const id = transport.schedule((time) => {
-                this.melodyVoice?.play(midi, time, sustainSeconds, 0.85);
-              }, musicStart + startBeat * beatSeconds);
-              this.scheduledEvents.push(id);
-            }
-          }
+      for (const n of melody) {
+        flatMelody.push({
+          note: n,
+          startBeat: step * beatsPerMeasure + cursor,
+          sourceMeasureIdx: mi,
+        });
+        cursor += beatsForDuration(n.duration, n.dotted);
+      }
+    }
+
+    const isLinearlyAdjacentInSource = (aIdx: number, bIdx: number): boolean =>
+      flatMelody[aIdx].sourceMeasureIdx ===
+        flatMelody[bIdx].sourceMeasureIdx ||
+      flatMelody[aIdx].sourceMeasureIdx + 1 ===
+        flatMelody[bIdx].sourceMeasureIdx;
+
+    for (let i = 0; i < flatMelody.length; i++) {
+      const { note, startBeat } = flatMelody[i];
+      if (note.kind !== "note") continue;
+
+      // Is this a tied-chain follower? (previous flat entry is a
+      // pitched note with tieToNext + matching pitch + linearly
+      // adjacent in the source measures — no form-jump between)
+      const prev = i > 0 ? flatMelody[i - 1] : null;
+      const isTiedFollower =
+        !!prev &&
+        prev.note.kind === "note" &&
+        prev.note.tieToNext === true &&
+        prev.note.pitch === note.pitch &&
+        isLinearlyAdjacentInSource(i - 1, i);
+      if (isTiedFollower) continue;
+
+      // Walk forward from `note` extending sustain across every tied
+      // follower (a chain of any length, spanning any number of
+      // measure boundaries within the same linear section).
+      let sustainBeats = beatsForDuration(note.duration, note.dotted);
+      let j = i;
+      while (j + 1 < flatMelody.length) {
+        const cur = flatMelody[j].note;
+        const nxt = flatMelody[j + 1].note;
+        if (
+          cur.kind !== "note" ||
+          cur.tieToNext !== true ||
+          nxt.kind !== "note" ||
+          nxt.pitch !== cur.pitch ||
+          !isLinearlyAdjacentInSource(j, j + 1)
+        ) {
+          break;
         }
-        cursor += beats;
-      });
+        sustainBeats += beatsForDuration(nxt.duration, nxt.dotted);
+        j++;
+      }
+
+      const midi = vexPitchToMidi(note.pitch);
+      if (midi === null) continue;
+      const sustainSeconds = Math.max(
+        0.05,
+        sustainBeats * beatSeconds * 0.92,
+      );
+      const id = transport.schedule((time) => {
+        this.melodyVoice?.play(midi, time, sustainSeconds, 0.85);
+      }, musicStart + startBeat * beatSeconds);
+      this.scheduledEvents.push(id);
     }
 
     // 3) Phase 27.1b — Loop region. If a loop range was set, configure
