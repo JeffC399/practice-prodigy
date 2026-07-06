@@ -51,21 +51,23 @@ function pitchToMidi(pitch: string): number | null {
   return 12 * (octave + 1) + semitone;
 }
 
-const HIGH_THRESHOLD = 84; // above ~C6 -> apply 8va
-const LOW_THRESHOLD = 55; // below ~G3 -> apply 8vb
-// One-octave shift + still out of range → escalate to 15ma / 15mb.
-// After a 12-semitone shift, the effective range is the raw range
-// ±12. So if raw hi > (HIGH_THRESHOLD + 12) = 96, even 8va won't
-// bring it in and we need 15ma.
-const HIGH_15_THRESHOLD = 96; // above ~C7 -> apply 15ma
-const LOW_15_THRESHOLD = 43; // below ~G2 -> apply 15mb
+// Tighter thresholds: goal is to always bring the DISPLAY range
+// into the comfortable staff window (MIDI 60-81, ~1 ledger line
+// either side). Since each shift moves the display by 12 semitones,
+// we escalate to 15 whenever a single 8-shift wouldn't be enough.
+const HIGH_THRESHOLD = 84; // stored > 84 -> apply 8va (display <= 72)
+const LOW_THRESHOLD = 55; // stored < 55 -> apply 8vb (display >= 67)
+// Escalation: if stored is beyond one shift's reach (stored 8va-
+// shifted still ends up above 84, or 8vb-shifted still below 55).
+const HIGH_15_THRESHOLD = 93; // stored > 93 -> apply 15ma (was 96)
+const LOW_15_THRESHOLD = 48; // stored < 48 -> apply 15mb (was 43)
 // Hysteresis: once a shift is applied, we don't remove it until the
-// notes are well INSIDE the staff. Avoids flickering when a note
-// hovers right at the threshold.
-const HIGH_RELEASE = 79; // above ~G5 (top space)
-const LOW_RELEASE = 60; // below ~C4 (middle C, one ledger line below)
-const HIGH_15_RELEASE = 91; // above ~G6
-const LOW_15_RELEASE = 48; // below ~C3
+// notes are well INSIDE the release threshold. Avoids flickering
+// when a note hovers right at the boundary.
+const HIGH_RELEASE = 79; // release 8va when stored <= 79
+const LOW_RELEASE = 60; // release 8vb when stored >= 60
+const HIGH_15_RELEASE = 88; // release 15ma when stored <= 88
+const LOW_15_RELEASE = 53; // release 15mb when stored >= 53
 
 /**
  * Compute the measure's stored-pitch MIDI range. Returns null when
