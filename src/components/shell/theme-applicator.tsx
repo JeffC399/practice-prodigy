@@ -122,6 +122,16 @@ export function ThemeApplicator() {
     root.style.setProperty("--ui-brightness", String(uiBrightness / 100));
     root.style.setProperty("--ui-saturation", String(uiSaturation / 100));
 
+    // Phase 34.7.1 — Only enable the body filter when the user has
+    // moved a slider off default. CSS filters (even identity ones)
+    // rasterize the element, which blurs text. Keeping the filter off
+    // at 100/100 keeps headings crisp for users who never touch the
+    // slider. Sheet paper inverse is likewise gated behind this class.
+    root.classList.toggle(
+      "ui-filter-active",
+      uiBrightness !== 100 || uiSaturation !== 100,
+    );
+
     // Corner radius.
     CORNER_RADII.forEach((r) => root.classList.remove(`radius-${r}`));
     if (cornerRadius !== "normal") {

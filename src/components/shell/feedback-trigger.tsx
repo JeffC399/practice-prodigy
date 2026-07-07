@@ -41,16 +41,15 @@ export function FeedbackTrigger() {
 
   return (
     <>
-      {/* Phase 34.6 — match the footer's font-mono + kill browser
-          default button padding (p-0) + normalize line-height. Without
-          these, the button's intrinsic 2px 6px browser padding pushed
-          it to a slightly different baseline than the surrounding <a>
-          links, which combined with the footer's flex-wrap made the
-          right-side row visually break to two lines on some widths. */}
+      {/* Phase 34.7.1 — Kill every browser default that could shift
+          the button's baseline off the surrounding <a> links: border,
+          appearance, padding, extra font metrics. `inline-flex h-4
+          items-center` matches the anchor sibling boxes exactly so
+          all four footer items align on the same y-coordinate. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="p-0 leading-none font-mono text-[11px] bg-transparent hover:text-foreground transition-colors"
+        className="inline-flex h-4 items-center border-0 p-0 leading-none font-mono text-[11px] bg-transparent appearance-none hover:text-foreground transition-colors"
         aria-label="Send feedback"
       >
         feedback

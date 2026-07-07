@@ -552,8 +552,21 @@
   --ui-saturation: 1;
 }
 
+/* Phase 34.7.1 — Only apply the filter when the user has actually
+ * moved a slider off default. Any CSS `filter:` (even identity
+ * `brightness(1)`) forces the browser to promote the element to a
+ * compositing layer and rasterize it, which destroys subpixel text
+ * antialiasing. At default (100/100) the filter is a no-op anyway,
+ * so gating it behind `.ui-filter-active` keeps all headings crisp
+ * for the vast majority of users who never touch the slider, while
+ * still letting the slider work for those who do.
+ *
+ * ThemeApplicator toggles `.ui-filter-active` on <html> whenever
+ * brightness !== 100 or saturation !== 100.
+ */
+
 /* Light mode filter — dim + reduce contrast as intensity drops. */
-body {
+.ui-filter-active body {
   filter:
     brightness(calc(0.5 + var(--ui-brightness) * 0.5))
     contrast(calc(0.5 + var(--ui-brightness) * 0.5))
@@ -561,7 +574,7 @@ body {
 }
 
 /* Dark mode filter — BRIGHTEN toward gray as intensity drops. */
-.dark body {
+.ui-filter-active.dark body {
   filter:
     brightness(calc(1 + (1 - var(--ui-brightness)) * 4))
     contrast(calc(0.5 + var(--ui-brightness) * 0.5))
@@ -569,8 +582,8 @@ body {
 }
 
 /* Sheet paper inverse — light mode. Undoes all three so notation
- * always reads at 100/100. */
-.sheet-paper {
+ * always reads at 100/100. Only needed when the body filter is on. */
+.ui-filter-active .sheet-paper {
   filter:
     brightness(calc(1 / (0.5 + var(--ui-brightness) * 0.5)))
     contrast(calc(1 / (0.5 + var(--ui-brightness) * 0.5)))
@@ -579,7 +592,7 @@ body {
 
 /* Sheet paper inverse — dark mode. Undoes the brighten formula so
  * notation always reads at 100/100. */
-.dark .sheet-paper {
+.ui-filter-active.dark .sheet-paper {
   filter:
     brightness(calc(1 / (1 + (1 - var(--ui-brightness)) * 4)))
     contrast(calc(1 / (0.5 + var(--ui-brightness) * 0.5)))
