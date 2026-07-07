@@ -1427,8 +1427,13 @@ function TwoPaneDisplay({
             transition={{ duration: 0.18, ease: "easeOut" }}
             className="flex flex-col items-center gap-2"
           >
+            {/* Phase 34.5 — Next chord dropped to /40 opacity (was /70).
+                Two-pane uses same font sizes for Now and Next, so opacity
+                is doing all the hierarchy work; /70 wasn't strong enough
+                and could read as more prominent than Now on some
+                palettes because of subtle bg tint interactions. */}
             <span
-              className={`font-mono font-semibold leading-none tracking-tight text-foreground/70 text-center ${chordTextSize}`}
+              className={`font-mono font-semibold leading-none tracking-tight text-foreground/40 text-center ${chordTextSize}`}
             >
               {nextLabel ?? "—"}
             </span>
@@ -1474,10 +1479,13 @@ function TwoPanePanel({
 }) {
   return (
     <section
+      // Phase 34.5 — bumped emphasized border/bg from /40 & /5 to
+      // /60 & /10, and demphasized panel's bg from card/40 to card/20
+      // so the visual hierarchy between Now and Next is unambiguous.
       className={`relative flex flex-col items-center justify-center gap-4 rounded-xl border px-6 py-10 min-h-[14rem] ${
         emphasized
-          ? "border-primary/40 bg-primary/5"
-          : "border-border bg-card/40"
+          ? "border-primary/60 bg-primary/10 shadow-sm"
+          : "border-border/60 bg-card/20"
       }`}
     >
       {pulsing && (
