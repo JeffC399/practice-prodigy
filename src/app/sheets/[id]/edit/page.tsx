@@ -112,6 +112,7 @@ import {
 } from "@/lib/sheets/selection";
 import {
   computeIdealOttava,
+  measureMidiRangeDebug,
   suggestOttavaForMeasure,
 } from "@/lib/sheets/ottava-suggest";
 import { SelectionOverlay } from "@/components/sheets/selection-overlay";
@@ -264,12 +265,18 @@ export default function SheetEditorPage() {
   useEffect(() => {
     if (!sheet) return;
     let changed = false;
-    const nextMeasures = sheet.measures.map((m) => {
+    const nextMeasures = sheet.measures.map((m, mi) => {
       const ideal = computeIdealOttava(m);
-      // Only touch a measure when the ideal shift differs from what's
-      // stored — including the case where ideal is null and the
-      // measure carries an unnecessary shift (auto-remove).
       const current = m.octavaShift;
+      // Phase 31.7.4 diagnostic: log every measure decision so we can
+      // trace why an expected escalation isn't happening.
+      const range = measureMidiRangeDebug(m);
+      if (range) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[auto-ottava] measure ${mi + 1}: range MIDI ${range.lo}-${range.hi}, current=${current ?? "none"}, ideal=${ideal ?? "none"}`,
+        );
+      }
       if (ideal === (current ?? null)) return m;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { octavaShift: _drop, ...rest } = m;
@@ -280,6 +287,8 @@ export default function SheetEditorPage() {
         : (rest as typeof m);
     });
     if (changed) {
+      // eslint-disable-next-line no-console
+      console.log("[auto-ottava] applying updates to store");
       updateSheet(id, { measures: nextMeasures }, { trackUndo: false });
     }
   }, [sheet, id]);
@@ -2592,6 +2601,22 @@ export default function SheetEditorPage() {
                         >
                           + {suggested}?
                         </button>
+                      );
+                    })()}
+                    {/* Phase 31.7.4 diagnostic — MIDI range + auto-
+                        ottava decision. Remove once we've verified
+                        the auto path is working. */}
+                    {(() => {
+                      const range = measureMidiRangeDebug(measure);
+                      if (!range) return null;
+                      const ideal = computeIdealOttava(measure);
+                      return (
+                        <span
+                          className="rounded border border-border bg-background px-1 py-0.5 font-mono text-[9px] text-muted-foreground"
+                          title="Stored-pitch MIDI range and auto-computed ideal ottava"
+                        >
+                          MIDI {range.lo}–{range.hi} → {ideal ?? "none"}
+                        </span>
                       );
                     })()}
                   </div>

@@ -71,8 +71,16 @@ const LOW_15_RELEASE = 53; // release 15mb when stored >= 53
 
 /**
  * Compute the measure's stored-pitch MIDI range. Returns null when
- * the measure has no pitched notes.
+ * the measure has no pitched notes. Exported for the editor's debug
+ * badge so we can see exactly what range is being fed to the shift
+ * decision.
  */
+export function measureMidiRangeDebug(
+  measure: SheetMeasure,
+): { hi: number; lo: number } | null {
+  return measureMidiRange(measure);
+}
+
 function measureMidiRange(
   measure: SheetMeasure,
 ): { hi: number; lo: number } | null {
