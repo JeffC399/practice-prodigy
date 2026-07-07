@@ -134,24 +134,10 @@
 }
 
 /*
- * Accent palette overrides — applied via the `accent-<color>` class on
- * <html> by the ThemeApplicator client component. Each overrides --primary
- * and --ring without touching the rest of the theme tokens. amber is the
- * brand default; the :root / .dark blocks above already set it, so we only
- * need explicit overrides for the alternates.
+ * Accent palette overrides — see the block near the end of this file
+ * (moved after the Phase 34 palette definitions in Phase 34.4 so accent
+ * choices always win over palette-defined `--primary` / `--ring`).
  */
-.accent-indigo {
-  --primary: oklch(0.62 0.18 274);
-  --ring: oklch(0.62 0.18 274);
-}
-.accent-emerald {
-  --primary: oklch(0.7 0.16 162);
-  --ring: oklch(0.7 0.16 162);
-}
-.accent-rose {
-  --primary: oklch(0.65 0.21 16);
-  --ring: oklch(0.65 0.21 16);
-}
 
 /* ==========================================================================
  * Phase 34 — Theme palettes.
@@ -672,5 +658,36 @@ body {
     margin: 0;
     padding: 0;
   }
+}
+
+/* ==========================================================================
+ * Phase 34.4 — Accent palette overrides (moved to end of file).
+ *
+ * Applied via the `accent-<color>` class on <html>. Each overrides
+ * `--primary` and `--ring` without touching the rest of the theme
+ * tokens. These rules sit AFTER every palette definition so an
+ * explicit user accent choice always wins over the palette's
+ * curated primary color — matching user intent that clicking an
+ * accent swatch reflects everywhere immediately.
+ *
+ * `accent-amber` needs an explicit block (even though amber is the
+ * brand default and lives in `:root`) so that switching to amber
+ * while a palette is active also overrides the palette's primary.
+ * ========================================================================== */
+.accent-amber {
+  --primary: oklch(0.795 0.171 70.67);
+  --ring: oklch(0.795 0.171 70.67);
+}
+.accent-indigo {
+  --primary: oklch(0.62 0.18 274);
+  --ring: oklch(0.62 0.18 274);
+}
+.accent-emerald {
+  --primary: oklch(0.7 0.16 162);
+  --ring: oklch(0.7 0.16 162);
+}
+.accent-rose {
+  --primary: oklch(0.65 0.21 16);
+  --ring: oklch(0.65 0.21 16);
 }
 
