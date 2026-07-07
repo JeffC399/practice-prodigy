@@ -66,17 +66,35 @@ const TREBLE: Thresholds = {
   LOW_15_RELEASE: 53,
 };
 
+// Effectively-disabled sentinel — any real MIDI value is <= 127.
+const NEVER = 9999;
+
 const BASS: Thresholds = {
-  // Comfortable range for bass: MIDI 41-60 (F2-C4). Shifted down
-  // by ~20 semitones from the treble thresholds. Notes on the bass
-  // staff itself (G2=43 to A3=57) never trigger a shift.
-  HIGH: 60, // stored > 60 -> apply 8va (display <= 48)
+  // Comfortable range for bass: MIDI 41-60 (F2-C4). Notes on the
+  // bass staff itself (G2=43 to A3=57) never trigger a shift.
+  //
+  // Auto-apply for HIGH shifts (8va / 15ma) is intentionally
+  // DISABLED in bass clef. Reasons:
+  //   1. A treble melody re-clef'd to bass would trigger 8va on
+  //      every measure, drawing a messy bracket across the whole
+  //      line that overlaps the chord row.
+  //   2. Bass-clef instruments (cello, bassoon, low brass) routinely
+  //      play notes with a few ledger lines above the staff without
+  //      any ottava marking -- that's just how the notation reads.
+  //   3. If the user genuinely wants 8va for a sustained high
+  //      passage, they can apply it manually via the Measures list
+  //      Ottava dropdown.
+  //
+  // LOW shifts still auto-apply because the visual clutter of many
+  // ledger lines below the staff is worse, and 8vb / 15mb brackets
+  // sit below the lyric band where they don't overlap anything.
+  HIGH: NEVER,
   LOW: 40, // stored < 40 -> apply 8vb (display >= 52)
-  HIGH_15: 72, // stored > 72 -> apply 15ma
+  HIGH_15: NEVER,
   LOW_15: 28, // stored < 28 -> apply 15mb
-  HIGH_RELEASE: 55,
+  HIGH_RELEASE: NEVER,
   LOW_RELEASE: 46,
-  HIGH_15_RELEASE: 67,
+  HIGH_15_RELEASE: NEVER,
   LOW_15_RELEASE: 34,
 };
 
