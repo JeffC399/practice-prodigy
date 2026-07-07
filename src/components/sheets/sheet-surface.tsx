@@ -700,7 +700,10 @@ export function SheetSurface({
 
         const stave = new Stave(staveX, staveY, staveWidth);
         if (isFirst) {
-          stave.addClef("treble");
+          // Phase 32.1 — Clef selection. VexFlow uses absolute pitch
+          // (StaveNote pitches don't change) — the clef just tells
+          // the renderer where each MIDI value sits on the staff.
+          stave.addClef(sheet.clef ?? "treble");
           stave.addKeySignature(keySpec);
           if (showTimeSig) {
             stave.addTimeSignature(

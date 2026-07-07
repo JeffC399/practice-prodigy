@@ -380,6 +380,13 @@ export type Sheet = {
   keyMode: SheetKeyMode;
   /** Time signature (single per piece). */
   timeSignature: SheetTimeSignature;
+  /**
+   * Phase 32.1 — Clef (single per piece). Treble is standard for
+   * most lead sheets; bass is the pro answer for melodies that live
+   * in the low bass range (below MIDI ~50). Defaults to treble when
+   * unset. Per-measure clef changes are a follow-up.
+   */
+  clef?: "treble" | "bass";
   /** Ordered list of measures. */
   measures: SheetMeasure[];
   /** Phase 25.0.2: visual font style. Defaults to "standard". */

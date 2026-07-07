@@ -112,7 +112,6 @@ import {
 } from "@/lib/sheets/selection";
 import {
   computeIdealOttava,
-  measureMidiRangeDebug,
   suggestOttavaForMeasure,
 } from "@/lib/sheets/ottava-suggest";
 import { SelectionOverlay } from "@/components/sheets/selection-overlay";
@@ -265,18 +264,9 @@ export default function SheetEditorPage() {
   useEffect(() => {
     if (!sheet) return;
     let changed = false;
-    const nextMeasures = sheet.measures.map((m, mi) => {
+    const nextMeasures = sheet.measures.map((m) => {
       const ideal = computeIdealOttava(m);
       const current = m.octavaShift;
-      // Phase 31.7.4 diagnostic: log every measure decision so we can
-      // trace why an expected escalation isn't happening.
-      const range = measureMidiRangeDebug(m);
-      if (range) {
-        // eslint-disable-next-line no-console
-        console.log(
-          `[auto-ottava] measure ${mi + 1}: range MIDI ${range.lo}-${range.hi}, current=${current ?? "none"}, ideal=${ideal ?? "none"}`,
-        );
-      }
       if (ideal === (current ?? null)) return m;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { octavaShift: _drop, ...rest } = m;
@@ -287,8 +277,6 @@ export default function SheetEditorPage() {
         : (rest as typeof m);
     });
     if (changed) {
-      // eslint-disable-next-line no-console
-      console.log("[auto-ottava] applying updates to store");
       updateSheet(id, { measures: nextMeasures }, { trackUndo: false });
     }
   }, [sheet, id]);
@@ -1875,6 +1863,34 @@ export default function SheetEditorPage() {
                 ))}
               </select>
             </label>
+            {/* Phase 32.1 — Clef selection. Treble is standard for
+                lead sheets; bass is the pro answer for melodies that
+                live in the low bass range where treble + 15mb still
+                leaves the notes on many ledger lines. */}
+            <label className="flex flex-col gap-1 text-xs">
+              Clef
+              <div className="flex items-center gap-1">
+                {(["treble", "bass"] as const).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => updateMeta("clef", c)}
+                    className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                      (sheet.clef ?? "treble") === c
+                        ? "border-primary/60 bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                    title={
+                      c === "bass"
+                        ? "Bass clef — for low-range melodies (e.g. bass line charts)"
+                        : "Treble clef — standard for most lead sheets"
+                    }
+                  >
+                    {c === "bass" ? "Bass" : "Treble"}
+                  </button>
+                ))}
+              </div>
+            </label>
             {/* Phase 25.0.2 — Font style toggle. Per-sheet aesthetic
                 choice; "standard" keeps the classic Georgia serif
                 engraving, "handwritten" switches the whole page to a
@@ -2601,22 +2617,6 @@ export default function SheetEditorPage() {
                         >
                           + {suggested}?
                         </button>
-                      );
-                    })()}
-                    {/* Phase 31.7.4 diagnostic — MIDI range + auto-
-                        ottava decision. Remove once we've verified
-                        the auto path is working. */}
-                    {(() => {
-                      const range = measureMidiRangeDebug(measure);
-                      if (!range) return null;
-                      const ideal = computeIdealOttava(measure);
-                      return (
-                        <span
-                          className="rounded border border-border bg-background px-1 py-0.5 font-mono text-[9px] text-muted-foreground"
-                          title="Stored-pitch MIDI range and auto-computed ideal ottava"
-                        >
-                          MIDI {range.lo}–{range.hi} → {ideal ?? "none"}
-                        </span>
                       );
                     })()}
                   </div>
