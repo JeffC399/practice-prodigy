@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import {
   ACCENT_PALETTES,
+  CORNER_RADII,
   FONT_SCALES,
   PAPER_COLORS,
   THEME_PALETTES,
@@ -39,6 +40,10 @@ export function ThemeApplicator() {
     reduceMotion,
     largerTargets,
     autoThemeByTime,
+    uiBrightness,
+    uiSaturation,
+    cornerRadius,
+    highContrast,
   } = useUserPrefs();
 
   useEffect(() => {
@@ -111,6 +116,21 @@ export function ThemeApplicator() {
     root.classList.toggle("reduce-motion", reduceMotion);
     root.classList.toggle("larger-targets", largerTargets);
 
+    // Phase 34.1 — brightness / saturation as CSS custom properties.
+    // Values are stored as percentages; convert to unitless multipliers
+    // (100% → 1.0) for the CSS filter().
+    root.style.setProperty("--ui-brightness", String(uiBrightness / 100));
+    root.style.setProperty("--ui-saturation", String(uiSaturation / 100));
+
+    // Corner radius.
+    CORNER_RADII.forEach((r) => root.classList.remove(`radius-${r}`));
+    if (cornerRadius !== "normal") {
+      root.classList.add(`radius-${cornerRadius}`);
+    }
+
+    // High-contrast.
+    root.classList.toggle("contrast-high", highContrast);
+
     // System-preference change listener (only matters when theme ==
     // "system" AND autoThemeByTime is off).
     if (theme === "system" && !autoThemeByTime) {
@@ -138,6 +158,10 @@ export function ThemeApplicator() {
     reduceMotion,
     largerTargets,
     autoThemeByTime,
+    uiBrightness,
+    uiSaturation,
+    cornerRadius,
+    highContrast,
   ]);
 
   return null;

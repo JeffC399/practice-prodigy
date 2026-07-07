@@ -2,6 +2,9 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ChordNotationStyle } from "@/lib/music/render-chord";
 
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, v));
+
 /**
  * User-global preferences store — the cross-module "User" layer of the
  * cascading-defaults architecture (PROJECT-DESIGN.md §3.2). These are
@@ -168,6 +171,27 @@ export const NOTE_COLORING_DISPLAY_NAMES: Record<NoteColoring, string> = {
   boomwhacker: "Boomwhacker (C=red, D=orange, …)",
 };
 
+/** Corner-radius scale — sharp / normal / round via --radius CSS var. */
+export type CornerRadius = "sharp" | "normal" | "round";
+export const CORNER_RADII = ["sharp", "normal", "round"] as const;
+export const CORNER_RADIUS_DISPLAY_NAMES: Record<CornerRadius, string> = {
+  sharp: "Sharp",
+  normal: "Normal",
+  round: "Round",
+};
+
+/**
+ * UI brightness / saturation slider bounds. Values are stored as
+ * percentages (60–100 for brightness; 60–140 for saturation). 100 =
+ * neutral / no filter applied.
+ */
+export const UI_BRIGHTNESS_MIN = 60;
+export const UI_BRIGHTNESS_MAX = 100;
+export const UI_BRIGHTNESS_DEFAULT = 100;
+export const UI_SATURATION_MIN = 60;
+export const UI_SATURATION_MAX = 140;
+export const UI_SATURATION_DEFAULT = 100;
+
 /**
  * How the arpeggio pattern label is shown on the drill screen, below
  * each displayed chord. Independent of which pattern is being drilled
@@ -238,6 +262,15 @@ export type UserPrefs = {
    * the manual `theme` setting for the applied class.
    */
   autoThemeByTime: boolean;
+  // Phase 34.1 — polish bundle.
+  /** UI-chrome brightness filter (60–100). 100 = neutral. Sheet stays 100. */
+  uiBrightness: number;
+  /** UI-chrome saturation filter (60–140). 100 = neutral. Sheet stays 100. */
+  uiSaturation: number;
+  /** Corner-radius scale for all rounded UI. */
+  cornerRadius: CornerRadius;
+  /** High-contrast override — boosts fg/bg separation for readability. */
+  highContrast: boolean;
 };
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
@@ -259,6 +292,10 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   reduceMotion: false,
   largerTargets: false,
   autoThemeByTime: false,
+  uiBrightness: UI_BRIGHTNESS_DEFAULT,
+  uiSaturation: UI_SATURATION_DEFAULT,
+  cornerRadius: "normal",
+  highContrast: false,
 };
 
 type UserPrefsStore = UserPrefs & {
@@ -279,6 +316,10 @@ type UserPrefsStore = UserPrefs & {
   setReduceMotion: (value: boolean) => void;
   setLargerTargets: (value: boolean) => void;
   setAutoThemeByTime: (value: boolean) => void;
+  setUiBrightness: (value: number) => void;
+  setUiSaturation: (value: number) => void;
+  setCornerRadius: (value: CornerRadius) => void;
+  setHighContrast: (value: boolean) => void;
   /** Mark the first-visit onboarding hint as dismissed. */
   dismissOnboarding: () => void;
   /** Reset all prefs to defaults. Used by the future Settings reset action. */
@@ -308,6 +349,24 @@ export const useUserPrefs = create<UserPrefsStore>()(
       setReduceMotion: (reduceMotion) => set({ reduceMotion }),
       setLargerTargets: (largerTargets) => set({ largerTargets }),
       setAutoThemeByTime: (autoThemeByTime) => set({ autoThemeByTime }),
+      setUiBrightness: (uiBrightness) =>
+        set({
+          uiBrightness: clamp(
+            uiBrightness,
+            UI_BRIGHTNESS_MIN,
+            UI_BRIGHTNESS_MAX,
+          ),
+        }),
+      setUiSaturation: (uiSaturation) =>
+        set({
+          uiSaturation: clamp(
+            uiSaturation,
+            UI_SATURATION_MIN,
+            UI_SATURATION_MAX,
+          ),
+        }),
+      setCornerRadius: (cornerRadius) => set({ cornerRadius }),
+      setHighContrast: (highContrast) => set({ highContrast }),
       dismissOnboarding: () => set({ hasSeenOnboarding: true }),
       resetAll: () => set(DEFAULT_USER_PREFS),
       resetAppearance: () =>
@@ -323,6 +382,10 @@ export const useUserPrefs = create<UserPrefsStore>()(
           reduceMotion: DEFAULT_USER_PREFS.reduceMotion,
           largerTargets: DEFAULT_USER_PREFS.largerTargets,
           autoThemeByTime: DEFAULT_USER_PREFS.autoThemeByTime,
+          uiBrightness: DEFAULT_USER_PREFS.uiBrightness,
+          uiSaturation: DEFAULT_USER_PREFS.uiSaturation,
+          cornerRadius: DEFAULT_USER_PREFS.cornerRadius,
+          highContrast: DEFAULT_USER_PREFS.highContrast,
         }),
     }),
     {

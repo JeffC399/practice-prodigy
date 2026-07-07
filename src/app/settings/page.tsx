@@ -14,6 +14,8 @@ import {
   ACCENT_PALETTES,
   CHORD_FONT_DISPLAY_NAMES,
   CHORD_FONTS,
+  CORNER_RADII,
+  CORNER_RADIUS_DISPLAY_NAMES,
   FONT_SCALE_DISPLAY_NAMES,
   FONT_SCALES,
   NOTE_COLORING_DISPLAY_NAMES,
@@ -31,12 +33,19 @@ import {
   THEME_MODES,
   THEME_PALETTE_DISPLAY_NAMES,
   THEME_PALETTES,
+  UI_BRIGHTNESS_DEFAULT,
+  UI_BRIGHTNESS_MAX,
+  UI_BRIGHTNESS_MIN,
   UI_DENSITIES,
   UI_DENSITY_DISPLAY_NAMES,
   UI_FONT_DISPLAY_NAMES,
   UI_FONTS,
+  UI_SATURATION_DEFAULT,
+  UI_SATURATION_MAX,
+  UI_SATURATION_MIN,
   useUserPrefs,
   type ThemeMode,
+  type ThemePalette,
 } from "@/lib/state/user-prefs";
 
 /**
@@ -98,6 +107,14 @@ export default function SettingsPage() {
   const setLargerTargets = useUserPrefs((s) => s.setLargerTargets);
   const autoThemeByTime = useUserPrefs((s) => s.autoThemeByTime);
   const setAutoThemeByTime = useUserPrefs((s) => s.setAutoThemeByTime);
+  const uiBrightness = useUserPrefs((s) => s.uiBrightness);
+  const setUiBrightness = useUserPrefs((s) => s.setUiBrightness);
+  const uiSaturation = useUserPrefs((s) => s.uiSaturation);
+  const setUiSaturation = useUserPrefs((s) => s.setUiSaturation);
+  const cornerRadius = useUserPrefs((s) => s.cornerRadius);
+  const setCornerRadius = useUserPrefs((s) => s.setCornerRadius);
+  const highContrast = useUserPrefs((s) => s.highContrast);
+  const setHighContrast = useUserPrefs((s) => s.setHighContrast);
   const resetAppearance = useUserPrefs((s) => s.resetAppearance);
 
   const drillsLib = useDrillsLibrary();
@@ -138,6 +155,12 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {/* Phase 34.1 — Live preview card. Everything above shows here
+            immediately as the user tweaks sliders / toggles / palettes
+            below. No round-trip required — the preview reads from the
+            same active CSS variables ThemeApplicator writes to <html>. */}
+        <AppearancePreview />
+
         {/* APPEARANCE — the flagship visual section. Theme, palette,
             accent, custom accent, and auto-by-time all live here. */}
         <SettingsSection
@@ -177,21 +200,13 @@ export default function SettingsPage() {
               {THEME_PALETTES.map((palette) => {
                 const isSelected = themePalette === palette;
                 return (
-                  <button
+                  <PaletteTile
                     key={palette}
-                    type="button"
-                    onClick={() => setThemePalette(palette)}
-                    className={`flex flex-col items-start gap-1.5 rounded-md border px-3 py-2 text-left transition-colors ${
-                      isSelected
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-background hover:border-primary/40"
-                    }`}
-                  >
-                    <PaletteSwatchPreview palette={palette} />
-                    <span className="truncate text-sm font-medium">
-                      {THEME_PALETTE_DISPLAY_NAMES[palette]}
-                    </span>
-                  </button>
+                    palette={palette}
+                    persistedPalette={themePalette}
+                    selected={isSelected}
+                    onSelect={() => setThemePalette(palette)}
+                  />
                 );
               })}
             </div>
@@ -266,6 +281,73 @@ export default function SettingsPage() {
                 Clear
               </button>
             </div>
+          </SettingsField>
+        </SettingsSection>
+
+        {/* Phase 34.1 — Fine tuning. Screen dimming + saturation + corner
+            radius + high contrast. Dimming + saturation are applied to
+            UI chrome only; the sheet-music paper stays at 100/100 via
+            an inverse filter so engraved notation and Boomwhacker
+            colors always read true. */}
+        <SettingsSection
+          title="Fine tuning"
+          description="Micro-adjustments that layer on top of the palette. Screen dimming and saturation affect only the app UI — your sheet-music surface always renders at 100/100 so notation and Boomwhacker colors stay true."
+        >
+          <SettingsField
+            label={`Screen dimming — ${uiBrightness}%`}
+            hint="Musicians often practice in low light. Slide down to darken the app UI without changing the palette."
+          >
+            <SliderRow
+              value={uiBrightness}
+              min={UI_BRIGHTNESS_MIN}
+              max={UI_BRIGHTNESS_MAX}
+              step={1}
+              onChange={setUiBrightness}
+              onReset={() => setUiBrightness(UI_BRIGHTNESS_DEFAULT)}
+              defaultValue={UI_BRIGHTNESS_DEFAULT}
+              minLabel={`${UI_BRIGHTNESS_MIN}%`}
+              maxLabel={`${UI_BRIGHTNESS_MAX}%`}
+            />
+          </SettingsField>
+
+          <SettingsField
+            label={`Color saturation — ${uiSaturation}%`}
+            hint="Slide down for a muted, eye-strain-friendly look, or up to make palette colors pop. Sheet-music colors are unaffected."
+          >
+            <SliderRow
+              value={uiSaturation}
+              min={UI_SATURATION_MIN}
+              max={UI_SATURATION_MAX}
+              step={1}
+              onChange={setUiSaturation}
+              onReset={() => setUiSaturation(UI_SATURATION_DEFAULT)}
+              defaultValue={UI_SATURATION_DEFAULT}
+              minLabel={`${UI_SATURATION_MIN}%`}
+              maxLabel={`${UI_SATURATION_MAX}%`}
+            />
+          </SettingsField>
+
+          <SettingsField
+            label="Corner radius"
+            hint="How rounded buttons, cards, and inputs look."
+          >
+            <ChipRow
+              options={CORNER_RADII}
+              value={cornerRadius}
+              onChange={setCornerRadius}
+              labels={CORNER_RADIUS_DISPLAY_NAMES}
+            />
+          </SettingsField>
+
+          <SettingsField
+            label="High contrast"
+            hint="Deepens the separation between text and background. Layers on top of your palette — safe to combine with any theme choice."
+          >
+            <ToggleRow
+              value={highContrast}
+              onChange={setHighContrast}
+              label={highContrast ? "On" : "Off"}
+            />
           </SettingsField>
         </SettingsSection>
 
@@ -722,6 +804,240 @@ function ResetButton({
       <RotateCcw className="h-3 w-3" aria-hidden="true" />
       {label}
     </button>
+  );
+}
+
+/**
+ * Slider row — a labeled range input with a "Reset" chevron on the
+ * right and small min/max labels underneath. Fires `onChange` with
+ * the numeric value (parseInt of the range's string value).
+ */
+function SliderRow({
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  onReset,
+  defaultValue,
+  minLabel,
+  maxLabel,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (next: number) => void;
+  onReset: () => void;
+  defaultValue: number;
+  minLabel: string;
+  maxLabel: string;
+}) {
+  const isDefault = value === defaultValue;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-3">
+        <input
+          type="range"
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(e) => onChange(parseInt(e.target.value, 10))}
+          className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-border accent-[color:var(--primary)]"
+        />
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={isDefault}
+          className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+        >
+          Reset
+        </button>
+      </div>
+      <div className="flex items-center justify-between px-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/60">
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Palette tile with hover-preview. Applies its palette's class to
+ * <html> on mouse enter and clears it on mouse leave — restoring the
+ * user's persisted palette. Click permanently sets the palette (which
+ * ThemeApplicator picks up via the store on the next render).
+ *
+ * Directly mutating <html> classList on hover bypasses the store
+ * intentionally: preview shouldn't persist. The final onClick delegates
+ * to the store, which then re-applies via ThemeApplicator so the
+ * classes end up correct even if hover state was left in-between.
+ */
+function PaletteTile({
+  palette,
+  persistedPalette,
+  selected,
+  onSelect,
+}: {
+  palette: ThemePalette;
+  persistedPalette: ThemePalette;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const applyPreview = (p: ThemePalette) => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    // Clear any palette class currently applied.
+    THEME_PALETTES.forEach((tp) => root.classList.remove(`palette-${tp}`));
+    if (p !== "default") root.classList.add(`palette-${p}`);
+  };
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      onMouseEnter={() => applyPreview(palette)}
+      onMouseLeave={() => applyPreview(persistedPalette)}
+      onFocus={() => applyPreview(palette)}
+      onBlur={() => applyPreview(persistedPalette)}
+      className={`flex flex-col items-start gap-1.5 rounded-md border px-3 py-2 text-left transition-colors ${
+        selected
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border bg-background hover:border-primary/40"
+      }`}
+    >
+      <PaletteSwatchPreview palette={palette} />
+      <span className="truncate text-sm font-medium">
+        {THEME_PALETTE_DISPLAY_NAMES[palette]}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Live preview card. Renders sample UI (title, buttons, card, text,
+ * a mini 2-note staff) so the user sees every appearance change
+ * reflect immediately. Elements use the same CSS variables the rest of
+ * the app uses, so palette / accent / density / brightness / saturation
+ * / corner-radius / contrast all show through here in real time.
+ */
+function AppearancePreview() {
+  return (
+    <section className="flex flex-col gap-3 rounded-md border border-border bg-background/50 p-5">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          Live preview
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
+          Updates as you tweak below
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
+          <h3 className="text-lg font-semibold tracking-tight text-card-foreground">
+            Practice Prodigy
+          </h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            A sample chord card with body text. Adjust the sliders and
+            palette below and see this update live.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Primary
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
+            >
+              Secondary
+            </button>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              Accent
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-4">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            Sample staff (paper unaffected)
+          </span>
+          <MiniStaffPreview />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            The paper surface is not dimmed or desaturated by the
+            sliders below — engraved notation always renders at 100%.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Tiny 2-note SVG staff. Uses the same `--sheet-paper` variable the
+ * real SheetSurface reads, so paper color changes propagate here too.
+ * Marks itself with class `sheet-paper` so the CSS inverse-filter is
+ * applied (matching the real sheet behavior).
+ */
+function MiniStaffPreview() {
+  return (
+    <div
+      className="sheet-paper rounded-sm border border-border p-2"
+      style={{ background: "var(--sheet-paper, #fbfaf5)" }}
+    >
+      <svg
+        viewBox="0 0 200 60"
+        className="h-14 w-full"
+        aria-hidden="true"
+      >
+        {/* Five staff lines. */}
+        {[0, 1, 2, 3, 4].map((i) => (
+          <line
+            key={i}
+            x1="10"
+            y1={16 + i * 8}
+            x2="190"
+            y2={16 + i * 8}
+            stroke="#222"
+            strokeWidth="1"
+          />
+        ))}
+        {/* Treble clef stand-in (simple text glyph). */}
+        <text
+          x="14"
+          y="42"
+          fontFamily="serif"
+          fontSize="34"
+          fill="#222"
+        >
+          𝄞
+        </text>
+        {/* Two quarter notes. */}
+        <g>
+          <ellipse cx="90" cy="32" rx="7" ry="5" fill="#e53935" />
+          <line
+            x1="97"
+            y1="32"
+            x2="97"
+            y2="10"
+            stroke="#222"
+            strokeWidth="1.5"
+          />
+        </g>
+        <g>
+          <ellipse cx="140" cy="24" rx="7" ry="5" fill="#43a047" />
+          <line
+            x1="147"
+            y1="24"
+            x2="147"
+            y2="4"
+            stroke="#222"
+            strokeWidth="1.5"
+          />
+        </g>
+      </svg>
+    </div>
   );
 }
 

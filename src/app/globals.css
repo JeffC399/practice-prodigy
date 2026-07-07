@@ -536,6 +536,61 @@
   --sheet-paper: #eeece8;
 }
 
+/* ==========================================================================
+ * Phase 34.1 — Appearance polish bundle.
+ * ========================================================================== */
+
+/* --- UI brightness / saturation filter (UI chrome only) ---
+ * The filter is applied to <body> via CSS custom properties. The sheet
+ * paper counteracts with the inverse so its rendered notation / chord
+ * symbols / Boomwhacker colors always show at 100% regardless of the
+ * UI slider values. Math: outer × inverse = 1.
+ *
+ * Defaults (1.0 / 1.0) are no-ops — no filter is composited when the
+ * user hasn't touched the sliders.
+ */
+:root {
+  --ui-brightness: 1;
+  --ui-saturation: 1;
+}
+body {
+  filter: brightness(var(--ui-brightness)) saturate(var(--ui-saturation));
+}
+.sheet-paper {
+  filter: brightness(calc(1 / var(--ui-brightness)))
+    saturate(calc(1 / var(--ui-saturation)));
+}
+
+/* --- Corner radius (sharp / normal / round) --- */
+.radius-sharp {
+  --radius: 0.125rem;
+}
+.radius-round {
+  --radius: 1rem;
+}
+/* `normal` = the base 0.625rem defined in :root above; no override needed. */
+
+/* --- High-contrast override ---
+ * Deepens foreground/background separation on top of whatever palette
+ * is active. Applied AFTER palette classes so it wins the cascade.
+ * Sheet paper deliberately not touched — engraved notation already
+ * carries its own high-contrast semantics.
+ */
+.contrast-high {
+  --foreground: oklch(0.05 0 0);
+  --background: oklch(1 0 0);
+  --muted-foreground: oklch(0.2 0 0);
+  --border: oklch(0.5 0 0);
+  --input: oklch(0.5 0 0);
+}
+.contrast-high.dark {
+  --foreground: oklch(1 0 0);
+  --background: oklch(0.05 0 0);
+  --muted-foreground: oklch(0.85 0 0);
+  --border: oklch(0.75 0 0 / 60%);
+  --input: oklch(0.75 0 0 / 60%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
