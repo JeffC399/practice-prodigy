@@ -34,17 +34,22 @@ export function SiteFooter() {
           A platform for musicians.
         </span>
       </div>
-      <div className="flex items-center gap-4">
+      {/* Phase 34.6 — flex-nowrap keeps the four right-side items on
+          the same visual line regardless of what the FeedbackTrigger
+          button's browser default styling reports for its intrinsic
+          size. `leading-none` on each item forces uniform line-height
+          so the button and the anchors sit on the same baseline. */}
+      <div className="flex flex-nowrap items-center gap-4 whitespace-nowrap leading-none">
         <FeedbackTrigger />
         <Link
           href="/settings"
-          className="hover:text-foreground transition-colors"
+          className="leading-none hover:text-foreground transition-colors"
         >
           settings
         </Link>
         <Link
           href="/roadmap"
-          className="hover:text-foreground transition-colors"
+          className="leading-none hover:text-foreground transition-colors"
         >
           roadmap
         </Link>
@@ -52,7 +57,7 @@ export function SiteFooter() {
           href="https://github.com/JeffC399/practice-prodigy"
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:text-foreground transition-colors"
+          className="leading-none hover:text-foreground transition-colors"
         >
           github
         </a>

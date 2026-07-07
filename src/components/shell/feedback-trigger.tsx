@@ -41,10 +41,16 @@ export function FeedbackTrigger() {
 
   return (
     <>
+      {/* Phase 34.6 — match the footer's font-mono + kill browser
+          default button padding (p-0) + normalize line-height. Without
+          these, the button's intrinsic 2px 6px browser padding pushed
+          it to a slightly different baseline than the surrounding <a>
+          links, which combined with the footer's flex-wrap made the
+          right-side row visually break to two lines on some widths. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hover:text-foreground transition-colors"
+        className="p-0 leading-none font-mono text-[11px] bg-transparent hover:text-foreground transition-colors"
         aria-label="Send feedback"
       >
         feedback
