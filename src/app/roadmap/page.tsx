@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BackButton } from "@/components/shell/back-button";
 import {
   BUCKET_DESCRIPTIONS,
   BUCKET_LABELS,
@@ -36,6 +37,9 @@ export default function RoadmapPage() {
     <main className="flex flex-1 flex-col items-center px-6 py-12">
       <div className="flex w-full max-w-3xl flex-col gap-10">
         <div className="flex flex-col gap-3">
+          {/* Phase 34.7 — Back button so Roadmap isn't a dead-end from
+              the footer link. Shared component with the Settings page. */}
+          <BackButton />
           <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Roadmap
           </span>

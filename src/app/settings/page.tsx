@@ -12,6 +12,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BackButton } from "@/components/shell/back-button";
 import {
   decodeAppearance,
   encodeAppearance,
@@ -215,7 +216,11 @@ export default function SettingsPage() {
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-12">
       <div className="flex w-full max-w-3xl flex-col gap-10">
+        {/* Phase 34.7 — Back button so Settings isn't a dead-end.
+            Returns to whatever page the user was on before clicking
+            the settings link. Shared component with the Roadmap page. */}
         <div className="flex flex-col gap-2">
+          <BackButton />
           <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Settings
           </span>
