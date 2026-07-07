@@ -2696,6 +2696,7 @@ export default function SheetEditorPage() {
                     timeSignature={sheet.timeSignature}
                     showClef={mIdx === 0}
                     showTimeSignature={mIdx === 0}
+                    clef={sheet.clef ?? "treble"}
                   />
                 </div>
                 <button
@@ -2885,6 +2886,7 @@ export default function SheetEditorPage() {
             measureIdx={editingMelodyIdx}
             melody={sheet.measures[editingMelodyIdx].melody ?? []}
             timeSignature={sheet.timeSignature}
+            clef={sheet.clef ?? "treble"}
             onSave={(melody) => {
               updateMeasureMelody(editingMelodyIdx, melody);
             }}
@@ -3024,12 +3026,14 @@ function MelodyEditorModal({
   measureIdx,
   melody,
   timeSignature,
+  clef,
   onSave,
   onClose,
 }: {
   measureIdx: number;
   melody: MelodyNote[];
   timeSignature: { beatsPerMeasure: number; beatUnit: number };
+  clef?: "treble" | "bass";
   onSave: (melody: MelodyNote[]) => void;
   onClose: () => void;
 }) {
@@ -3172,6 +3176,7 @@ function MelodyEditorModal({
             showTimeSignature
             width={400}
             height={110}
+            clef={clef}
           />
         </div>
 

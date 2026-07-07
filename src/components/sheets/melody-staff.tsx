@@ -53,6 +53,8 @@ export type MelodyStaffProps = {
   width?: number;
   /** Height in px; default fits a single staff plus padding. */
   height?: number;
+  /** Phase 32.2.2 — clef used for both the stave symbol and per-note positioning. */
+  clef?: "treble" | "bass";
 };
 
 /** Standard per-measure width when not overridden. */
@@ -74,6 +76,7 @@ export function MelodyStaff({
   showTimeSignature = false,
   width = DEFAULT_WIDTH,
   height = DEFAULT_HEIGHT,
+  clef = "treble",
 }: MelodyStaffProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -92,7 +95,7 @@ export function MelodyStaff({
     // Staff. Position + width tuned so notes have breathing room
     // after the optional clef + time-sig.
     const stave = new Stave(0, STAVE_TOP_PAD, width);
-    if (showClef) stave.addClef("treble");
+    if (showClef) stave.addClef(clef);
     if (showTimeSignature) {
       stave.addTimeSignature(
         `${timeSignature.beatsPerMeasure}/${timeSignature.beatUnit}`,
@@ -105,13 +108,18 @@ export function MelodyStaff({
       return;
     }
 
-    // Convert MelodyNote[] to VexFlow StaveNote[].
+    // Convert MelodyNote[] to VexFlow StaveNote[]. Phase 32.2.2 —
+    // pass clef so notes render at the correct Y for the current
+    // clef (VexFlow uses treble as default when clef is omitted,
+    // which caused pitch positions to lie about their absolute value
+    // when the stave switched to bass).
+    const restKey = clef === "bass" ? "d/3" : "b/4";
     const staveNotes = melody.map((n) => {
       if (n.kind === "rest") {
-        // Rests sit in the middle of the staff (b/4 line for rest glyphs).
         const note = new StaveNote({
-          keys: ["b/4"],
+          keys: [restKey],
           duration: `${n.duration}r`,
+          clef,
         });
         if (n.dotted) Dot.buildAndAttach([note], { all: true });
         return note;
@@ -119,6 +127,7 @@ export function MelodyStaff({
       const note = new StaveNote({
         keys: [n.pitch],
         duration: n.duration,
+        clef,
       });
       if (n.dotted) Dot.buildAndAttach([note], { all: true });
       return note;
@@ -308,7 +317,7 @@ export function MelodyStaff({
       }
     });
     context.restore();
-  }, [melody, timeSignature, showClef, showTimeSignature, width, height]);
+  }, [melody, timeSignature, showClef, showTimeSignature, width, height, clef]);
 
   return (
     <div

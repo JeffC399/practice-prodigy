@@ -283,19 +283,34 @@ function melodyForDisplay(
   );
 }
 
-function buildStaveNotesForMelody(melody: MelodyNote[]): StaveNote[] {
+function buildStaveNotesForMelody(
+  melody: MelodyNote[],
+  clef: "treble" | "bass" = "treble",
+): StaveNote[] {
+  // Rests need to sit visually IN the middle of the staff regardless
+  // of clef. Treble middle line = B4 ("b/4"); bass middle line = D3
+  // ("d/3"). Without this per-clef adjustment, rests would drift up
+  // or down when switching clefs.
+  const restKey = clef === "bass" ? "d/3" : "b/4";
   return melody.map((n) => {
     if (n.kind === "rest") {
       const note = new StaveNote({
-        keys: ["b/4"],
+        keys: [restKey],
         duration: `${n.duration}r`,
+        clef,
       });
       if (n.dotted) Dot.buildAndAttach([note], { all: true });
       return note;
     }
+    // Phase 32.2.2 — pass the clef so VexFlow places the note at
+    // the correct absolute pitch position for that clef. Without
+    // this, "f/4" would sit at the treble F4 Y coordinate even
+    // when drawn on a bass stave, so it visually read as "A" (bass
+    // clef's bottom-space pitch at that Y).
     const note = new StaveNote({
       keys: [n.pitch],
       duration: n.duration,
+      clef,
     });
     if (n.dotted) Dot.buildAndAttach([note], { all: true });
     return note;
@@ -910,7 +925,10 @@ export function SheetSurface({
         // lyric layout) see the same shifted melody, so pitch-
         // equality checks (used by ties + slurs) stay consistent.
         const displayMelody = melodyForDisplay(melody, measure.octavaShift);
-        const staveNotes = buildStaveNotesForMelody(displayMelody);
+        const staveNotes = buildStaveNotesForMelody(
+          displayMelody,
+          sheet.clef ?? "treble",
+        );
         const voice = new Voice({
           numBeats: sheet.timeSignature.beatsPerMeasure,
           beatValue: sheet.timeSignature.beatUnit,
