@@ -612,6 +612,18 @@ export function SheetSurface({
         perMeasureWidth,
       );
       const noteAreaTotal = noteAreaPer * lineMeasures.length;
+      // Phase 33.1 — Does any measure on this line have a lyric on a
+      // pitched note? Used to decide whether a below-staff ottava
+      // bracket needs to clear the lyric band or can sit tight
+      // against the staff.
+      const hasLyricsOnLine = lineMeasures.some((m) =>
+        (m.melody ?? []).some(
+          (n) =>
+            n.kind === "note" &&
+            !!n.lyric &&
+            n.lyric.text.length > 0,
+        ),
+      );
 
       // Measure-number label above the first measure of this line.
       ctx.save();
@@ -1253,9 +1265,13 @@ export function SheetSurface({
         // descending stems, ledger-line notes below the staff, AND
         // any lyric syllables on this line.
         const isAbove = span.shift === "8va" || span.shift === "15ma";
-        const bracketY = isAbove
-          ? lineY + CHORD_BAND_HEIGHT - 4
-          : staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET + 18;
+        // Phase 33.1 — When the line has no lyrics, park the below-
+        // staff bracket much closer to the staff so it visually
+        // connects to the notes rather than floating in dead space.
+        const belowY = hasLyricsOnLine
+          ? staveY + STAVE_HEIGHT + LYRIC_BASELINE_OFFSET + 18
+          : staveY + STAVE_HEIGHT + 22;
+        const bracketY = isAbove ? lineY + CHORD_BAND_HEIGHT - 4 : belowY;
         const hookHeight = 8;
         const hookSign = isAbove ? 1 : -1; // hook DOWN for above, UP for below
         ctx.save();

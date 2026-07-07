@@ -1046,6 +1046,7 @@ export default function SheetEditorPage() {
         | "instruction"
         | "sectionLabel"
         | "octavaShift"
+        | "clef"
       >
     >,
   ) => {
@@ -2508,6 +2509,9 @@ export default function SheetEditorPage() {
                 beatsPerMeasure={sheet.timeSignature.beatsPerMeasure}
                 onClickStaff={onClickStaff}
                 onExit={exitClickEntryMode}
+                getClef={(mi) =>
+                  sheet.measures[mi]?.clef ?? sheet.clef ?? "treble"
+                }
               />
             )}
             {editorMode === "chord-entry" && surfaceLayout && (
@@ -2865,6 +2869,28 @@ export default function SheetEditorPage() {
                       <option value="8vb">8vb (down)</option>
                       <option value="15ma">15ma (2 up)</option>
                       <option value="15mb">15mb (2 down)</option>
+                    </select>
+                    {/* Phase 33.1 — Per-measure clef override. "Auto"
+                        (empty) lets the auto-clef effect decide based
+                        on the measure's note range; Treble/Bass pin
+                        it. */}
+                    <select
+                      value={measure.clef ?? ""}
+                      onChange={(e) =>
+                        updateMeasureForm(mIdx, {
+                          clef: (e.target.value || undefined) as
+                            | "treble"
+                            | "bass"
+                            | undefined,
+                        })
+                      }
+                      className="rounded border border-border bg-background px-1 py-0.5 text-[10px]"
+                      aria-label="Clef"
+                      title="Per-measure clef override. Auto uses the sheet default with auto-detect."
+                    >
+                      <option value="">Clef: Auto</option>
+                      <option value="treble">Treble</option>
+                      <option value="bass">Bass</option>
                     </select>
                   </div>
                 </div>

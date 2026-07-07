@@ -18,8 +18,10 @@ import { MELODY_DURATION_BEATS } from "@/lib/sheets/types";
  * with the new note tacked onto the end of the target measure.
  */
 
-/** VexFlow letter cycle going DOWNWARD from F5 (the top staff line). */
+/** VexFlow letter cycle going DOWNWARD from F5 (treble top staff line). */
 const LETTER_CYCLE_DOWN_FROM_F5 = ["f", "e", "d", "c", "b", "a", "g"] as const;
+/** VexFlow letter cycle going DOWNWARD from A3 (bass top staff line). */
+const LETTER_CYCLE_DOWN_FROM_A3 = ["a", "g", "f", "e", "d", "c", "b"] as const;
 const STAFF_STEP_PX = 5;
 
 /**
@@ -65,17 +67,26 @@ export function measureAtX(
 export function pitchAtClickY(
   measure: SheetMeasureRect,
   clickY: number,
+  clef: "treble" | "bass" = "treble",
 ): string {
   const step = Math.round((clickY - measure.topLineY) / STAFF_STEP_PX);
-  // Letter: 7-letter cycle modulo (with proper handling of negative
-  // steps).
   const letterIdx = ((step % 7) + 7) % 7;
+  if (clef === "bass") {
+    // Bass clef step map (A3 = top line = step 0, going DOWN):
+    //   0 (A3), 1 (G3), 2 (F3), 3 (E3), 4 (D3), 5 (C3) — octave 3
+    //   6 (B2), 7 (A2), 8 (G2), 9 (F2), 10 (E2), 11 (D2), 12 (C2) — octave 2
+    //   13 (B1) — octave 1
+    // Octave decrement fires at c→b (steps 5→6). Formula:
+    //   octave = 3 - floor((step + 1) / 7)
+    const letter = LETTER_CYCLE_DOWN_FROM_A3[letterIdx];
+    const octave = 3 - Math.floor((step + 1) / 7);
+    return `${letter}/${octave}`;
+  }
+  // Treble clef step map (F5 = top line = step 0, going DOWN):
+  //   0 (F5), 1 (E5), 2 (D5), 3 (C5) — octave 5
+  //   4 (B4), 5 (A4), 6 (G4), 7 (F4), 8 (E4), 9 (D4), 10 (C4) — octave 4
+  //   11 (B3) — octave 3
   const letter = LETTER_CYCLE_DOWN_FROM_F5[letterIdx];
-  // Octave: F5 = 5. The boundary changes at step 3→4 (C5→B4 transition):
-  //   step 0 (F5), 1 (E5), 2 (D5), 3 (C5) — octave 5
-  //   step 4 (B4), 5 (A4), 6 (G4), 7 (F4), 8 (E4), 9 (D4), 10 (C4) — octave 4
-  //   step 11 (B3) — octave 3
-  // Formula: octave = 5 - floor((step + 3) / 7)
   const octave = 5 - Math.floor((step + 3) / 7);
   return `${letter}/${octave}`;
 }

@@ -40,6 +40,12 @@ export type MelodyEntryOverlayProps = {
   onClickStaff: (measureIdx: number, pitch: string) => void;
   /** Called when the user presses Escape — parent exits the mode. */
   onExit: () => void;
+  /**
+   * Phase 33.1 — resolve the clef for a measure so click-Y-to-pitch
+   * math is correct when the sheet or measure is in bass mode.
+   * Defaults to treble when not provided.
+   */
+  getClef?: (measureIdx: number) => "treble" | "bass";
 };
 
 /** Vertical buffer above the top staff line + below the bottom staff
@@ -54,6 +60,7 @@ export function MelodyEntryOverlay({
   beatsPerMeasure,
   onClickStaff,
   onExit,
+  getClef,
 }: MelodyEntryOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -109,7 +116,8 @@ export function MelodyEntryOverlay({
         ) {
           return;
         }
-        const pitch = pitchAtClickY(targetRect, clickY);
+        const clef = getClef?.(targetRect.measureIdx) ?? "treble";
+        const pitch = pitchAtClickY(targetRect, clickY, clef);
         onClickStaff(measureIdx, pitch);
       }}
     >
