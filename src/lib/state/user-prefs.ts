@@ -181,11 +181,17 @@ export const CORNER_RADIUS_DISPLAY_NAMES: Record<CornerRadius, string> = {
 };
 
 /**
- * UI brightness / saturation slider bounds. Values are stored as
- * percentages (60–100 for brightness; 60–140 for saturation). 100 =
- * neutral / no filter applied.
+ * Theme intensity + saturation slider bounds. Values are stored as
+ * percentages. Both default to 100 = the palette's full natural
+ * strength (no filter effect applied).
+ *
+ * Phase 34.3 — `uiBrightness` is a misnomer we're keeping for
+ * persistence continuity; semantics changed to "theme intensity."
+ * 100 = full palette, 50 = maximally shifted toward mid-gray in
+ * either light or dark mode (they converge). See globals.css for the
+ * mode-aware filter formula.
  */
-export const UI_BRIGHTNESS_MIN = 60;
+export const UI_BRIGHTNESS_MIN = 50;
 export const UI_BRIGHTNESS_MAX = 100;
 export const UI_BRIGHTNESS_DEFAULT = 100;
 export const UI_SATURATION_MIN = 60;

@@ -396,8 +396,8 @@ export default function SettingsPage() {
           description="Micro-adjustments that layer on top of the palette. Screen dimming and saturation affect only the app UI — your sheet-music surface always renders at 100/100 so notation and Boomwhacker colors stay true."
         >
           <SettingsField
-            label={`Screen dimming — ${uiBrightness}%`}
-            hint="Musicians often practice in low light. Slide down to darken the app UI without changing the palette."
+            label={`Theme intensity — ${uiBrightness}%`}
+            hint="100% is the palette's full look. Sliding down flattens toward mid-gray — in dark mode this brightens the app; in light mode it dims. Lets the brightest dark and darkest light look meaningfully closer."
           >
             <SliderRow
               value={uiBrightness}
@@ -407,8 +407,8 @@ export default function SettingsPage() {
               onChange={setUiBrightness}
               onReset={() => setUiBrightness(UI_BRIGHTNESS_DEFAULT)}
               defaultValue={UI_BRIGHTNESS_DEFAULT}
-              minLabel={`${UI_BRIGHTNESS_MIN}%`}
-              maxLabel={`${UI_BRIGHTNESS_MAX}%`}
+              minLabel="Flat / gray"
+              maxLabel="Full palette"
             />
           </SettingsField>
 
