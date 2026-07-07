@@ -73,29 +73,35 @@ const BASS: Thresholds = {
   // Comfortable range for bass: MIDI 41-60 (F2-C4). Notes on the
   // bass staff itself (G2=43 to A3=57) never trigger a shift.
   //
-  // Auto-apply for HIGH shifts (8va / 15ma) is intentionally
-  // DISABLED in bass clef. Reasons:
-  //   1. A treble melody re-clef'd to bass would trigger 8va on
-  //      every measure, drawing a messy bracket across the whole
-  //      line that overlaps the chord row.
-  //   2. Bass-clef instruments (cello, bassoon, low brass) routinely
-  //      play notes with a few ledger lines above the staff without
-  //      any ottava marking -- that's just how the notation reads.
-  //   3. If the user genuinely wants 8va for a sustained high
-  //      passage, they can apply it manually via the Measures list
-  //      Ottava dropdown.
+  // AUTO-APPLY DISABLED for HIGH (8va / 15ma) AND for 15mb:
+  //   - HIGH: bass-clef instruments routinely play a few ledger
+  //     lines above the staff without any ottava marking. Also
+  //     8va brackets sitting above the chord row cause visual
+  //     overlap.
+  //   - 15mb: in bass clef, shifting extremely low notes up by 2
+  //     octaves pushes them ABOVE the staff -- worse than 8vb
+  //     which lands them near / on the staff. Auto-15mb was
+  //     causing the "15mb applied to notes floating above the
+  //     bass staff with a disconnected bracket below" bug.
   //
-  // LOW shifts still auto-apply because the visual clutter of many
-  // ledger lines below the staff is worse, and 8vb / 15mb brackets
-  // sit below the lyric band where they don't overlap anything.
+  // Only 8vb auto-applies in bass clef. If the user genuinely
+  // wants 15mb / 15ma / 8va (rare), they can apply it manually
+  // via the Measures-list Ottava dropdown.
+  //
+  // Setting release thresholds to NEVER on HIGH-side means
+  // range.hi > NEVER is always false -> de-escalate down.
+  // Setting LOW_15_RELEASE to 0 means range.lo < 0 is always
+  // false -> de-escalate 15mb -> 8vb (or null) immediately when
+  // switching to bass, even if 15mb was previously applied in
+  // treble mode.
   HIGH: NEVER,
   LOW: 40, // stored < 40 -> apply 8vb (display >= 52)
   HIGH_15: NEVER,
-  LOW_15: 28, // stored < 28 -> apply 15mb
+  LOW_15: 0, // never auto-apply 15mb
   HIGH_RELEASE: NEVER,
   LOW_RELEASE: 46,
   HIGH_15_RELEASE: NEVER,
-  LOW_15_RELEASE: 34,
+  LOW_15_RELEASE: 0, // force de-escalation of any existing 15mb
 };
 
 function thresholdsFor(clef: Clef | undefined): Thresholds {
