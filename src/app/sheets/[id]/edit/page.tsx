@@ -264,8 +264,11 @@ export default function SheetEditorPage() {
   useEffect(() => {
     if (!sheet) return;
     let changed = false;
+    // Phase 32.2 — pass the sheet's clef so bass-clef measures
+    // don't get treble-centric ottavas auto-applied.
+    const clef = sheet.clef ?? "treble";
     const nextMeasures = sheet.measures.map((m) => {
-      const ideal = computeIdealOttava(m);
+      const ideal = computeIdealOttava(m, clef);
       const current = m.octavaShift;
       if (ideal === (current ?? null)) return m;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -2602,7 +2605,10 @@ export default function SheetEditorPage() {
                         comfortable treble range AND doesn't already
                         carry an octavaShift. Click to apply. */}
                     {(() => {
-                      const suggested = suggestOttavaForMeasure(measure);
+                      const suggested = suggestOttavaForMeasure(
+                        measure,
+                        sheet.clef ?? "treble",
+                      );
                       if (!suggested) return null;
                       return (
                         <button

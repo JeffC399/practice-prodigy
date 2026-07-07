@@ -5,23 +5,13 @@ import type {
 
 /**
  * Phase 31.7 — Auto-detect out-of-range measures and suggest an
- * ottava marking that would bring them back near the treble staff.
+ * ottava marking that would bring them back near the staff.
  *
- * Rule of thumb (treble clef):
- *   - The staff itself spans E4 (MIDI 64) at the bottom line to
- *     F5 (MIDI 77) at the top line.
- *   - Comfortable range with a couple of ledger lines each side:
- *     roughly C4 (MIDI 60) up to C6 (MIDI 84).
- *   - Beyond that in either direction, an ottava marking is the
- *     standard engraving fix.
- *
- * Suggests:
- *   - `8va` when the measure's HIGHEST note lands above MIDI 84
- *     (i.e. above ~C6 — needs 3+ ledger lines above the staff).
- *   - `8vb` when the measure's LOWEST note lands below MIDI 55
- *     (i.e. below ~G3 — needs 3+ ledger lines below the staff).
- *   - `null` otherwise (or when the measure already has an
- *     `octavaShift` set — the user has already decided).
+ * Phase 32.2 — Clef-aware. The comfortable range for treble clef
+ * is roughly MIDI 60-81 (C4 to A5); for bass clef it's MIDI 41-60
+ * (F2 to C4). Thresholds shift down by ~20 semitones when the clef
+ * is bass so the auto-ottava doesn't fire on notes that already
+ * sit comfortably on the bass staff.
  *
  * Cheap enough to run on every render — no memoisation needed.
  */
@@ -51,23 +41,48 @@ function pitchToMidi(pitch: string): number | null {
   return 12 * (octave + 1) + semitone;
 }
 
-// Tighter thresholds: goal is to always bring the DISPLAY range
-// into the comfortable staff window (MIDI 60-81, ~1 ledger line
-// either side). Since each shift moves the display by 12 semitones,
-// we escalate to 15 whenever a single 8-shift wouldn't be enough.
-const HIGH_THRESHOLD = 84; // stored > 84 -> apply 8va (display <= 72)
-const LOW_THRESHOLD = 55; // stored < 55 -> apply 8vb (display >= 67)
-// Escalation: if stored is beyond one shift's reach (stored 8va-
-// shifted still ends up above 84, or 8vb-shifted still below 55).
-const HIGH_15_THRESHOLD = 93; // stored > 93 -> apply 15ma (was 96)
-const LOW_15_THRESHOLD = 48; // stored < 48 -> apply 15mb (was 43)
-// Hysteresis: once a shift is applied, we don't remove it until the
-// notes are well INSIDE the release threshold. Avoids flickering
-// when a note hovers right at the boundary.
-const HIGH_RELEASE = 79; // release 8va when stored <= 79
-const LOW_RELEASE = 60; // release 8vb when stored >= 60
-const HIGH_15_RELEASE = 88; // release 15ma when stored <= 88
-const LOW_15_RELEASE = 53; // release 15mb when stored >= 53
+export type Clef = "treble" | "bass";
+
+type Thresholds = {
+  HIGH: number;
+  LOW: number;
+  HIGH_15: number;
+  LOW_15: number;
+  HIGH_RELEASE: number;
+  LOW_RELEASE: number;
+  HIGH_15_RELEASE: number;
+  LOW_15_RELEASE: number;
+};
+
+const TREBLE: Thresholds = {
+  // Comfortable range for treble: MIDI 60-81 (C4-A5).
+  HIGH: 84, // stored > 84 -> apply 8va (display <= 72)
+  LOW: 55, // stored < 55 -> apply 8vb (display >= 67)
+  HIGH_15: 93, // stored > 93 -> apply 15ma
+  LOW_15: 48, // stored < 48 -> apply 15mb
+  HIGH_RELEASE: 79,
+  LOW_RELEASE: 60,
+  HIGH_15_RELEASE: 88,
+  LOW_15_RELEASE: 53,
+};
+
+const BASS: Thresholds = {
+  // Comfortable range for bass: MIDI 41-60 (F2-C4). Shifted down
+  // by ~20 semitones from the treble thresholds. Notes on the bass
+  // staff itself (G2=43 to A3=57) never trigger a shift.
+  HIGH: 60, // stored > 60 -> apply 8va (display <= 48)
+  LOW: 40, // stored < 40 -> apply 8vb (display >= 52)
+  HIGH_15: 72, // stored > 72 -> apply 15ma
+  LOW_15: 28, // stored < 28 -> apply 15mb
+  HIGH_RELEASE: 55,
+  LOW_RELEASE: 46,
+  HIGH_15_RELEASE: 67,
+  LOW_15_RELEASE: 34,
+};
+
+function thresholdsFor(clef: Clef | undefined): Thresholds {
+  return clef === "bass" ? BASS : TREBLE;
+}
 
 /**
  * Compute the measure's stored-pitch MIDI range. Returns null when
@@ -93,72 +108,66 @@ function measureMidiRange(
 }
 
 /**
- * Phase 31.7 — the ORIGINAL suggestion helper: returns a shift only
- * for measures that DON'T already have one and whose notes need it.
- * Used by the manual "+ 8vb?" suggestion chip in the Measures list.
+ * Manual "+ 8vb?" suggestion helper: returns a shift only for
+ * measures that DON'T already have one and whose notes need it.
  */
 export function suggestOttavaForMeasure(
   measure: SheetMeasure,
+  clef: Clef | undefined = "treble",
 ): SheetOctavaShift | null {
   if (measure.octavaShift) return null;
   const range = measureMidiRange(measure);
   if (!range) return null;
-  if (range.hi > HIGH_15_THRESHOLD) return "15ma";
-  if (range.hi > HIGH_THRESHOLD) return "8va";
-  if (range.lo < LOW_15_THRESHOLD) return "15mb";
-  if (range.lo < LOW_THRESHOLD) return "8vb";
+  const t = thresholdsFor(clef);
+  if (range.hi > t.HIGH_15) return "15ma";
+  if (range.hi > t.HIGH) return "8va";
+  if (range.lo < t.LOW_15) return "15mb";
+  if (range.lo < t.LOW) return "8vb";
   return null;
 }
 
 /**
- * Phase 31.7.1 — automatic-mode helper: computes the "ideal" ottava
- * for a measure based purely on its stored notes, ignoring the
- * current shift. Returns `null` when the notes are comfortably on
- * the staff and don't warrant any shift.
+ * Automatic-mode helper: computes the "ideal" ottava for a measure
+ * based purely on its stored notes AND the current clef, ignoring
+ * the current shift. Returns `null` when the notes are comfortably
+ * on the staff and don't warrant any shift.
  *
  * Uses HYSTERESIS: once a shift is present, the removal thresholds
- * are TIGHTER (HIGH_RELEASE / LOW_RELEASE) than the application
- * thresholds. Prevents flickering when a note sits right at the
- * boundary and the user is editing back and forth.
- *
- * Used by the editor's auto-apply effect that keeps every measure's
- * ottava in sync with its note range.
+ * are tighter than the application thresholds. Also supports
+ * escalation (8vb → 15mb) and de-escalation (15mb → 8vb → none).
  */
 export function computeIdealOttava(
   measure: SheetMeasure,
+  clef: Clef | undefined = "treble",
 ): SheetOctavaShift | null {
   const range = measureMidiRange(measure);
   if (!range) return null;
   const current = measure.octavaShift;
+  const t = thresholdsFor(clef);
 
-  // Hysteresis on the current shift: keep it unless the range has
-  // moved well INSIDE the release threshold. Also allow escalation
-  // when notes have moved further out (e.g. 8vb → 15mb).
   if (current === "8va") {
-    if (range.hi > HIGH_15_THRESHOLD) return "15ma"; // escalate
-    return range.hi > HIGH_RELEASE ? "8va" : null;
+    if (range.hi > t.HIGH_15) return "15ma";
+    return range.hi > t.HIGH_RELEASE ? "8va" : null;
   }
   if (current === "15ma") {
-    // De-escalate to 8va once the top note is inside the 15-release
-    // window but still above the 8va-release window.
-    if (range.hi > HIGH_15_RELEASE) return "15ma";
-    if (range.hi > HIGH_RELEASE) return "8va";
+    if (range.hi > t.HIGH_15_RELEASE) return "15ma";
+    if (range.hi > t.HIGH_RELEASE) return "8va";
     return null;
   }
   if (current === "8vb") {
-    if (range.lo < LOW_15_THRESHOLD) return "15mb"; // escalate
-    return range.lo < LOW_RELEASE ? "8vb" : null;
+    if (range.lo < t.LOW_15) return "15mb";
+    return range.lo < t.LOW_RELEASE ? "8vb" : null;
   }
   if (current === "15mb") {
-    if (range.lo < LOW_15_RELEASE) return "15mb";
-    if (range.lo < LOW_RELEASE) return "8vb";
+    if (range.lo < t.LOW_15_RELEASE) return "15mb";
+    if (range.lo < t.LOW_RELEASE) return "8vb";
     return null;
   }
   // No shift currently — apply if the notes are outside the
   // application thresholds. Escalate straight to 15 when far out.
-  if (range.hi > HIGH_15_THRESHOLD) return "15ma";
-  if (range.hi > HIGH_THRESHOLD) return "8va";
-  if (range.lo < LOW_15_THRESHOLD) return "15mb";
-  if (range.lo < LOW_THRESHOLD) return "8vb";
+  if (range.hi > t.HIGH_15) return "15ma";
+  if (range.hi > t.HIGH) return "8va";
+  if (range.lo < t.LOW_15) return "15mb";
+  if (range.lo < t.LOW) return "8vb";
   return null;
 }
