@@ -1102,8 +1102,17 @@ function AppearancePreview({
           element's SIZE never changes based on this, so there's no
           layout reflow when it fires. */}
       <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
+      {/* Phase 34.7.2 — Dropped `backdrop-blur` + went from
+          `bg-background/95` to a fully opaque `bg-background`. Any
+          `backdrop-filter` (like `backdrop-blur`) promotes the element
+          to a compositing layer, which causes ALL descendant text to
+          lose subpixel antialiasing — this is why the "Practice
+          Prodigy" heading inside the preview rendered visibly softer
+          than the rest of the app. Opaque background is a cheap trade
+          for crisp text, and the sticky section still reads as a
+          distinct floating panel because of the border + shadow. */}
       <section
-        className={`z-20 flex flex-col gap-3 rounded-md border border-border bg-background/95 p-5 backdrop-blur transition-shadow ${
+        className={`z-20 flex flex-col gap-3 rounded-md border border-border bg-background p-5 transition-shadow ${
           pinned ? "sticky top-14" : ""
         } ${pinned && floating ? "shadow-lg" : ""}`}
       >

@@ -28,7 +28,7 @@ export function SiteHeader() {
   return (
     <header
       data-site-header
-      className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/85 px-4 py-2 backdrop-blur-md sm:px-6"
+      className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background px-4 py-2 sm:px-6"
     >
       <Link
         href="/"
