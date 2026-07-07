@@ -111,6 +111,7 @@ import {
   transposeSelection,
 } from "@/lib/sheets/selection";
 import {
+  computeIdealClef,
   computeIdealOttava,
   suggestOttavaForMeasure,
 } from "@/lib/sheets/ottava-suggest";
@@ -264,20 +265,39 @@ export default function SheetEditorPage() {
   useEffect(() => {
     if (!sheet) return;
     let changed = false;
-    // Phase 32.2 — pass the sheet's clef so bass-clef measures
-    // don't get treble-centric ottavas auto-applied.
-    const clef = sheet.clef ?? "treble";
+    const sheetClef = sheet.clef ?? "treble";
+    // Phase 33 — Auto-clef + auto-ottava together. For each measure:
+    //   1. Resolve the ideal clef (may differ from sheet.clef when
+    //      a measure's notes are clearly on the other side of C4).
+    //   2. Compute the ideal ottava using the RESOLVED clef so
+    //      thresholds match the measure's real render context.
+    // Both apply silently (trackUndo: false) so the sync doesn't
+    // pollute undo history. Users can override either via the
+    // Measures list.
     const nextMeasures = sheet.measures.map((m) => {
-      const ideal = computeIdealOttava(m, clef);
-      const current = m.octavaShift;
-      if (ideal === (current ?? null)) return m;
+      const idealClef = computeIdealClef(m, sheetClef);
+      const currentClef = m.clef;
+      const resolvedClef =
+        idealClef ?? currentClef ?? sheetClef;
+      const idealOttava = computeIdealOttava(m, resolvedClef);
+      const currentOttava = m.octavaShift;
+      const clefChanged =
+        idealClef !== null && idealClef !== currentClef;
+      const ottavaChanged = idealOttava !== (currentOttava ?? null);
+      if (!clefChanged && !ottavaChanged) return m;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { octavaShift: _drop, ...rest } = m;
-      void _drop;
+      const { octavaShift: _dropO, clef: _dropC, ...rest } = m;
+      void _dropO;
+      void _dropC;
       changed = true;
-      return ideal
-        ? ({ ...rest, octavaShift: ideal } as typeof m)
-        : (rest as typeof m);
+      const next = { ...rest } as typeof m;
+      const preservedClef = clefChanged ? idealClef : currentClef;
+      const preservedOttava = ottavaChanged
+        ? idealOttava
+        : currentOttava;
+      if (preservedClef) next.clef = preservedClef;
+      if (preservedOttava) next.octavaShift = preservedOttava;
+      return next;
     });
     if (changed) {
       updateSheet(id, { measures: nextMeasures }, { trackUndo: false });

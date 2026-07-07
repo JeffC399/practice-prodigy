@@ -109,6 +109,36 @@ function thresholdsFor(clef: Clef | undefined): Thresholds {
 }
 
 /**
+ * Phase 33 — Compute the ideal per-measure clef based purely on the
+ * stored note range. Uses the midpoint of the range as the decision
+ * anchor: notes centered at or above MIDI 60 (C4/middle C) → treble;
+ * below → bass. Uses hysteresis so a note hovering right at the
+ * boundary doesn't flicker between clefs on edits.
+ *
+ * Returns `null` when the measure has no notes (so we fall back to
+ * the sheet-level clef) OR when the current clef already matches
+ * the ideal AND is within the hysteresis window.
+ */
+export function computeIdealClef(
+  measure: SheetMeasure,
+  sheetClef: "treble" | "bass" | undefined,
+): "treble" | "bass" | null {
+  const range = measureMidiRange(measure);
+  if (!range) return null;
+  const mid = (range.hi + range.lo) / 2;
+  const current: "treble" | "bass" =
+    measure.clef ?? sheetClef ?? "treble";
+  // Hysteresis: only switch when the range is clearly on the other
+  // side. Prevents flickering when notes hover near middle C.
+  //   Treble → Bass:  switch when mid < 52 (E3, comfortably bass)
+  //   Bass   → Treble: switch when mid > 62 (D4, comfortably treble)
+  //   Otherwise: return null (keep current)
+  if (current === "treble" && mid < 52) return "bass";
+  if (current === "bass" && mid > 62) return "treble";
+  return null;
+}
+
+/**
  * Compute the measure's stored-pitch MIDI range. Returns null when
  * the measure has no pitched notes.
  */

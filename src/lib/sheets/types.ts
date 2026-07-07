@@ -254,6 +254,16 @@ export type SheetMeasure = {
    * the display Y by ±1 octave and draws the bracket.
    */
   octavaShift?: SheetOctavaShift;
+  /**
+   * Phase 33: per-measure clef override. When set, this measure
+   * renders with the specified clef regardless of the sheet-level
+   * `clef` setting. Enables the "line 1 in treble, line 2 in bass"
+   * split-range engraving pattern that Real Book charts use for
+   * melodies that jump between registers. The editor's auto-clef
+   * effect sets this automatically when a measure's notes are
+   * clearly on one side of the treble/bass boundary.
+   */
+  clef?: "treble" | "bass";
 };
 
 /**

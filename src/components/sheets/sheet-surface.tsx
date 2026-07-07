@@ -578,6 +578,14 @@ export function SheetSurface({
       outgoingNote: StaveNote | null;
     } | null = null;
 
+    // Phase 33 — Track the previously rendered clef across measures
+    // AND across line boundaries. Used to decide whether a mid-line
+    // clef change needs to draw a new clef glyph. First-of-line
+    // measures always draw their clef.
+    let previousRenderedClef: "treble" | "bass" =
+      sheet.clef ?? "treble";
+    const defaultClef: "treble" | "bass" = sheet.clef ?? "treble";
+
     lines.forEach((lineMeasures, lineIdx) => {
       const showTimeSig = lineIdx === 0;
       const isLastLine = lineIdx === lines.length - 1;
@@ -713,12 +721,23 @@ export function SheetSurface({
         // Original measure index in the sheet's flat measures array.
         const measureIdx = lineIdx * measuresPerLine + i;
 
+        // Phase 33 — Per-measure clef resolution. Falls back to the
+        // sheet-level clef, then to treble.
+        const measureClef: "treble" | "bass" =
+          measure.clef ?? defaultClef;
+        // Draw the clef at the start of the line (always) AND at the
+        // start of any measure where the clef differs from the
+        // previously-rendered one.
+        const drawClef = isFirst || measureClef !== previousRenderedClef;
+
         const stave = new Stave(staveX, staveY, staveWidth);
-        if (isFirst) {
+        if (drawClef) {
           // Phase 32.1 — Clef selection. VexFlow uses absolute pitch
           // (StaveNote pitches don't change) — the clef just tells
           // the renderer where each MIDI value sits on the staff.
-          stave.addClef(sheet.clef ?? "treble");
+          stave.addClef(measureClef);
+        }
+        if (isFirst) {
           stave.addKeySignature(keySpec);
           if (showTimeSig) {
             stave.addTimeSignature(
@@ -914,6 +933,9 @@ export function SheetSurface({
           // tie's landing point). Standard convention: silence breaks
           // a tie chain.
           pendingCrossMeasureTie = null;
+          // Phase 33 — still update the clef tracker so subsequent
+          // measures know what clef this measure rendered.
+          previousRenderedClef = measureClef;
           return;
         }
         // Phase 30.3 — apply per-measure ottava shift as a DISPLAY
@@ -927,7 +949,7 @@ export function SheetSurface({
         const displayMelody = melodyForDisplay(melody, measure.octavaShift);
         const staveNotes = buildStaveNotesForMelody(
           displayMelody,
-          sheet.clef ?? "treble",
+          measureClef,
         );
         const voice = new Voice({
           numBeats: sheet.timeSignature.beatsPerMeasure,
@@ -1171,6 +1193,9 @@ export function SheetSurface({
             _measureFirstIdx: i, // unused once translated
           });
         });
+        // Phase 33 — remember the clef we rendered so the next
+        // measure can decide whether to draw its own clef glyph.
+        previousRenderedClef = measureClef;
       });
 
       // Phase 28: volta-bracket render pass. After all measures of the
