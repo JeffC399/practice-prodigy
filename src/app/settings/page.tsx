@@ -1,7 +1,21 @@
 "use client";
 
-import { Download, RotateCcw, Sun, Moon, Monitor } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  Check,
+  Copy,
+  Download,
+  RotateCcw,
+  Sparkles,
+  Sun,
+  Moon,
+  Monitor,
+  Undo2,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  decodeAppearance,
+  encodeAppearance,
+} from "@/lib/state/share-appearance";
 import {
   CHORD_NOTATION_STYLES,
   NOTATION_STYLE_DISPLAY_NAMES,
@@ -12,6 +26,9 @@ import {
   ACCENT_PALETTE_DISPLAY_NAMES,
   ACCENT_PALETTE_SWATCHES,
   ACCENT_PALETTES,
+  APPEARANCE_MOOD_DESCRIPTIONS,
+  APPEARANCE_MOOD_DISPLAY_NAMES,
+  APPEARANCE_MOODS,
   CHORD_FONT_DISPLAY_NAMES,
   CHORD_FONTS,
   CORNER_RADII,
@@ -43,7 +60,11 @@ import {
   UI_SATURATION_DEFAULT,
   UI_SATURATION_MAX,
   UI_SATURATION_MIN,
+  appearanceSlicesEqual,
+  getAppearanceSnapshot,
   useUserPrefs,
+  type AppearanceMood,
+  type AppearanceSlice,
   type ThemeMode,
   type ThemePalette,
 } from "@/lib/state/user-prefs";
@@ -116,6 +137,8 @@ export default function SettingsPage() {
   const highContrast = useUserPrefs((s) => s.highContrast);
   const setHighContrast = useUserPrefs((s) => s.setHighContrast);
   const resetAppearance = useUserPrefs((s) => s.resetAppearance);
+  const applyAppearanceSlice = useUserPrefs((s) => s.applyAppearanceSlice);
+  const applyMood = useUserPrefs((s) => s.applyMood);
 
   const drillsLib = useDrillsLibrary();
 
@@ -126,6 +149,58 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
+
+  // Phase 34.2 — snapshot the appearance the moment the user enters
+  // Settings so we can offer "Revert changes" and drive the Compare
+  // toggle's "before" view. Snapshot is captured once on mount and
+  // updated only when the user hits Revert / applies a snapshot.
+  const [snapshot, setSnapshot] = useState<AppearanceSlice | null>(null);
+  const currentAppearance = useMemo(
+    () =>
+      getAppearanceSnapshot(useUserPrefs.getState()),
+    // We want to recompute on every render since any pref change
+    // triggers a re-render of this component via the field selectors
+    // above. Purposely empty deps + read from the store's raw state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      theme,
+      accent,
+      themePalette,
+      customAccent,
+      fontScale,
+      uiDensity,
+      paperColor,
+      uiFont,
+      chordFontDefault,
+      noteColoring,
+      reduceMotion,
+      largerTargets,
+      autoThemeByTime,
+      uiBrightness,
+      uiSaturation,
+      cornerRadius,
+      highContrast,
+    ],
+  );
+  useEffect(() => {
+    if (mounted && !snapshot) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSnapshot(currentAppearance);
+    }
+  }, [mounted, snapshot, currentAppearance]);
+  const isDirty =
+    snapshot !== null && !appearanceSlicesEqual(snapshot, currentAppearance);
+  const revertToSnapshot = () => {
+    if (snapshot) applyAppearanceSlice(snapshot);
+  };
+
+  // Compare toggle — "before" (frozen snapshot) vs "now" (live) shown
+  // side by side in the preview.
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  // Sticky preview pin — user can dismiss the stickiness for a scroll
+  // session. Doesn't persist; resets on route change.
+  const [previewPinned, setPreviewPinned] = useState(true);
 
   if (!mounted) {
     return (
@@ -158,8 +233,35 @@ export default function SettingsPage() {
         {/* Phase 34.1 — Live preview card. Everything above shows here
             immediately as the user tweaks sliders / toggles / palettes
             below. No round-trip required — the preview reads from the
-            same active CSS variables ThemeApplicator writes to <html>. */}
-        <AppearancePreview />
+            same active CSS variables ThemeApplicator writes to <html>.
+            Phase 34.2 — sticky wrapper + optional Compare view. */}
+        <AppearancePreview
+          pinned={previewPinned}
+          onTogglePin={() => setPreviewPinned((v) => !v)}
+          snapshot={snapshot}
+          isDirty={isDirty}
+          onRevert={revertToSnapshot}
+          compareOpen={compareOpen}
+          onToggleCompare={() => setCompareOpen((v) => !v)}
+        />
+
+        {/* Phase 34.2 — Preset moods bundle. One-click starting points
+            for common scenarios. Applies a partial appearance slice
+            through the store's atomic applyMood action. */}
+        <SettingsSection
+          title="Preset moods"
+          description="One-click bundles for common practice scenarios. Applying a mood only touches the fields it defines — everything else stays as you set it."
+        >
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {APPEARANCE_MOODS.map((mood) => (
+              <MoodTile
+                key={mood}
+                mood={mood}
+                onApply={() => applyMood(mood)}
+              />
+            ))}
+          </div>
+        </SettingsSection>
 
         {/* APPEARANCE — the flagship visual section. Theme, palette,
             accent, custom accent, and auto-by-time all live here. */}
@@ -584,6 +686,20 @@ export default function SettingsPage() {
           </SettingsField>
         </SettingsSection>
 
+        {/* Phase 34.2 — share appearance code. Encode / decode the
+            appearance slice as a compact string that can be pasted
+            elsewhere. Great for teachers sending exact setups to
+            students. */}
+        <SettingsSection
+          title="Share appearance"
+          description="Copy your current look as a short code. Anyone with the code — or another device of yours — can paste it here to apply the exact same appearance."
+        >
+          <ShareAppearance
+            currentSlice={currentAppearance}
+            onApply={(slice) => applyAppearanceSlice(slice)}
+          />
+        </SettingsSection>
+
         {/* DATA — single-click export of everything that lives in
             localStorage. Useful for backups, migrating to a new
             device before cloud sync ships, and for testers who want
@@ -920,57 +1036,452 @@ function PaletteTile({
  * reflect immediately. Elements use the same CSS variables the rest of
  * the app uses, so palette / accent / density / brightness / saturation
  * / corner-radius / contrast all show through here in real time.
+ *
+ * Phase 34.2 additions:
+ *   - Sticky (via `position: sticky; top: 0.5rem`) so the preview
+ *     stays visible while the user scrolls the long Settings page.
+ *     Pin toggle in the header lets the user opt out for a scroll
+ *     session (state is component-local; resets on route change).
+ *   - Auto-collapse to a slim strip once scrolled past the natural
+ *     position via a scroll observer. The full card returns as soon
+ *     as the user scrolls back near the top.
+ *   - Compare mode splits the preview so "before" (frozen snapshot on
+ *     entry) shows alongside "now" (live). Applies the snapshot's
+ *     appearance to the left half via inline CSS custom properties.
+ *   - Revert button restores the initial-mount snapshot, clearing
+ *     any changes made in this Settings session.
  */
-function AppearancePreview() {
+function AppearancePreview({
+  pinned,
+  onTogglePin,
+  snapshot,
+  isDirty,
+  onRevert,
+  compareOpen,
+  onToggleCompare,
+}: {
+  pinned: boolean;
+  onTogglePin: () => void;
+  snapshot: AppearanceSlice | null;
+  isDirty: boolean;
+  onRevert: () => void;
+  compareOpen: boolean;
+  onToggleCompare: () => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Watch the sentinel above the sticky container; once it leaves the
+  // top of the viewport, we know the sticky element is now pinned and
+  // can collapse to a slim strip. IntersectionObserver is 60fps-safe
+  // and requires zero scroll math.
+  useEffect(() => {
+    if (!pinned || !sentinelRef.current) return;
+    const el = sentinelRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setCollapsed(!entry.isIntersecting);
+      },
+      { rootMargin: "0px", threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [pinned]);
+
+  // When the user unpins, always render the full card (never
+  // auto-collapse a non-sticky preview — collapsed makes no sense
+  // when it's just sitting in the document flow).
+  const showCollapsed = pinned && collapsed;
+
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-border bg-background/50 p-5">
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          Live preview
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
-          Updates as you tweak below
-        </span>
-      </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
-          <h3 className="text-lg font-semibold tracking-tight text-card-foreground">
-            Practice Prodigy
-          </h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            A sample chord card with body text. Adjust the sliders and
-            palette below and see this update live.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-            >
-              Primary
-            </button>
-            <button
-              type="button"
-              className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
-            >
-              Secondary
-            </button>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              Accent
+    <>
+      {/* Zero-height sentinel used by IntersectionObserver to detect
+          when the sticky preview has left its natural position. Placed
+          just above the sticky element so it scrolls off before the
+          sticky pins. */}
+      <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
+      <section
+        className={`z-30 flex flex-col gap-3 rounded-md border border-border bg-background/95 p-5 backdrop-blur transition-all ${
+          pinned ? "sticky top-2" : ""
+        } ${showCollapsed ? "p-3" : "p-5"}`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Live preview
             </span>
+            {isDirty && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
+                Unsaved
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <PreviewIconButton
+              active={compareOpen}
+              disabled={!snapshot}
+              onClick={onToggleCompare}
+              label={compareOpen ? "Hide compare" : "Compare with before"}
+              icon="split"
+            />
+            {isDirty && (
+              <PreviewIconButton
+                onClick={onRevert}
+                label="Revert to state on entry"
+                icon="revert"
+              />
+            )}
+            <PreviewIconButton
+              active={pinned}
+              onClick={onTogglePin}
+              label={pinned ? "Unpin preview" : "Pin preview"}
+              icon="pin"
+            />
           </div>
         </div>
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-4">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Sample staff (paper unaffected)
-          </span>
-          <MiniStaffPreview />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            The paper surface is not dimmed or desaturated by the
-            sliders below — engraved notation always renders at 100%.
-          </p>
-        </div>
+
+        {showCollapsed ? (
+          <PreviewSlimStrip />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {compareOpen && snapshot ? (
+              <>
+                <PreviewHalf
+                  label="Before"
+                  frozenSlice={snapshot}
+                />
+                <PreviewHalf
+                  label="Now"
+                  frozenSlice={null}
+                />
+              </>
+            ) : (
+              <>
+                <PreviewCard />
+                <PreviewStaffCard />
+              </>
+            )}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+/**
+ * The slim collapsed strip shown once the sticky preview has scrolled
+ * past its natural position. Shows only the essentials: a small mini
+ * staff, an accent chip, and a label. Full card returns as the user
+ * scrolls back.
+ */
+function PreviewSlimStrip() {
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className="sheet-paper h-6 w-12 flex-shrink-0 rounded-sm border border-border"
+        style={{ background: "var(--sheet-paper, #fbfaf5)" }}
+        aria-hidden="true"
+      />
+      <span className="inline-block h-3 w-3 flex-shrink-0 rounded-full bg-primary" />
+      <span className="text-xs text-muted-foreground">
+        Preview visible — scroll up for the full card
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The interactive left-half of the preview (chord card + buttons).
+ * Renders sample UI at the CURRENT live CSS variables when
+ * `frozenSlice` is null; renders at the frozen snapshot's palette /
+ * accent / paper color / etc when `frozenSlice` is supplied. Frozen
+ * mode is used by the Compare toggle to show "before" alongside "now".
+ */
+function PreviewHalf({
+  label,
+  frozenSlice,
+}: {
+  label: string;
+  frozenSlice: AppearanceSlice | null;
+}) {
+  const frozenStyle = frozenSlice
+    ? buildFrozenPreviewStyle(frozenSlice)
+    : undefined;
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-md border border-border bg-card p-4"
+      style={frozenStyle}
+    >
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <PreviewCardInner />
+    </div>
+  );
+}
+
+/**
+ * Full-width interactive preview card (used when Compare is off).
+ */
+function PreviewCard() {
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
+      <PreviewCardInner />
+    </div>
+  );
+}
+
+function PreviewCardInner() {
+  return (
+    <>
+      <h3 className="text-lg font-semibold tracking-tight text-card-foreground">
+        Practice Prodigy
+      </h3>
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        Adjust the sliders and palette below — this card updates live.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+        >
+          Primary
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
+        >
+          Secondary
+        </button>
+        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          Accent
+        </span>
       </div>
-    </section>
+    </>
+  );
+}
+
+function PreviewStaffCard() {
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-4">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        Sample staff (paper unaffected)
+      </span>
+      <MiniStaffPreview />
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        The paper surface is not dimmed or desaturated by the sliders
+        below — engraved notation always renders at 100%.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Build inline CSS variables that force the Preview subtree to render
+ * as if the given appearance slice were active. Used for the "Before"
+ * half of the Compare view. Doesn't attempt to reproduce every field
+ * — focuses on the visible ones: primary accent, paper color.
+ * (Palette classes can't be applied to a subtree without swapping
+ * `<html>`, so a full palette reproduction here would require
+ * inlining every palette's variable set — deferred as a follow-up.)
+ */
+function buildFrozenPreviewStyle(
+  slice: AppearanceSlice,
+): React.CSSProperties {
+  const style = {} as Record<string, string>;
+  const primary =
+    slice.customAccent ?? ACCENT_PALETTE_SWATCHES[slice.accent];
+  if (primary) {
+    style["--primary"] = primary;
+    style["--ring"] = primary;
+  }
+  style["--sheet-paper"] = PAPER_COLOR_SWATCHES[slice.paperColor];
+  return style as React.CSSProperties;
+}
+
+/**
+ * Small icon-only button used in the preview header (Compare / Revert
+ * / Pin). Compact and non-distracting; live-updates from the same
+ * accent color as everything else.
+ */
+function PreviewIconButton({
+  onClick,
+  disabled,
+  active,
+  label,
+  icon,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  label: string;
+  icon: "split" | "revert" | "pin";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
+        active
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/40"
+      } disabled:cursor-not-allowed disabled:opacity-40`}
+    >
+      {icon === "split" && (
+        <svg
+          viewBox="0 0 20 20"
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M10 3v14M3 6h4M13 6h4M3 10h4M13 10h4M3 14h4M13 14h4" />
+        </svg>
+      )}
+      {icon === "revert" && <Undo2 className="h-3.5 w-3.5" />}
+      {icon === "pin" && (
+        <svg
+          viewBox="0 0 20 20"
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M8 3l4 4M6 5l9 9-5 1-1 5-9-9 6-6z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Preset "mood" tile — one-click bundle applier. Shows the mood's
+ * name + a short description. Click applies the mood via the store's
+ * atomic `applyMood` action.
+ */
+function MoodTile({
+  mood,
+  onApply,
+}: {
+  mood: AppearanceMood;
+  onApply: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onApply}
+      className="flex flex-col gap-1 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+    >
+      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+        {APPEARANCE_MOOD_DISPLAY_NAMES[mood]}
+      </span>
+      <span className="text-xs text-muted-foreground leading-relaxed">
+        {APPEARANCE_MOOD_DESCRIPTIONS[mood]}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Share-appearance panel — copy your current appearance to the
+ * clipboard as a short code, or paste someone else's code to apply
+ * their exact look. Uses the base64-encoded slice from
+ * `src/lib/state/share-appearance.ts`.
+ */
+function ShareAppearance({
+  currentSlice,
+  onApply,
+}: {
+  currentSlice: AppearanceSlice;
+  onApply: (slice: AppearanceSlice) => void;
+}) {
+  const code = useMemo(() => encodeAppearance(currentSlice), [currentSlice]);
+  const [importCode, setImportCode] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const handleImport = () => {
+    const trimmed = importCode.trim();
+    if (!trimmed) return;
+    const decoded = decodeAppearance(trimmed);
+    if (!decoded) {
+      setImportError("That doesn't look like a valid appearance code.");
+      return;
+    }
+    setImportError(null);
+    onApply(decoded);
+    setImportCode("");
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SettingsField label="Your appearance code">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={code}
+            readOnly
+            onFocus={(e) => e.currentTarget.select()}
+            className="flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-xs focus:border-primary focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors"
+          >
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-primary" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      </SettingsField>
+
+      <SettingsField
+        label="Import an appearance code"
+        hint="Paste someone else's code (or one from another device) to apply their exact look."
+      >
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={importCode}
+            onChange={(e) => {
+              setImportCode(e.target.value);
+              if (importError) setImportError(null);
+            }}
+            placeholder="Paste a code here…"
+            className="flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-xs focus:border-primary focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleImport}
+            disabled={!importCode.trim()}
+            className="rounded-md border border-primary/60 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+          >
+            Apply
+          </button>
+        </div>
+        {importError && (
+          <span className="text-xs text-destructive">{importError}</span>
+        )}
+      </SettingsField>
+    </div>
   );
 }
 

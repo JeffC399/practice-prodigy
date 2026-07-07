@@ -193,6 +193,39 @@ export const UI_SATURATION_MAX = 140;
 export const UI_SATURATION_DEFAULT = 100;
 
 /**
+ * Phase 34.2 — Preset "mood" bundles. Each mood is a partial appearance
+ * slice the user can apply in one click. Non-appearance fields are left
+ * alone. All values below use the same units as the corresponding pref.
+ */
+export type AppearanceMood =
+  | "late-night"
+  | "bright-classroom"
+  | "focus"
+  | "boomwhacker-classroom";
+export const APPEARANCE_MOODS = [
+  "late-night",
+  "bright-classroom",
+  "focus",
+  "boomwhacker-classroom",
+] as const;
+export const APPEARANCE_MOOD_DISPLAY_NAMES: Record<AppearanceMood, string> = {
+  "late-night": "Late Night Practice",
+  "bright-classroom": "Bright Classroom",
+  focus: "Focus",
+  "boomwhacker-classroom": "Boomwhacker Classroom",
+};
+export const APPEARANCE_MOOD_DESCRIPTIONS: Record<AppearanceMood, string> = {
+  "late-night":
+    "Dark warm palette, dimmed UI, reduced motion. For 11pm practice.",
+  "bright-classroom":
+    "Light theme, high contrast, larger targets, larger font.",
+  focus:
+    "Muted saturation, serif UI font, high contrast. Reduces visual noise.",
+  "boomwhacker-classroom":
+    "Light theme with Boomwhacker note coloring on. High contrast, larger targets, for teaching kids.",
+};
+
+/**
  * How the arpeggio pattern label is shown on the drill screen, below
  * each displayed chord. Independent of which pattern is being drilled
  * — purely a visual preference.
@@ -298,6 +331,79 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   highContrast: false,
 };
 
+/**
+ * Phase 34.2 — every appearance-only field. Used by:
+ *   - `getAppearanceSnapshot()` — captures the current appearance for
+ *     the "Revert changes" and Compare functionality.
+ *   - `applyAppearanceSnapshot()` — restores a saved snapshot.
+ *   - the appearance-code encode/decode module (`share-appearance.ts`).
+ *
+ * Keep in sync with the Phase 34/34.1 pref additions. If a field is
+ * appearance-facing (visible in Settings > Appearance), add it here.
+ */
+export const APPEARANCE_KEYS = [
+  "theme",
+  "accent",
+  "themePalette",
+  "customAccent",
+  "fontScale",
+  "uiDensity",
+  "paperColor",
+  "uiFont",
+  "chordFontDefault",
+  "noteColoring",
+  "reduceMotion",
+  "largerTargets",
+  "autoThemeByTime",
+  "uiBrightness",
+  "uiSaturation",
+  "cornerRadius",
+  "highContrast",
+] as const;
+export type AppearanceKey = (typeof APPEARANCE_KEYS)[number];
+export type AppearanceSlice = Pick<UserPrefs, AppearanceKey>;
+
+/**
+ * Preset mood → partial appearance slice. Applied atomically via
+ * `applyAppearanceSlice`. Non-listed fields are left alone.
+ */
+export const APPEARANCE_MOOD_PRESETS: Record<
+  AppearanceMood,
+  Partial<AppearanceSlice>
+> = {
+  "late-night": {
+    theme: "dark",
+    themePalette: "warm",
+    uiBrightness: 75,
+    uiSaturation: 90,
+    reduceMotion: true,
+  },
+  "bright-classroom": {
+    theme: "light",
+    themePalette: "default",
+    highContrast: true,
+    largerTargets: true,
+    fontScale: "large",
+    uiBrightness: 100,
+    uiSaturation: 100,
+  },
+  focus: {
+    themePalette: "solarized",
+    uiFont: "serif",
+    uiSaturation: 80,
+    highContrast: false,
+    reduceMotion: true,
+  },
+  "boomwhacker-classroom": {
+    theme: "light",
+    themePalette: "default",
+    noteColoring: "boomwhacker",
+    highContrast: true,
+    largerTargets: true,
+    fontScale: "large",
+  },
+};
+
 type UserPrefsStore = UserPrefs & {
   setPracticeLayout: (layout: PracticeLayout) => void;
   setTheme: (theme: ThemeMode) => void;
@@ -326,6 +432,10 @@ type UserPrefsStore = UserPrefs & {
   resetAll: () => void;
   /** Reset ONLY the Phase 34 appearance fields to their defaults. */
   resetAppearance: () => void;
+  /** Phase 34.2 — apply a partial appearance slice atomically. */
+  applyAppearanceSlice: (slice: Partial<AppearanceSlice>) => void;
+  /** Phase 34.2 — apply a preset mood by name. */
+  applyMood: (mood: AppearanceMood) => void;
 };
 
 export const useUserPrefs = create<UserPrefsStore>()(
@@ -387,6 +497,8 @@ export const useUserPrefs = create<UserPrefsStore>()(
           cornerRadius: DEFAULT_USER_PREFS.cornerRadius,
           highContrast: DEFAULT_USER_PREFS.highContrast,
         }),
+      applyAppearanceSlice: (slice) => set(slice),
+      applyMood: (mood) => set(APPEARANCE_MOOD_PRESETS[mood]),
     }),
     {
       name: "practice-prodigy:user-prefs:v1",
@@ -407,3 +519,32 @@ export const useUserPrefs = create<UserPrefsStore>()(
     },
   ),
 );
+
+/**
+ * Phase 34.2 — extract the appearance-only slice from a full prefs
+ * object. Used by the Settings page to snapshot the user's appearance
+ * on mount (for Revert changes) and to feed the Compare toggle's
+ * "before" view.
+ */
+export function getAppearanceSnapshot(prefs: UserPrefs): AppearanceSlice {
+  const out = {} as AppearanceSlice;
+  for (const k of APPEARANCE_KEYS) {
+    // Preserve `null` on customAccent; every other field is a value.
+    (out as Record<string, unknown>)[k] = prefs[k];
+  }
+  return out;
+}
+
+/**
+ * Shallow-compare two appearance slices. Returns true if every key
+ * matches. Handles `customAccent`'s nullable case.
+ */
+export function appearanceSlicesEqual(
+  a: AppearanceSlice,
+  b: AppearanceSlice,
+): boolean {
+  for (const k of APPEARANCE_KEYS) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
