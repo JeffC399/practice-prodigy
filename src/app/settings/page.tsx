@@ -1068,42 +1068,39 @@ function AppearancePreview({
   compareOpen: boolean;
   onToggleCompare: () => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Track whether the sticky preview has scrolled past its natural
+  // position — used to add a subtle drop-shadow so the user knows it's
+  // floating. Purely visual; no size changes on scroll, so the page's
+  // total scroll height stays constant and the browser never has to
+  // snap-adjust the scroll position (Phase 34.2.1 fix — the previous
+  // auto-collapse behavior triggered layout reflow on every scroll
+  // over the sticky boundary, which the browser reconciled by yanking
+  // the viewport back near the top).
+  const [floating, setFloating] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Watch the sentinel above the sticky container; once it leaves the
-  // top of the viewport, we know the sticky element is now pinned and
-  // can collapse to a slim strip. IntersectionObserver is 60fps-safe
-  // and requires zero scroll math.
   useEffect(() => {
     if (!pinned || !sentinelRef.current) return;
     const el = sentinelRef.current;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setCollapsed(!entry.isIntersecting);
-      },
+      ([entry]) => setFloating(!entry.isIntersecting),
       { rootMargin: "0px", threshold: 0 },
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [pinned]);
 
-  // When the user unpins, always render the full card (never
-  // auto-collapse a non-sticky preview — collapsed makes no sense
-  // when it's just sitting in the document flow).
-  const showCollapsed = pinned && collapsed;
-
   return (
     <>
-      {/* Zero-height sentinel used by IntersectionObserver to detect
-          when the sticky preview has left its natural position. Placed
-          just above the sticky element so it scrolls off before the
-          sticky pins. */}
+      {/* Zero-height sentinel — used by IntersectionObserver purely to
+          detect "am I currently pinned?" for shadow styling. The sticky
+          element's SIZE never changes based on this, so there's no
+          layout reflow when it fires. */}
       <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
       <section
-        className={`z-30 flex flex-col gap-3 rounded-md border border-border bg-background/95 p-5 backdrop-blur transition-all ${
-          pinned ? "sticky top-2" : ""
-        } ${showCollapsed ? "p-3" : "p-5"}`}
+        className={`z-20 flex flex-col gap-3 rounded-md border border-border bg-background/95 p-5 backdrop-blur transition-shadow ${
+          pinned ? "sticky top-14" : ""
+        } ${pinned && floating ? "shadow-lg" : ""}`}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -1140,53 +1137,21 @@ function AppearancePreview({
           </div>
         </div>
 
-        {showCollapsed ? (
-          <PreviewSlimStrip />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {compareOpen && snapshot ? (
-              <>
-                <PreviewHalf
-                  label="Before"
-                  frozenSlice={snapshot}
-                />
-                <PreviewHalf
-                  label="Now"
-                  frozenSlice={null}
-                />
-              </>
-            ) : (
-              <>
-                <PreviewCard />
-                <PreviewStaffCard />
-              </>
-            )}
-          </div>
-        )}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {compareOpen && snapshot ? (
+            <>
+              <PreviewHalf label="Before" frozenSlice={snapshot} />
+              <PreviewHalf label="Now" frozenSlice={null} />
+            </>
+          ) : (
+            <>
+              <PreviewCard />
+              <PreviewStaffCard />
+            </>
+          )}
+        </div>
       </section>
     </>
-  );
-}
-
-/**
- * The slim collapsed strip shown once the sticky preview has scrolled
- * past its natural position. Shows only the essentials: a small mini
- * staff, an accent chip, and a label. Full card returns as the user
- * scrolls back.
- */
-function PreviewSlimStrip() {
-  return (
-    <div className="flex items-center gap-3">
-      <div
-        className="sheet-paper h-6 w-12 flex-shrink-0 rounded-sm border border-border"
-        style={{ background: "var(--sheet-paper, #fbfaf5)" }}
-        aria-hidden="true"
-      />
-      <span className="inline-block h-3 w-3 flex-shrink-0 rounded-full bg-primary" />
-      <span className="text-xs text-muted-foreground">
-        Preview visible — scroll up for the full card
-      </span>
-    </div>
   );
 }
 
@@ -1209,7 +1174,7 @@ function PreviewHalf({
     : undefined;
   return (
     <div
-      className="flex flex-col gap-2 rounded-md border border-border bg-card p-4"
+      className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3"
       style={frozenStyle}
     >
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1225,7 +1190,7 @@ function PreviewHalf({
  */
 function PreviewCard() {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3">
       <PreviewCardInner />
     </div>
   );
@@ -1234,26 +1199,26 @@ function PreviewCard() {
 function PreviewCardInner() {
   return (
     <>
-      <h3 className="text-lg font-semibold tracking-tight text-card-foreground">
+      <h3 className="text-base font-semibold tracking-tight text-card-foreground">
         Practice Prodigy
       </h3>
-      <p className="text-sm text-muted-foreground leading-relaxed">
+      <p className="text-xs text-muted-foreground leading-relaxed">
         Adjust the sliders and palette below — this card updates live.
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
         >
           Primary
         </button>
         <button
           type="button"
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
+          className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:border-primary/40 transition-colors"
         >
           Secondary
         </button>
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-medium text-primary">
           Accent
         </span>
       </div>
@@ -1263,15 +1228,11 @@ function PreviewCardInner() {
 
 function PreviewStaffCard() {
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-4">
+    <div className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         Sample staff (paper unaffected)
       </span>
       <MiniStaffPreview />
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        The paper surface is not dimmed or desaturated by the sliders
-        below — engraved notation always renders at 100%.
-      </p>
     </div>
   );
 }
