@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Sun, Moon, Monitor } from "lucide-react";
+import { Download, RotateCcw, Sun, Moon, Monitor } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   CHORD_NOTATION_STYLES,
@@ -12,6 +12,15 @@ import {
   ACCENT_PALETTE_DISPLAY_NAMES,
   ACCENT_PALETTE_SWATCHES,
   ACCENT_PALETTES,
+  CHORD_FONT_DISPLAY_NAMES,
+  CHORD_FONTS,
+  FONT_SCALE_DISPLAY_NAMES,
+  FONT_SCALES,
+  NOTE_COLORING_DISPLAY_NAMES,
+  NOTE_COLORINGS,
+  PAPER_COLOR_DISPLAY_NAMES,
+  PAPER_COLOR_SWATCHES,
+  PAPER_COLORS,
   PATTERN_DISPLAYS,
   PATTERN_DISPLAY_DESCRIPTIONS,
   PATTERN_DISPLAY_LABELS,
@@ -20,6 +29,12 @@ import {
   PRACTICE_LAYOUTS,
   THEME_MODE_DISPLAY_NAMES,
   THEME_MODES,
+  THEME_PALETTE_DISPLAY_NAMES,
+  THEME_PALETTES,
+  UI_DENSITIES,
+  UI_DENSITY_DISPLAY_NAMES,
+  UI_FONT_DISPLAY_NAMES,
+  UI_FONTS,
   useUserPrefs,
   type ThemeMode,
 } from "@/lib/state/user-prefs";
@@ -28,22 +43,27 @@ import {
  * Settings — the user-global preferences surface (PROJECT-DESIGN.md
  * §3.2 cascading-defaults "User" layer + §4.8 settings architecture).
  *
- * Phase 9.0 (this build) ships:
- *   - Appearance: theme (light/dark/system) + accent palette + practice layout
- *   - Notation: global default chord-notation style
- *   - Data: export all drills + prefs as a single .json bundle
+ * Phase 34 (this pass) — Appearance Overhaul. The user asked for
+ * "maximum degree of control over look/feel", so this page is now the
+ * central mission-control for every visual preference:
  *
- * Stubs are visible for the sections that come in later sub-phases:
- *   - Practice defaults (default BPM / time sig / count-in / pattern)
- *   - Audio (master volume, click sound, output device)
- *   - Accessibility (reduced motion, text scaling, high contrast)
- *   - Account / sync (placeholder until Supabase Auth in v1.1)
+ *   - Theme mode (light/dark/system) + auto-by-time
+ *   - Predefined theme palettes (Nord, Dracula, Solarized, Sepia,
+ *     High Contrast, Warm, Cool, plus the brand default)
+ *   - Accent color swatches + arbitrary custom accent color picker
+ *   - Font scale (compact/normal/large) + UI density (compact/normal/roomy)
+ *   - Paper color swatches for the sheet-music surface
+ *   - UI font family + chord font family defaults
+ *   - Note pitch coloring (Boomwhacker on lead sheets)
+ *   - Accessibility: reduce motion, larger click targets
+ *   - Reset appearance to defaults (one click)
  *
- * The cascade discipline: per-drill settings ALWAYS override the
- * user-global defaults set here. Settings is the fallback layer for
- * when a drill doesn't specify a value, not a hard override.
+ * The cascade discipline: per-drill / per-sheet settings ALWAYS
+ * override the user-global defaults set here. Settings is the fallback
+ * layer for when a drill / sheet doesn't specify its own value.
  */
 export default function SettingsPage() {
+  // Existing prefs (Phase 9 + earlier).
   const theme = useUserPrefs((s) => s.theme);
   const setTheme = useUserPrefs((s) => s.setTheme);
   const accent = useUserPrefs((s) => s.accent);
@@ -54,6 +74,32 @@ export default function SettingsPage() {
   const setNotationDefault = useUserPrefs((s) => s.setNotationDefault);
   const patternDisplay = useUserPrefs((s) => s.patternDisplay);
   const setPatternDisplay = useUserPrefs((s) => s.setPatternDisplay);
+
+  // Phase 34 — all new appearance prefs.
+  const themePalette = useUserPrefs((s) => s.themePalette);
+  const setThemePalette = useUserPrefs((s) => s.setThemePalette);
+  const customAccent = useUserPrefs((s) => s.customAccent);
+  const setCustomAccent = useUserPrefs((s) => s.setCustomAccent);
+  const fontScale = useUserPrefs((s) => s.fontScale);
+  const setFontScale = useUserPrefs((s) => s.setFontScale);
+  const uiDensity = useUserPrefs((s) => s.uiDensity);
+  const setUiDensity = useUserPrefs((s) => s.setUiDensity);
+  const paperColor = useUserPrefs((s) => s.paperColor);
+  const setPaperColor = useUserPrefs((s) => s.setPaperColor);
+  const uiFont = useUserPrefs((s) => s.uiFont);
+  const setUiFont = useUserPrefs((s) => s.setUiFont);
+  const chordFontDefault = useUserPrefs((s) => s.chordFontDefault);
+  const setChordFontDefault = useUserPrefs((s) => s.setChordFontDefault);
+  const noteColoring = useUserPrefs((s) => s.noteColoring);
+  const setNoteColoring = useUserPrefs((s) => s.setNoteColoring);
+  const reduceMotion = useUserPrefs((s) => s.reduceMotion);
+  const setReduceMotion = useUserPrefs((s) => s.setReduceMotion);
+  const largerTargets = useUserPrefs((s) => s.largerTargets);
+  const setLargerTargets = useUserPrefs((s) => s.setLargerTargets);
+  const autoThemeByTime = useUserPrefs((s) => s.autoThemeByTime);
+  const setAutoThemeByTime = useUserPrefs((s) => s.setAutoThemeByTime);
+  const resetAppearance = useUserPrefs((s) => s.resetAppearance);
+
   const drillsLib = useDrillsLibrary();
 
   // Gate render until after mount so persisted-store hydration doesn't
@@ -85,21 +131,23 @@ export default function SettingsPage() {
             Your preferences
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Cross-module choices that apply everywhere. Per-drill
-            settings (on the Setup screen) always override these
-            defaults — this page sets the fallback values when a
-            drill doesn&rsquo;t specify its own.
+            Cross-module choices that apply everywhere. Per-drill and
+            per-sheet settings always override these defaults — this
+            page sets the fallback values when a drill or sheet
+            doesn&rsquo;t specify its own.
           </p>
         </div>
 
-        {/* APPEARANCE — theme + accent + layout. The visible flagship
-            section: changing any value here re-tints the whole app
-            instantly via the ThemeApplicator client component. */}
+        {/* APPEARANCE — the flagship visual section. Theme, palette,
+            accent, custom accent, and auto-by-time all live here. */}
         <SettingsSection
-          title="Appearance"
-          description="Theme and accent. Applies to every screen."
+          title="Theme & palette"
+          description="Overall look. Palettes ship with matching light + dark variants; pick a mode below to see either."
+          headerAction={
+            <ResetButton onClick={resetAppearance} label="Reset appearance" />
+          }
         >
-          <SettingsField label="Theme">
+          <SettingsField label="Theme mode">
             <div className="grid grid-cols-3 gap-2">
               {THEME_MODES.map((mode) => (
                 <ThemeOption
@@ -107,20 +155,65 @@ export default function SettingsPage() {
                   mode={mode}
                   selected={theme === mode}
                   onSelect={() => setTheme(mode)}
+                  disabled={autoThemeByTime}
                 />
               ))}
             </div>
           </SettingsField>
 
-          <SettingsField label="Accent color">
+          <SettingsField
+            label="Auto-switch by time of day"
+            hint="When on, the theme mode toggles automatically: light 6am–6pm, dark otherwise."
+          >
+            <ToggleRow
+              value={autoThemeByTime}
+              onChange={setAutoThemeByTime}
+              label={autoThemeByTime ? "Auto" : "Manual"}
+            />
+          </SettingsField>
+
+          <SettingsField label="Palette">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {ACCENT_PALETTES.map((palette) => {
-                const isSelected = accent === palette;
+              {THEME_PALETTES.map((palette) => {
+                const isSelected = themePalette === palette;
                 return (
                   <button
                     key={palette}
                     type="button"
-                    onClick={() => setAccent(palette)}
+                    onClick={() => setThemePalette(palette)}
+                    className={`flex flex-col items-start gap-1.5 rounded-md border px-3 py-2 text-left transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background hover:border-primary/40"
+                    }`}
+                  >
+                    <PaletteSwatchPreview palette={palette} />
+                    <span className="truncate text-sm font-medium">
+                      {THEME_PALETTE_DISPLAY_NAMES[palette]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Accent color"
+          description="Applies to primary buttons, active toggles, focus rings, and the app-wide highlight color. Pick a preset swatch, or set a fully custom color."
+        >
+          <SettingsField label="Preset swatches">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {ACCENT_PALETTES.map((palette) => {
+                const isSelected = accent === palette && !customAccent;
+                return (
+                  <button
+                    key={palette}
+                    type="button"
+                    onClick={() => {
+                      setAccent(palette);
+                      setCustomAccent(null);
+                    }}
                     className={`flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
                       isSelected
                         ? "border-primary bg-primary/10 text-primary"
@@ -143,7 +236,178 @@ export default function SettingsPage() {
             </div>
           </SettingsField>
 
-          <SettingsField label="Practice screen layout">
+          <SettingsField
+            label="Custom accent color"
+            hint="Any color you like. Overrides the swatch above. Clear it to fall back to the preset."
+          >
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={customAccent ?? ACCENT_PALETTE_SWATCHES[accent]}
+                onChange={(e) => setCustomAccent(e.target.value)}
+                className="h-10 w-14 cursor-pointer rounded-md border border-border bg-background"
+                aria-label="Pick a custom accent color"
+              />
+              <input
+                type="text"
+                value={customAccent ?? ""}
+                onChange={(e) =>
+                  setCustomAccent(e.target.value.trim() || null)
+                }
+                placeholder="#f59e0b or oklch(...)"
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setCustomAccent(null)}
+                disabled={!customAccent}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Clear
+              </button>
+            </div>
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Typography & density"
+          description="Text sizing, spacing, and font choices across the whole app."
+        >
+          <SettingsField label="Font scale">
+            <ChipRow
+              options={FONT_SCALES}
+              value={fontScale}
+              onChange={setFontScale}
+              labels={FONT_SCALE_DISPLAY_NAMES}
+            />
+          </SettingsField>
+
+          <SettingsField label="UI density">
+            <ChipRow
+              options={UI_DENSITIES}
+              value={uiDensity}
+              onChange={setUiDensity}
+              labels={UI_DENSITY_DISPLAY_NAMES}
+            />
+          </SettingsField>
+
+          <SettingsField label="UI font family">
+            <select
+              value={uiFont}
+              onChange={(e) =>
+                setUiFont(e.target.value as typeof uiFont)
+              }
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+            >
+              {UI_FONTS.map((font) => (
+                <option key={font} value={font}>
+                  {UI_FONT_DISPLAY_NAMES[font]}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+
+          <SettingsField
+            label="Default chord font"
+            hint="Used on new lead sheets. Each sheet keeps its own chord-font choice, so this only affects sheets that haven't been customized."
+          >
+            <select
+              value={chordFontDefault}
+              onChange={(e) =>
+                setChordFontDefault(e.target.value as typeof chordFontDefault)
+              }
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+            >
+              {CHORD_FONTS.map((font) => (
+                <option key={font} value={font}>
+                  {CHORD_FONT_DISPLAY_NAMES[font]}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Lead sheet appearance"
+          description="Paper color and note coloring for the Lead Sheet Builder."
+        >
+          <SettingsField label="Paper color">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PAPER_COLORS.map((color) => {
+                const isSelected = paperColor === color;
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setPaperColor(color)}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background hover:border-primary/40"
+                    }`}
+                  >
+                    <span
+                      className="inline-block h-4 w-4 rounded-sm ring-1 ring-border"
+                      style={{
+                        backgroundColor: PAPER_COLOR_SWATCHES[color],
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {PAPER_COLOR_DISPLAY_NAMES[color]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </SettingsField>
+
+          <SettingsField
+            label="Note pitch coloring"
+            hint="Boomwhacker colors each note by pitch class (C = red, D = orange, E = yellow, F = green, G = teal, A = blue, B = purple) — the same convention as the popular classroom Boomwhacker tubes."
+          >
+            <ChipRow
+              options={NOTE_COLORINGS}
+              value={noteColoring}
+              onChange={setNoteColoring}
+              labels={NOTE_COLORING_DISPLAY_NAMES}
+              cols={2}
+            />
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Accessibility"
+          description="Motion + click-target adjustments. The app also respects your OS's reduced-motion setting automatically."
+        >
+          <SettingsField
+            label="Reduce motion"
+            hint="Turns off animations and transitions across the app."
+          >
+            <ToggleRow
+              value={reduceMotion}
+              onChange={setReduceMotion}
+              label={reduceMotion ? "On" : "Off"}
+            />
+          </SettingsField>
+
+          <SettingsField
+            label="Larger click targets"
+            hint="Enforces a 44×44px minimum for buttons and links — helpful on touchscreens or with fine-motor challenges."
+          >
+            <ToggleRow
+              value={largerTargets}
+              onChange={setLargerTargets}
+              label={largerTargets ? "On" : "Off"}
+            />
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Practice screen layout"
+          description="Only affects the Bass Arpeggios drill screen."
+        >
+          <SettingsField label="Layout">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {PRACTICE_LAYOUTS.map((layout) => {
                 const isSelected = practiceLayout === layout;
@@ -249,23 +513,6 @@ export default function SettingsPage() {
           <DataExport drillsCount={drillsLib.drills.length} />
         </SettingsSection>
 
-        {/* Stubs — visible but disabled, so the user knows these are
-            coming without having to guess from the roadmap. */}
-        <SettingsSection
-          title="Practice defaults"
-          description="Default tempo, time signature, count-in, and arpeggio pattern for new drills."
-          stub
-        />
-        <SettingsSection
-          title="Audio"
-          description="Master volume, click sound choice, output device."
-          stub
-        />
-        <SettingsSection
-          title="Accessibility"
-          description="Reduced motion, text scaling, high contrast."
-          stub
-        />
         <SettingsSection
           title="Account & sync"
           description="Sign in to back up your drills to the cloud and sync across devices."
@@ -280,11 +527,13 @@ function SettingsSection({
   title,
   description,
   stub,
+  headerAction,
   children,
 }: {
   title: string;
   description: string;
   stub?: boolean;
+  headerAction?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   return (
@@ -300,10 +549,12 @@ function SettingsSection({
           <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             {title}
           </h2>
-          {stub && (
+          {stub ? (
             <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
               Coming soon
             </span>
+          ) : (
+            headerAction
           )}
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">
@@ -317,14 +568,21 @@ function SettingsSection({
 
 function SettingsField({
   label,
+  hint,
   children,
 }: {
   label: string;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium text-foreground">{label}</span>
+      {hint && (
+        <span className="-mt-1 text-xs text-muted-foreground leading-relaxed">
+          {hint}
+        </span>
+      )}
       {children}
     </div>
   );
@@ -340,20 +598,26 @@ function ThemeOption({
   mode,
   selected,
   onSelect,
+  disabled,
 }: {
   mode: ThemeMode;
   selected: boolean;
   onSelect: () => void;
+  disabled?: boolean;
 }) {
   const Icon = THEME_ICONS[mode];
   return (
     <button
       type="button"
       onClick={onSelect}
+      disabled={disabled}
+      title={disabled ? "Auto-switch is on — turn it off to pick a mode" : undefined}
       className={`flex flex-col items-center gap-1.5 rounded-md border px-3 py-3 text-sm transition-colors ${
-        selected
-          ? "border-primary bg-primary/10 text-primary"
-          : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/40"
+        disabled
+          ? "cursor-not-allowed border-border/40 bg-background/40 text-muted-foreground/50"
+          : selected
+            ? "border-primary bg-primary/10 text-primary"
+            : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/40"
       }`}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
@@ -361,6 +625,145 @@ function ThemeOption({
     </button>
   );
 }
+
+/**
+ * A row of pill-style chips for enum choices (font scale, density,
+ * note coloring). Generic over the option type so it works for any
+ * string-literal union backed by a `Record<T, string>` label map.
+ */
+function ChipRow<T extends string>({
+  options,
+  value,
+  onChange,
+  labels,
+  cols = 3,
+}: {
+  options: readonly T[];
+  value: T;
+  onChange: (next: T) => void;
+  labels: Record<T, string>;
+  cols?: 2 | 3;
+}) {
+  const gridCols = cols === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3";
+  return (
+    <div className={`grid grid-cols-1 gap-2 ${gridCols}`}>
+      {options.map((opt) => {
+        const isSelected = value === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(opt)}
+            className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+              isSelected
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-background text-foreground hover:border-primary/40"
+            }`}
+          >
+            {labels[opt]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ToggleRow({
+  value,
+  onChange,
+  label,
+}: {
+  value: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      role="switch"
+      aria-checked={value}
+      className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
+        value
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border bg-background text-foreground hover:border-primary/40"
+      }`}
+    >
+      <span className="font-medium">{label}</span>
+      <span
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+          value ? "bg-primary" : "bg-border"
+        }`}
+        aria-hidden="true"
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
+            value ? "translate-x-4" : "translate-x-0.5"
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
+function ResetButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+    >
+      <RotateCcw className="h-3 w-3" aria-hidden="true" />
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Tiny 3-color swatch strip previewing a palette's dominant colors.
+ * Reads directly from static values (not the live CSS variables) so
+ * each preview shows its palette regardless of which one is active.
+ */
+function PaletteSwatchPreview({
+  palette,
+}: {
+  palette: (typeof THEME_PALETTES)[number];
+}) {
+  const swatches = PALETTE_PREVIEW_SWATCHES[palette];
+  return (
+    <div className="flex gap-1">
+      {swatches.map((c, i) => (
+        <span
+          key={i}
+          className="inline-block h-3 w-6 rounded-sm ring-1 ring-border/60"
+          style={{ backgroundColor: c }}
+          aria-hidden="true"
+        />
+      ))}
+    </div>
+  );
+}
+
+// [primary, background-dark, accent] preview swatches per palette.
+const PALETTE_PREVIEW_SWATCHES: Record<
+  (typeof THEME_PALETTES)[number],
+  [string, string, string]
+> = {
+  default: ["#f59e0b", "#18181b", "#3f3f46"],
+  nord: ["#88c0d0", "#2e3440", "#5e81ac"],
+  dracula: ["#bd93f9", "#282a36", "#ff79c6"],
+  solarized: ["#268bd2", "#002b36", "#b58900"],
+  sepia: ["#c99a4c", "#2b2117", "#d9b878"],
+  "high-contrast": ["#ffff00", "#000000", "#00ffff"],
+  warm: ["#f59e0b", "#1c1310", "#ff8f42"],
+  cool: ["#22d3ee", "#0d1a1e", "#67e8f9"],
+};
 
 /**
  * Bundles drills-library + user-prefs into a single .json blob and

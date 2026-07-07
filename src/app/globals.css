@@ -153,6 +153,389 @@
   --ring: oklch(0.65 0.21 16);
 }
 
+/* ==========================================================================
+ * Phase 34 — Theme palettes.
+ * Applied via `palette-<name>` class on <html> AND `.dark` for the dark
+ * variant. Each palette defines its own dark AND light color set. The
+ * `default` palette is the original brand look and lives in :root / .dark
+ * above, so no explicit block is needed for it.
+ * ========================================================================== */
+
+/* --- Nord (frosty blues) --- */
+.palette-nord {
+  --background: #eceff4;
+  --foreground: #2e3440;
+  --card: #e5e9f0;
+  --card-foreground: #2e3440;
+  --popover: #e5e9f0;
+  --popover-foreground: #2e3440;
+  --primary: #5e81ac;
+  --primary-foreground: #eceff4;
+  --secondary: #d8dee9;
+  --secondary-foreground: #2e3440;
+  --muted: #d8dee9;
+  --muted-foreground: #4c566a;
+  --accent: #88c0d0;
+  --accent-foreground: #2e3440;
+  --destructive: #bf616a;
+  --border: #d8dee9;
+  --input: #d8dee9;
+  --ring: #5e81ac;
+}
+.palette-nord.dark {
+  --background: #2e3440;
+  --foreground: #eceff4;
+  --card: #3b4252;
+  --card-foreground: #eceff4;
+  --popover: #3b4252;
+  --popover-foreground: #eceff4;
+  --primary: #88c0d0;
+  --primary-foreground: #2e3440;
+  --secondary: #434c5e;
+  --secondary-foreground: #eceff4;
+  --muted: #434c5e;
+  --muted-foreground: #d8dee9;
+  --accent: #5e81ac;
+  --accent-foreground: #eceff4;
+  --destructive: #bf616a;
+  --border: #4c566a;
+  --input: #4c566a;
+  --ring: #88c0d0;
+}
+
+/* --- Dracula (rich purple/dark) --- */
+.palette-dracula {
+  --background: #f8f8f2;
+  --foreground: #282a36;
+  --card: #f1f1eb;
+  --card-foreground: #282a36;
+  --popover: #f1f1eb;
+  --popover-foreground: #282a36;
+  --primary: #bd93f9;
+  --primary-foreground: #282a36;
+  --secondary: #e6e6e0;
+  --secondary-foreground: #282a36;
+  --muted: #e6e6e0;
+  --muted-foreground: #44475a;
+  --accent: #ff79c6;
+  --accent-foreground: #282a36;
+  --destructive: #ff5555;
+  --border: #d6d6d0;
+  --input: #d6d6d0;
+  --ring: #bd93f9;
+}
+.palette-dracula.dark {
+  --background: #282a36;
+  --foreground: #f8f8f2;
+  --card: #343746;
+  --card-foreground: #f8f8f2;
+  --popover: #343746;
+  --popover-foreground: #f8f8f2;
+  --primary: #bd93f9;
+  --primary-foreground: #282a36;
+  --secondary: #44475a;
+  --secondary-foreground: #f8f8f2;
+  --muted: #44475a;
+  --muted-foreground: #b6b8c8;
+  --accent: #ff79c6;
+  --accent-foreground: #282a36;
+  --destructive: #ff5555;
+  --border: #4a4d5e;
+  --input: #4a4d5e;
+  --ring: #bd93f9;
+}
+
+/* --- Solarized (Ethan Schoonover's iconic warm palette) --- */
+.palette-solarized {
+  --background: #fdf6e3;
+  --foreground: #073642;
+  --card: #eee8d5;
+  --card-foreground: #073642;
+  --popover: #eee8d5;
+  --popover-foreground: #073642;
+  --primary: #268bd2;
+  --primary-foreground: #fdf6e3;
+  --secondary: #eee8d5;
+  --secondary-foreground: #586e75;
+  --muted: #eee8d5;
+  --muted-foreground: #93a1a1;
+  --accent: #b58900;
+  --accent-foreground: #fdf6e3;
+  --destructive: #dc322f;
+  --border: #eee8d5;
+  --input: #eee8d5;
+  --ring: #268bd2;
+}
+.palette-solarized.dark {
+  --background: #002b36;
+  --foreground: #93a1a1;
+  --card: #073642;
+  --card-foreground: #eee8d5;
+  --popover: #073642;
+  --popover-foreground: #eee8d5;
+  --primary: #268bd2;
+  --primary-foreground: #002b36;
+  --secondary: #073642;
+  --secondary-foreground: #93a1a1;
+  --muted: #073642;
+  --muted-foreground: #839496;
+  --accent: #b58900;
+  --accent-foreground: #002b36;
+  --destructive: #dc322f;
+  --border: #073642;
+  --input: #073642;
+  --ring: #268bd2;
+}
+
+/* --- Sepia (warm paper vibe) --- */
+.palette-sepia {
+  --background: #f4ecd8;
+  --foreground: #5c4a30;
+  --card: #ede2c8;
+  --card-foreground: #5c4a30;
+  --popover: #ede2c8;
+  --popover-foreground: #5c4a30;
+  --primary: #a97335;
+  --primary-foreground: #f4ecd8;
+  --secondary: #e6d9be;
+  --secondary-foreground: #5c4a30;
+  --muted: #e6d9be;
+  --muted-foreground: #8a7250;
+  --accent: #c99a4c;
+  --accent-foreground: #5c4a30;
+  --destructive: #b45840;
+  --border: #d9c9a8;
+  --input: #d9c9a8;
+  --ring: #a97335;
+}
+.palette-sepia.dark {
+  --background: #2b2117;
+  --foreground: #e6d9be;
+  --card: #362a1c;
+  --card-foreground: #e6d9be;
+  --popover: #362a1c;
+  --popover-foreground: #e6d9be;
+  --primary: #c99a4c;
+  --primary-foreground: #2b2117;
+  --secondary: #4a3826;
+  --secondary-foreground: #e6d9be;
+  --muted: #4a3826;
+  --muted-foreground: #b8a888;
+  --accent: #d9b878;
+  --accent-foreground: #2b2117;
+  --destructive: #d17055;
+  --border: #5a4634;
+  --input: #5a4634;
+  --ring: #c99a4c;
+}
+
+/* --- High Contrast (maximum WCAG AAA readability) --- */
+.palette-high-contrast {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #f5f5f5;
+  --card-foreground: #000000;
+  --popover: #f5f5f5;
+  --popover-foreground: #000000;
+  --primary: #0000c8;
+  --primary-foreground: #ffffff;
+  --secondary: #e0e0e0;
+  --secondary-foreground: #000000;
+  --muted: #e0e0e0;
+  --muted-foreground: #404040;
+  --accent: #d20000;
+  --accent-foreground: #ffffff;
+  --destructive: #d20000;
+  --border: #000000;
+  --input: #000000;
+  --ring: #0000c8;
+}
+.palette-high-contrast.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #1a1a1a;
+  --card-foreground: #ffffff;
+  --popover: #1a1a1a;
+  --popover-foreground: #ffffff;
+  --primary: #ffff00;
+  --primary-foreground: #000000;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #ffffff;
+  --muted: #2a2a2a;
+  --muted-foreground: #c8c8c8;
+  --accent: #00ffff;
+  --accent-foreground: #000000;
+  --destructive: #ff5555;
+  --border: #ffffff;
+  --input: #ffffff;
+  --ring: #ffff00;
+}
+
+/* --- Warm (sunset oranges + earthy neutrals) --- */
+.palette-warm {
+  --background: #fef8f2;
+  --foreground: #3a281c;
+  --card: #f8ecdd;
+  --card-foreground: #3a281c;
+  --popover: #f8ecdd;
+  --popover-foreground: #3a281c;
+  --primary: #d97706;
+  --primary-foreground: #fef8f2;
+  --secondary: #f2dfc9;
+  --secondary-foreground: #3a281c;
+  --muted: #f2dfc9;
+  --muted-foreground: #785a44;
+  --accent: #e76a2c;
+  --accent-foreground: #fef8f2;
+  --destructive: #b91c1c;
+  --border: #ecd5b9;
+  --input: #ecd5b9;
+  --ring: #d97706;
+}
+.palette-warm.dark {
+  --background: #1c1310;
+  --foreground: #f7e4cc;
+  --card: #2c1e18;
+  --card-foreground: #f7e4cc;
+  --popover: #2c1e18;
+  --popover-foreground: #f7e4cc;
+  --primary: #f59e0b;
+  --primary-foreground: #1c1310;
+  --secondary: #3a2a20;
+  --secondary-foreground: #f7e4cc;
+  --muted: #3a2a20;
+  --muted-foreground: #d4b596;
+  --accent: #ff8f42;
+  --accent-foreground: #1c1310;
+  --destructive: #ef4444;
+  --border: #4a3628;
+  --input: #4a3628;
+  --ring: #f59e0b;
+}
+
+/* --- Cool (deep teals + slate) --- */
+.palette-cool {
+  --background: #f0f6f7;
+  --foreground: #143034;
+  --card: #e5eff1;
+  --card-foreground: #143034;
+  --popover: #e5eff1;
+  --popover-foreground: #143034;
+  --primary: #0891b2;
+  --primary-foreground: #f0f6f7;
+  --secondary: #d6e5e8;
+  --secondary-foreground: #143034;
+  --muted: #d6e5e8;
+  --muted-foreground: #4b6870;
+  --accent: #2dd4bf;
+  --accent-foreground: #143034;
+  --destructive: #b91c1c;
+  --border: #c9dde0;
+  --input: #c9dde0;
+  --ring: #0891b2;
+}
+.palette-cool.dark {
+  --background: #0d1a1e;
+  --foreground: #d4e4e7;
+  --card: #142529;
+  --card-foreground: #d4e4e7;
+  --popover: #142529;
+  --popover-foreground: #d4e4e7;
+  --primary: #22d3ee;
+  --primary-foreground: #0d1a1e;
+  --secondary: #1e353a;
+  --secondary-foreground: #d4e4e7;
+  --muted: #1e353a;
+  --muted-foreground: #8fabb0;
+  --accent: #67e8f9;
+  --accent-foreground: #0d1a1e;
+  --destructive: #ef4444;
+  --border: #2c464c;
+  --input: #2c464c;
+  --ring: #22d3ee;
+}
+
+/* ==========================================================================
+ * Phase 34 — Font scale, UI density, accessibility toggles.
+ * ========================================================================== */
+.font-scale-compact {
+  font-size: 0.875rem;
+}
+.font-scale-large {
+  font-size: 1.0625rem;
+}
+/* `normal` = browser default 1rem (no override). */
+
+/* UI density scales CSS variables so buttons/inputs/cards can adjust
+   without every component needing conditional Tailwind classes. */
+.density-compact {
+  --density-scale: 0.85;
+}
+.density-roomy {
+  --density-scale: 1.15;
+}
+
+/* Reduce motion — disable animations globally when the user opts in. */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+/* Also respect the OS preference automatically. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Larger click targets — pad interactive elements for touch / motor
+   accessibility. Applies globally when opted in. */
+.larger-targets button,
+.larger-targets [role="button"],
+.larger-targets a[href],
+.larger-targets input[type="checkbox"],
+.larger-targets input[type="radio"],
+.larger-targets select,
+.larger-targets summary {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* UI font family selection. */
+.ui-font-inter {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+}
+.ui-font-system {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+}
+.ui-font-serif {
+  --font-sans: Georgia, "Times New Roman", ui-serif, serif;
+}
+
+/* Sheet paper color variable — read by SheetSurface. */
+:root {
+  --sheet-paper: #f6f1e6;
+}
+.paper-white {
+  --sheet-paper: #ffffff;
+}
+.paper-off-white {
+  --sheet-paper: #faf8f3;
+}
+.paper-gray {
+  --sheet-paper: #eeece8;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

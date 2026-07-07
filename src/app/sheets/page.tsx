@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { decodeSheet } from "@/lib/sheets/share";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
+import { useUserPrefs } from "@/lib/state/user-prefs";
 
 /**
  * /sheets — lead-sheet library landing page.
@@ -20,6 +21,12 @@ export default function SheetsLibraryPage() {
   const router = useRouter();
   const sheets = useSheetsLibrary((s) => s.sheets);
   const createSheet = useSheetsLibrary((s) => s.createSheet);
+  // Phase 34 — the user's global chord-font default seeds the fontStyle
+  // of freshly-created sheets. Only "handwritten" maps to the sheet's
+  // handwritten aesthetic voice; every other chord-font pref (serif,
+  // sans, mono) lands as the standard/serif look, which each sheet's
+  // own font-style picker can still override.
+  const chordFontDefault = useUserPrefs((s) => s.chordFontDefault);
   const deleteSheet = useSheetsLibrary((s) => s.deleteSheet);
   const importSheet = useSheetsLibrary((s) => s.importSheet);
   const [mounted, setMounted] = useState(false);
@@ -64,7 +71,9 @@ export default function SheetsLibraryPage() {
   }, [sortedSheets, query]);
 
   const handleCreate = () => {
-    const id = createSheet();
+    const initialFontStyle =
+      chordFontDefault === "handwritten" ? "handwritten" : "standard";
+    const id = createSheet({ fontStyle: initialFontStyle });
     router.push(`/sheets/${id}/edit`);
   };
 

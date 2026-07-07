@@ -286,6 +286,7 @@ function melodyForDisplay(
 function buildStaveNotesForMelody(
   melody: MelodyNote[],
   clef: "treble" | "bass" = "treble",
+  noteColoring: "off" | "boomwhacker" = "off",
 ): StaveNote[] {
   // Rests need to sit visually IN the middle of the staff regardless
   // of clef. Treble middle line = B4 ("b/4"); bass middle line = D3
@@ -313,8 +314,38 @@ function buildStaveNotesForMelody(
       clef,
     });
     if (n.dotted) Dot.buildAndAttach([note], { all: true });
+    // Phase 34 — Boomwhacker pitch coloring. Notehead + stem tinted
+    // by the pitch's letter class (C=red, D=orange, …), matching the
+    // classroom Boomwhacker tube color convention.
+    if (noteColoring === "boomwhacker") {
+      const color = boomwhackerColorForPitch(n.pitch);
+      if (color) {
+        note.setStyle({ fillStyle: color, strokeStyle: color });
+      }
+    }
     return note;
   });
+}
+
+/**
+ * Boomwhacker color mapping (the widely used classroom convention).
+ * Ignores accidentals — sharps/flats inherit the natural letter's hue,
+ * matching how physical Boomwhacker tubes are colored (there are no
+ * separate colors per enharmonic pitch, just per letter).
+ */
+const BOOMWHACKER_COLORS: Record<string, string> = {
+  c: "#e53935", // red
+  d: "#fb8c00", // orange
+  e: "#fdd835", // yellow
+  f: "#43a047", // green
+  g: "#00acc1", // teal
+  a: "#3949ab", // blue
+  b: "#8e24aa", // purple
+};
+
+function boomwhackerColorForPitch(pitch: string): string | null {
+  const letter = pitch[0]?.toLowerCase();
+  return (letter && BOOMWHACKER_COLORS[letter]) ?? null;
 }
 
 function collectTuplets(
@@ -481,6 +512,10 @@ export function SheetSurface({
 }: SheetSurfaceProps) {
   const musicRef = useRef<HTMLDivElement>(null);
   const notationStyle = useUserPrefs((s) => s.notationDefault);
+  // Phase 34 — Boomwhacker note coloring. When "off" (default), the
+  // renderer draws noteheads/stems in the ambient text color (as before);
+  // when "boomwhacker", each pitched note is tinted by its letter class.
+  const noteColoring = useUserPrefs((s) => s.noteColoring);
   /**
    * Phase 25.0.2 — font family family selector. "standard" uses the
    * classic serif Georgia/Times engraving; "handwritten" uses Patrick
@@ -962,6 +997,7 @@ export function SheetSurface({
         const staveNotes = buildStaveNotesForMelody(
           displayMelody,
           measureClef,
+          noteColoring,
         );
         const voice = new Voice({
           numBeats: sheet.timeSignature.beatsPerMeasure,
@@ -1347,13 +1383,17 @@ export function SheetSurface({
     chordSize,
     lyricFont,
     lyricSize,
+    noteColoring,
   ]);
 
   return (
     <div
       className="sheet-paper relative mx-auto rounded-sm shadow-2xl print:shadow-none"
       style={{
-        background: "#fbfaf5",
+        // Phase 34 — paper color reads from the --sheet-paper CSS
+        // custom property (set by ThemeApplicator via .paper-<name>
+        // classes on <html>). Cream is the default.
+        background: "var(--sheet-paper, #fbfaf5)",
         color: "#1a1a1a",
         width,
         // Phase 24c.2: lock to Letter paper height so the user always

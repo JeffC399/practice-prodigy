@@ -31,7 +31,13 @@ type SheetsLibraryStore = {
   /** Phase 26 — per-sheet redo stack. */
   redoStacks: Record<string, Sheet[]>;
   getById: (id: string) => Sheet | undefined;
-  createSheet: () => string;
+  /**
+   * Create a new sheet. Optional `overrides` are shallow-merged over
+   * the default sheet — Settings uses this to apply the user's global
+   * font-style default to fresh sheets without disturbing sheets that
+   * already have their own choice.
+   */
+  createSheet: (overrides?: Partial<Sheet>) => string;
   /**
    * Phase 33 — clone a Sheet imported from a share URL / JSON file
    * into the local library. Generates a fresh id + timestamps so the
@@ -67,7 +73,7 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
       undoStacks: {},
       redoStacks: {},
       getById: (id) => get().sheets.find((s) => s.id === id),
-      createSheet: () => {
+      createSheet: (overrides) => {
         const id = newSheetId();
         const now = Date.now();
         set((state) => ({
@@ -76,6 +82,7 @@ export const useSheetsLibrary = create<SheetsLibraryStore>()(
             {
               id,
               ...makeDefaultSheet(),
+              ...(overrides ?? {}),
               createdAt: now,
               updatedAt: now,
             },
