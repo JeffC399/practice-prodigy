@@ -3,6 +3,8 @@
 import { KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
+import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
 import {
   ORDERING_STRATEGIES,
   ORDERING_STRATEGY_DISPLAY_NAMES,
@@ -60,11 +62,14 @@ export default function KeySequencerSetupPage() {
   const setKeyPool = useKeySequencerConfig((s) => s.setKeyPool);
   const keyOrdering = useKeySequencerConfig((s) => s.keyOrdering);
   const setKeyOrdering = useKeySequencerConfig((s) => s.setKeyOrdering);
+  const promptRows = useKeySequencerConfig((s) => s.promptRows);
+  const setPromptRows = useKeySequencerConfig((s) => s.setPromptRows);
   const enharmonicPreference =
     useKeySequencerConfig((s) => s.enharmonicPreference) ?? "auto";
   const setEnharmonicPreference = useKeySequencerConfig(
     (s) => s.setEnharmonicPreference,
   );
+  const wholeConfig = useKeySequencerConfig();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -224,17 +229,28 @@ export default function KeySequencerSetupPage() {
           </label>
         </section>
 
-        {/* Prompt rows placeholder — built in Slice 45.1 */}
-        <section className="flex flex-col gap-3 rounded-md border border-dashed border-border/60 bg-background/40 p-5">
-          <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-            Prompt rows
-          </h2>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Coming in the next slice: up to 3 rows of user-defined key words
-            (Quality, Pattern, Direction — or anything you type) that layer
-            on top of the key selection so each measure shows the key + one
-            word per row.
-          </p>
+        {/* Prompt rows — the composability heart of Key Sequencer.
+            Users type free-text words in up to 3 rows; each measure
+            surfaces one word per row combined with the key. */}
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Prompt rows
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Layer up to 3 rows of key words on top of the key
+              selection. Each measure will show the current key plus
+              one word from each row (per that row's ordering).
+            </p>
+          </div>
+          <PromptRowEditor rows={promptRows} onChange={setPromptRows} />
+        </section>
+
+        {/* Live preview of the first 4 measures. Reruns on every
+            config change. Stable seed so previews don't flicker on
+            each keystroke. */}
+        <section className="flex flex-col gap-3">
+          <KeySequencerLivePreview config={wholeConfig} />
         </section>
 
         {/* Launch placeholder — session page ships in Slice 45.2 */}
