@@ -199,9 +199,22 @@ export default function SettingsPage() {
   // side by side in the preview.
   const [compareOpen, setCompareOpen] = useState(false);
 
-  // Sticky preview pin — user can dismiss the stickiness for a scroll
+  // Sticky preview pin — user can toggle stickiness for a scroll
   // session. Doesn't persist; resets on route change.
-  const [previewPinned, setPreviewPinned] = useState(true);
+  //
+  // Phase 34.7.5 — Default changed from `true` to `false`. Reason: any
+  // `position: sticky` element is proactively promoted to a browser
+  // compositing layer in Chrome, and text on a compositing layer
+  // cannot use subpixel antialiasing — the compositor doesn't have
+  // LCD subpixel information, so it falls back to grayscale AA. This
+  // was the last unfixable-in-CSS cause of the "Practice Prodigy"
+  // heading rendering slightly soft even after 34.7.1 – 34.7.4
+  // stripped every filter, backdrop-blur, and font-smoothing override.
+  // Defaulting pinned = false means the preview renders in the normal
+  // document flow, no compositing, crisp text. Users who want the
+  // pinned behavior can still click the pin icon and opt in — they
+  // just do so knowing the trade-off.
+  const [previewPinned, setPreviewPinned] = useState(false);
 
   if (!mounted) {
     return (
