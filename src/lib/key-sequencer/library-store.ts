@@ -124,6 +124,8 @@ export const useKeyDrillsLibrary = create<KeyDrillsLibraryStore>()(
               config: clonedConfig,
               createdAt: now,
               updatedAt: now,
+              // Phase 46 — starter → user drill on duplicate.
+              isStarter: false,
             },
           ],
         }));
@@ -147,6 +149,9 @@ export const useKeyDrillsLibrary = create<KeyDrillsLibraryStore>()(
           // stable default order matching the template array order.
           createdAt: now - (STARTER_TEMPLATES.length - i),
           updatedAt: now - (STARTER_TEMPLATES.length - i),
+          // Phase 46 — marks these as starter templates so the setup
+          // page renders them in the separate Templates section.
+          isStarter: true,
         }));
         set({
           drills: [...state.drills, ...seeded],

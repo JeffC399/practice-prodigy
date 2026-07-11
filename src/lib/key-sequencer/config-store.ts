@@ -33,6 +33,9 @@ type KeySequencerConfigStore = KeySequencerConfig & {
   updatePromptRow: (id: string, patch: Partial<PromptRow>) => void;
   removePromptRow: (id: string) => void;
   setRestMeasuresBetweenKeys: (n: number) => void;
+  setTransitionUnit: (u: "measures" | "beats") => void;
+  setTransitionMeasures: (n: number) => void;
+  setTransitionBeats: (n: number) => void;
   setBpm: (bpm: number) => void;
   setTimeSignature: (ts: KeySequencerConfig["timeSignature"]) => void;
   setMeasuresPerKey: (n: number) => void;
@@ -69,6 +72,9 @@ export const useKeySequencerConfig = create<KeySequencerConfigStore>()(
         })),
       setRestMeasuresBetweenKeys: (restMeasuresBetweenKeys) =>
         set({ restMeasuresBetweenKeys }),
+      setTransitionUnit: (transitionUnit) => set({ transitionUnit }),
+      setTransitionMeasures: (transitionMeasures) => set({ transitionMeasures }),
+      setTransitionBeats: (transitionBeats) => set({ transitionBeats }),
       setBpm: (bpm) => set({ bpm }),
       setTimeSignature: (timeSignature) => set({ timeSignature }),
       setMeasuresPerKey: (measuresPerKey) => set({ measuresPerKey }),

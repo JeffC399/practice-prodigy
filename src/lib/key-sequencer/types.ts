@@ -105,8 +105,24 @@ export type KeySequencerConfig = {
   /** 0..KEY_SEQUENCER_MAX_ROWS prompt rows. */
   promptRows: PromptRow[];
 
-  /** Optional pause between key changes. 0..4. */
+  /**
+   * @deprecated Superseded by transitionUnit / transitionMeasures /
+   * transitionBeats. Kept in the type for existing user data; the
+   * default config no longer sets it and the sequencer / UI both use
+   * the new prep-between-keys system. Free to remove after a v2
+   * migration.
+   */
   restMeasuresBetweenKeys: number;
+
+  /**
+   * Phase 46 — Prep between keys. Mirrors the Bass Arpeggios
+   * "transition" system: inserted BETWEEN key groups, played with
+   * stick-click audio + "Get ready" visual state so users get an
+   * unambiguous heads-up before the next key starts.
+   */
+  transitionUnit?: "measures" | "beats";
+  transitionMeasures?: number; // 0..4
+  transitionBeats?: number;    // 0..16
 
   /** Standard drill config shared with Bass Arpeggios substrate. */
   bpm: number;
@@ -139,6 +155,13 @@ export type KeyDrill = {
   createdAt: number;
   updatedAt: number;
   lastLoadedAt?: number;
+  /**
+   * Phase 46 — Flag on drills that came from STARTER_TEMPLATES so the
+   * setup page can split "Your drills" (user-owned) from "Templates"
+   * (starter-owned, collapsible). Duplicating a starter deliberately
+   * strips this flag so the copy becomes a user drill.
+   */
+  isStarter?: boolean;
 };
 
 /** Fresh drill id generator. */
@@ -166,6 +189,9 @@ export const DEFAULT_KEY_SEQUENCER_CONFIG: KeySequencerConfig = {
   keyOrdering: "cycleOf5ths",
   promptRows: [],
   restMeasuresBetweenKeys: 0,
+  transitionUnit: "measures",
+  transitionMeasures: 0,
+  transitionBeats: 0,
   bpm: 90,
   timeSignature: { beatsPerMeasure: 4, beatUnit: 4 },
   measuresPerKey: 2,

@@ -62,6 +62,19 @@ export default function KeySequencerSessionPage() {
   const beatsPerMeasure = config.timeSignature.beatsPerMeasure;
   const totalPlayingBeats = steps.length * beatsPerMeasure;
 
+  // Phase 46 — beatStyles for prep/transition measures. Every beat of
+  // a step where isRest = true gets played with the stick-click audio
+  // (matches Arpeggios' transition behavior).
+  const beatStyles = useMemo(() => {
+    const styles: Array<"play" | "transition"> = [];
+    for (const step of steps) {
+      for (let b = 0; b < beatsPerMeasure; b++) {
+        styles.push(step.isRest ? "transition" : "play");
+      }
+    }
+    return styles;
+  }, [steps, beatsPerMeasure]);
+
   // Which step (measure) are we in? Absolute beat = 1..totalPlayingBeats
   // during playing; 0 during idle / count-in.
   const currentStepIdx = useMemo(() => {
@@ -95,6 +108,7 @@ export default function KeySequencerSessionPage() {
       totalPlayingBeats: config.repeatIndefinitely
         ? undefined
         : totalPlayingBeats,
+      beatStyles,
     });
   }, [
     isPlaying,
@@ -102,6 +116,7 @@ export default function KeySequencerSessionPage() {
     config,
     beatsPerMeasure,
     totalPlayingBeats,
+    beatStyles,
     start,
   ]);
 
@@ -494,9 +509,9 @@ function NowCard({
   isCountIn: boolean;
   config: import("@/lib/key-sequencer/types").KeySequencerConfig;
 }) {
-  const label = isCountIn ? "Get ready" : "Now";
-  const emphasis =
-    isIdle || isCountIn ? "opacity-60" : "";
+  const isPrep = !!step && step.isRest;
+  const label = isCountIn || isPrep ? "Get ready" : "Now";
+  const emphasis = isIdle || isCountIn || isPrep ? "opacity-60" : "";
   const displayStep = step ?? {
     isRest: false,
     key: config.keyPool[0] ?? null,
@@ -524,9 +539,21 @@ function NowCard({
           className="flex flex-col items-center gap-2"
         >
           {displayStep.isRest ? (
-            <span className="text-6xl font-semibold text-muted-foreground">
-              Rest
-            </span>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-4xl font-semibold text-muted-foreground">
+                Get ready
+              </span>
+              {displayStep.upcomingKey && (
+                <span className="text-2xl font-semibold text-foreground/70">
+                  →{" "}
+                  {keyDisplay(
+                    displayStep.upcomingKey,
+                    enharmonicPreference,
+                    config.keyOrdering,
+                  )}
+                </span>
+              )}
+            </div>
           ) : (
             <span className="text-8xl font-semibold text-foreground leading-none">
               {displayStep.key
@@ -580,9 +607,20 @@ function NextCard({
         Next
       </span>
       {step.isRest ? (
-        <span className="text-xl font-semibold text-muted-foreground">
-          Rest
-        </span>
+        <div className="flex flex-col items-center">
+          <span className="text-base font-medium text-muted-foreground">
+            (prep)
+          </span>
+          {step.upcomingKey && (
+            <span className="text-2xl font-semibold text-foreground/70 leading-none">
+              {keyDisplay(
+                step.upcomingKey,
+                enharmonicPreference,
+                config.keyOrdering,
+              )}
+            </span>
+          )}
+        </div>
       ) : (
         <>
           <span className="text-3xl font-semibold text-foreground leading-none">
@@ -635,9 +673,20 @@ function TwoPaneNextCard({
         Next
       </span>
       {step.isRest ? (
-        <span className="text-5xl font-semibold text-muted-foreground/70">
-          Rest
-        </span>
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-2xl font-semibold text-muted-foreground/70">
+            (prep)
+          </span>
+          {step.upcomingKey && (
+            <span className="text-6xl font-semibold text-foreground/60 leading-none">
+              {keyDisplay(
+                step.upcomingKey,
+                enharmonicPreference,
+                config.keyOrdering,
+              )}
+            </span>
+          )}
+        </div>
       ) : (
         <>
           <span className="text-7xl font-semibold text-foreground/70 leading-none">

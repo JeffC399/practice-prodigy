@@ -1,6 +1,13 @@
 "use client";
 
-import { KeyRound, Play, Save, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  KeyRound,
+  Play,
+  Plus,
+  Save,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -14,12 +21,18 @@ import {
   ORDERING_STRATEGY_DISPLAY_NAMES,
   TIME_SIGNATURES,
 } from "@/lib/state/practice-config";
+import {
+  PRACTICE_LAYOUTS,
+  PRACTICE_LAYOUT_DISPLAY_NAMES,
+  useUserPrefs,
+} from "@/lib/state/user-prefs";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
 import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
-import type {
-  KeyDrill,
-  KeyPitchClass,
-  KeySequencerConfig,
+import {
+  DEFAULT_KEY_SEQUENCER_CONFIG,
+  type KeyDrill,
+  type KeyPitchClass,
+  type KeySequencerConfig,
 } from "@/lib/key-sequencer/types";
 import {
   isVoiceAnnounceSupported,
@@ -127,6 +140,38 @@ export default function KeySequencerSetupPage() {
   const voiceAnnounce = useKeySequencerConfig((s) => s.voiceAnnounce);
   const setVoiceAnnounce = useKeySequencerConfig((s) => s.setVoiceAnnounce);
   const ttsSupported = isVoiceAnnounceSupported();
+
+  // Phase 46 — prep between keys (transition system).
+  const transitionUnit = useKeySequencerConfig((s) => s.transitionUnit) ?? "measures";
+  const setTransitionUnit = useKeySequencerConfig((s) => s.setTransitionUnit);
+  const transitionMeasures =
+    useKeySequencerConfig((s) => s.transitionMeasures) ?? 0;
+  const setTransitionMeasures = useKeySequencerConfig(
+    (s) => s.setTransitionMeasures,
+  );
+  const transitionBeats =
+    useKeySequencerConfig((s) => s.transitionBeats) ?? 0;
+  const setTransitionBeats = useKeySequencerConfig((s) => s.setTransitionBeats);
+
+  // Phase 46 — user's practice layout preference (single / two pane).
+  const practiceLayout = useUserPrefs((s) => s.practiceLayout);
+  const setPracticeLayout = useUserPrefs((s) => s.setPracticeLayout);
+
+  // Phase 46 — collapsible starter-templates section.
+  const [templatesOpen, setTemplatesOpen] = useState(true);
+  const reset = useKeySequencerConfig((s) => s.reset);
+  const handleCreateNewExercise = () => {
+    // Reset to defaults (matches DEFAULT_KEY_SEQUENCER_CONFIG shape)
+    // and clear the loaded-drill link so the editing badge disappears.
+    reset();
+    setSaveName("");
+    setSaveNotes("");
+    // Scroll to the top of the setup content so the user sees the
+    // fresh slate immediately.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   const loadedKeyDrillId = useKeySequencerConfig((s) => s.loadedKeyDrillId);
   const setLoadedKeyDrillId = useKeySequencerConfig(
     (s) => s.setLoadedKeyDrillId,
@@ -143,6 +188,16 @@ export default function KeySequencerSetupPage() {
         (a, b) => (b.lastLoadedAt ?? 0) - (a.lastLoadedAt ?? 0),
       ),
     [drillsLib.drills],
+  );
+
+  // Phase 46 — split user drills from starter templates.
+  const userDrills = useMemo(
+    () => sortedDrills.filter((d) => !d.isStarter),
+    [sortedDrills],
+  );
+  const templateDrills = useMemo(
+    () => sortedDrills.filter((d) => d.isStarter),
+    [sortedDrills],
   );
 
   const editingDrill = useMemo(() => {
@@ -280,29 +335,41 @@ export default function KeySequencerSetupPage() {
           </p>
         </header>
 
-        {/* Your key drills — the saved library at the top of the page.
-            Same location + pattern as /practice's Quick Start section. */}
+        {/* Your key drills — user-owned saves. Separated from
+            templates below so the user's own work is always the top
+            of the page. */}
         <section className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              Your key drills
-            </h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Your saved key drills — click a card to launch, pencil to
-              edit, copy to duplicate.
-            </p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="flex flex-col gap-1">
+              <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                Your key drills
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Click a card to launch, pencil to edit, copy to duplicate.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCreateNewExercise}
+              className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+              title="Reset the setup to a fresh drill"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              Create new exercise
+            </button>
           </div>
-          {sortedDrills.length === 0 ? (
+          {userDrills.length === 0 ? (
             <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
-              No saved key drills yet. Configure one below and hit{" "}
+              No saved key drills yet — try a template below, or configure
+              your own and hit{" "}
               <span className="font-medium text-foreground">
                 Save as drill
-              </span>{" "}
-              to add it here.
+              </span>
+              .
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {sortedDrills.map((d) => (
+              {userDrills.map((d) => (
                 <KeyDrillCard
                   key={d.id}
                   drill={d}
@@ -319,6 +386,66 @@ export default function KeySequencerSetupPage() {
             </div>
           )}
         </section>
+
+        {/* Templates — starter drills seeded on first install. In their
+            own collapsible section so users can hide them once they
+            have their own library going. Duplicating a template creates
+            a user-owned copy (with isStarter=false), keeping the
+            original intact. */}
+        {templateDrills.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setTemplatesOpen((v) => !v)}
+              className="flex items-center gap-2 self-start text-left"
+              aria-expanded={templatesOpen}
+            >
+              {templatesOpen ? (
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              )}
+              <div className="flex flex-col">
+                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                  Templates
+                  <span className="ml-1.5 normal-case tracking-normal font-normal text-muted-foreground/70">
+                    · {templateDrills.length}
+                  </span>
+                </span>
+                {!templatesOpen && (
+                  <span className="text-[11px] text-muted-foreground/70">
+                    Curated starters — click to expand.
+                  </span>
+                )}
+              </div>
+            </button>
+            {templatesOpen && (
+              <>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Starter templates showing what the module can do. Duplicate one
+                  to make it your own (the original stays here as reference).
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {templateDrills.map((d) => (
+                    <KeyDrillCard
+                      key={d.id}
+                      drill={d}
+                      isEditing={d.id === loadedKeyDrillId}
+                      onLaunch={handleLaunchDrill}
+                      onEdit={handleEditDrill}
+                      onDuplicate={handleDuplicateDrill}
+                      onDelete={(id) => {
+                        drillsLib.deleteDrill(id);
+                        if (id === loadedKeyDrillId)
+                          setLoadedKeyDrillId(undefined);
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         {/* Editing badge — visible when the live config was loaded from
             a saved drill. Save changes / Discard / Done editing. */}
@@ -555,7 +682,7 @@ export default function KeySequencerSetupPage() {
             </label>
             <label className="flex flex-col gap-1 text-xs">
               <span className="font-mono uppercase tracking-wider text-muted-foreground">
-                Measures per key
+                Measures each key stays
               </span>
               <input
                 type="number"
@@ -570,25 +697,58 @@ export default function KeySequencerSetupPage() {
                 }
                 className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="font-mono uppercase tracking-wider text-muted-foreground">
-                Rest measures between keys
+              <span className="text-[10px] text-muted-foreground/70">
+                How long each key stays before advancing. Set to 1 for a fresh key every measure.
               </span>
-              <input
-                type="number"
-                min={0}
-                max={4}
-                step={1}
-                value={restMeasuresBetweenKeys}
-                onChange={(e) =>
-                  setRestMeasuresBetweenKeys(
-                    Math.max(0, Math.min(4, parseInt(e.target.value, 10) || 0)),
-                  )
-                }
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-              />
             </label>
+            <div className="flex flex-col gap-1 text-xs">
+              <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                Prep between keys
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={transitionUnit === "measures" ? 4 : 16}
+                  step={1}
+                  value={
+                    transitionUnit === "measures"
+                      ? transitionMeasures
+                      : transitionBeats
+                  }
+                  onChange={(e) => {
+                    const v = Math.max(
+                      0,
+                      Math.min(
+                        transitionUnit === "measures" ? 4 : 16,
+                        parseInt(e.target.value, 10) || 0,
+                      ),
+                    );
+                    if (transitionUnit === "measures") {
+                      setTransitionMeasures(v);
+                    } else {
+                      setTransitionBeats(v);
+                    }
+                  }}
+                  className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                />
+                <select
+                  value={transitionUnit}
+                  onChange={(e) =>
+                    setTransitionUnit(
+                      e.target.value as "measures" | "beats",
+                    )
+                  }
+                  className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                >
+                  <option value="measures">measures</option>
+                  <option value="beats">beats</option>
+                </select>
+              </div>
+              <span className="text-[10px] text-muted-foreground/70">
+                Silence + stick-click cue between keys (matches Arpeggios).
+              </span>
+            </div>
             <label className="flex flex-col gap-1 text-xs">
               <span className="font-mono uppercase tracking-wider text-muted-foreground">
                 Count-in measures
@@ -639,6 +799,48 @@ export default function KeySequencerSetupPage() {
               />
             </label>
           )}
+        </section>
+
+        {/* Display — practice-screen layout picker. Mirrors the Arpeggios
+            module's Display section so the picker feels the same across
+            modules. Applies globally via useUserPrefs. */}
+        <section className="flex flex-col gap-3 rounded-md border border-border bg-card/40 p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Display
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Drill-screen layout. Applies to both Arpeggios and Key
+              Sequencer.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {PRACTICE_LAYOUTS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setPracticeLayout(l)}
+                className={`flex flex-col gap-0.5 rounded-md border px-3 py-2 text-left transition-colors ${
+                  practiceLayout === l
+                    ? "border-primary/60 bg-primary/10"
+                    : "border-border bg-background hover:border-primary/40"
+                }`}
+              >
+                <span
+                  className={`text-sm font-medium ${
+                    practiceLayout === l ? "text-primary" : "text-foreground"
+                  }`}
+                >
+                  {PRACTICE_LAYOUT_DISPLAY_NAMES[l]}
+                </span>
+                <span className="text-[10px] text-muted-foreground/80">
+                  {l === "single-pane"
+                    ? "Big Now card, small Next preview below."
+                    : "Equal-weight Now / Next side-by-side."}
+                </span>
+              </button>
+            ))}
+          </div>
         </section>
 
         {/* Voice announcement — optional browser TTS reads the upcoming

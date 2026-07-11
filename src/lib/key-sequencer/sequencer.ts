@@ -107,7 +107,13 @@ function orderPromptWords(
 
 /** One measure of drill output. */
 export type KeySequencerStep = {
-  /** True for rest measures (between key changes). */
+  /**
+   * True for prep/transition measures inserted between key changes
+   * (see config.transitionMeasures). During these, the metronome
+   * plays stick-click audio and the visual state shows "Get ready".
+   * Legacy "rest measures" also surface as isRest=true; the audio /
+   * visual treatment is identical.
+   */
   isRest: boolean;
   key: KeyPitchClass | null;
   /** One word per prompt row, aligned to config.promptRows order. Empty when isRest. */
@@ -116,6 +122,13 @@ export type KeySequencerStep = {
   measureInRun: number;
   /** Zero-based pass index (0, 1, 2, ...). Even at repeatIndefinitely = true. */
   passIndex: number;
+  /**
+   * Phase 46 — For prep/transition measures, the KEY of the next key
+   * group (the "get ready for" key). Undefined on play measures.
+   * Enables the Next preview to keep showing the upcoming key
+   * during prep, and Now to show "Get ready" + preview key.
+   */
+  upcomingKey?: KeyPitchClass;
 };
 
 /**
@@ -141,7 +154,24 @@ export function buildKeySequence(
   const rng = mulberry32(seed);
   const keyOrdering = config.keyOrdering;
   const measuresPerKey = Math.max(1, config.measuresPerKey);
-  const restMeasures = Math.max(0, config.restMeasuresBetweenKeys);
+  // Phase 46 — new prep system supersedes restMeasuresBetweenKeys.
+  // Only when both new fields are unset AND the legacy field is set do
+  // we fall back to it; that gives existing user data a graceful path.
+  const transitionUnit = config.transitionUnit ?? "measures";
+  const transitionMeasures =
+    transitionUnit === "measures"
+      ? Math.max(0, config.transitionMeasures ?? 0)
+      : 0;
+  // We only emit full-measure prep steps in this MVP. transitionBeats
+  // is stored + surfaced in the UI so the future beat-mode refactor
+  // has substrate, but for now the sequencer treats "beats" mode as
+  // rounded to the nearest measure (min 1 when beats > 0).
+  const transitionBeatsRounded =
+    transitionUnit === "beats" && (config.transitionBeats ?? 0) > 0 ? 1 : 0;
+  const restMeasures =
+    transitionMeasures || transitionBeatsRounded
+      ? transitionMeasures || transitionBeatsRounded
+      : Math.max(0, config.restMeasuresBetweenKeys ?? 0);
   const repetitions = config.repeatIndefinitely
     ? 32 // preview cap; the actual session engine will re-buffer for indefinite
     : Math.max(1, config.repetitions);
@@ -212,11 +242,26 @@ export function buildKeySequence(
         if (steps.length >= maxMeasures) return steps;
       }
 
-      // Rest measures between keys (skip after the very last key of the
-      // very last pass so the drill ends cleanly).
+      // Rest / prep measures between keys (skip after the very last
+      // key of the very last pass so the drill ends cleanly).
       const isLastKeyOfLastPass =
         pass === repetitions - 1 && k === keyOrder[keyOrder.length - 1];
       if (restMeasures > 0 && !isLastKeyOfLastPass) {
+        // Determine which key is coming up so the "Get ready" preview
+        // can name it. If this is the last key of THIS pass but not
+        // the last pass, upcoming is the first key of the NEXT pass.
+        const isLastKeyOfPass = k === keyOrder[keyOrder.length - 1];
+        let upcoming: KeyPitchClass | undefined;
+        if (!isLastKeyOfPass) {
+          upcoming = keyOrder[keyPositionInPass + 1];
+        } else if (pass < repetitions - 1) {
+          // Peek at first key of next pass. shuffleEachPass re-shuffles,
+          // so we can only guarantee an accurate upcoming key when NOT
+          // shuffling per pass; otherwise leave undefined.
+          if (keyOrdering !== "randomShuffleEachPass") {
+            upcoming = initialKeyOrder[0];
+          }
+        }
         for (let ri = 0; ri < restMeasures; ri++) {
           steps.push({
             isRest: true,
@@ -224,6 +269,7 @@ export function buildKeySequence(
             rowWords: config.promptRows.map(() => ""),
             measureInRun: ri,
             passIndex: pass,
+            upcomingKey: upcoming,
           });
           if (steps.length >= maxMeasures) return steps;
         }

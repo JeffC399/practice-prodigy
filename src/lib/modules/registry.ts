@@ -55,16 +55,19 @@ export type ModuleEntry = {
 
 export const MODULES: ModuleEntry[] = [
   {
-    id: "bass-arpeggios",
-    name: "Bass Arpeggios",
-    shortName: "Bass Arpeggios",
+    id: "arpeggios",
+    name: "Arpeggios",
+    shortName: "Arpeggios",
     status: "live",
     bucket: "now",
     route: "/practice",
     description:
-      "Drill arpeggio patterns over user-defined chord sequences. The v1 launch module.",
+      "Drill arpeggio patterns over user-defined chord sequences. Bass-tuned today; guitar + other instruments land with the upcoming instrument selector.",
     icon: Music,
-    routeMatch: (p) => p.startsWith("/practice"),
+    // Phase 46 — narrow the matcher so /practice/keys (Key Sequencer)
+    // doesn't get swallowed by this "startsWith /practice" match.
+    routeMatch: (p) =>
+      p.startsWith("/practice") && !p.startsWith("/practice/keys"),
   },
   {
     id: "my-practice",
