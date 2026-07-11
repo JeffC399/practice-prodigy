@@ -155,24 +155,23 @@ export default function SheetsLibraryPage() {
             input relied on browser default sizing. */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 items-center gap-2">
-            <div className="relative flex-1">
+            {/* Phase 36.1.6 — The visible search-bar rectangle is
+                this wrapper `<div>`, styled with the exact same
+                h-9 min-h-9 max-h-9 + border + bg + rounded classes
+                as the Import button. The `<input>` inside is set
+                to fill the container transparently (no border, no
+                background, no height styling), so any input-
+                specific rendering quirk is impossible — the box the
+                user sees is literally the div, matched to Import's
+                dimensions pixel for pixel. */}
+            <div className="relative flex h-9 min-h-9 max-h-9 flex-1 items-center rounded-md border border-border bg-background">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              {/* Phase 36.1.3 — `type="text"` instead of `type="search"`.
-                  Even with `appearance-none`, Chrome retains subtle
-                  vertical-metric differences for search inputs vs
-                  plain text inputs that made the search bar visually
-                  read as a slightly different height than the sibling
-                  `<button>` Import + New sheet controls. Plain text
-                  input renders with the same box metrics as the
-                  buttons. Also matched Import's `font-medium` +
-                  `text-muted-foreground` so the placeholder text
-                  weight + baseline align identically. */}
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search title, composer, style, key…"
-                className="h-9 w-full appearance-none rounded-md border border-border bg-background pl-8 pr-3 text-sm font-medium text-muted-foreground placeholder:text-muted-foreground/70 placeholder:font-normal focus:outline-none focus:border-primary/40"
+                className="h-full w-full appearance-none rounded-md border-0 bg-transparent pl-8 pr-3 text-sm font-medium text-muted-foreground placeholder:text-muted-foreground/70 placeholder:font-normal focus:outline-none"
                 aria-label="Search sheets"
               />
             </div>
