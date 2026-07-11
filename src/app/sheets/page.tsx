@@ -191,10 +191,18 @@ export default function SheetsLibraryPage() {
               className="hidden"
             />
           </div>
+          {/* Phase 36.1.2 — `border border-transparent` matches the
+              1px border on the sibling Search + Import controls, so
+              the interior colored fill on all three occupies the
+              same 34px (36 total − 1 top border − 1 bottom border).
+              Without the transparent border, this button's solid
+              teal fill uses the full 36px and looks visually
+              "chunkier" than the bordered controls, even though the
+              DOM height is identical. */}
           <button
             type="button"
             onClick={handleCreate}
-            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="flex h-9 items-center gap-1.5 rounded-md border border-transparent bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             <Plus className="h-4 w-4" />
             New sheet
