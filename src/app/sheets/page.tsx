@@ -157,12 +157,19 @@ export default function SheetsLibraryPage() {
           <div className="flex flex-1 items-center gap-2">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              {/* Phase 36.1.1 — `appearance-none` strips Chrome's
+                  default search-bezel rendering. Without it, the
+                  input's outer box is 36px but Chrome draws an
+                  internal decorative rounded rectangle smaller
+                  than the box, so the search bar visually looks
+                  shorter than the sibling buttons (which use
+                  `appearance: button` and fill the whole box). */}
               <input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search title, composer, style, key…"
-                className="h-9 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
+                className="h-9 w-full appearance-none rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
                 aria-label="Search sheets"
               />
             </div>
