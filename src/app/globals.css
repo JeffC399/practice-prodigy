@@ -634,7 +634,13 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    /* Phase 34.7.4 — Dropped `antialiased` here too. Same reason as
+     * the Phase 34.7.3 removal from <html>: it forces
+     * `-webkit-font-smoothing: antialiased`, which on Windows/Chrome
+     * disables ClearType subpixel AA and softens every bold heading.
+     * Letting the browser default win means Windows uses ClearType
+     * and macOS uses its OS default. */
+    @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
