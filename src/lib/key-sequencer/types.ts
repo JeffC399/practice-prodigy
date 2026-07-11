@@ -120,6 +120,14 @@ export type KeySequencerConfig = {
 
   enharmonicPreference?: EnharmonicPreference;
   voiceAnnounce?: VoiceAnnounce;
+
+  /**
+   * Phase 45.4 — When the config was loaded from a saved KeyDrill,
+   * this is that drill's id. Drives the "Editing: X" badge on the
+   * setup page and enables Save-changes (overwrite) semantics.
+   * Undefined = ad-hoc setup with no saved drill backing it.
+   */
+  loadedKeyDrillId?: string;
 };
 
 /** Saved drill in the user's Key Sequencer library. */

@@ -43,6 +43,7 @@ type KeySequencerConfigStore = KeySequencerConfig & {
     p: KeySequencerConfig["enharmonicPreference"],
   ) => void;
   setVoiceAnnounce: (v: KeySequencerConfig["voiceAnnounce"]) => void;
+  setLoadedKeyDrillId: (id: string | undefined) => void;
 };
 
 export const useKeySequencerConfig = create<KeySequencerConfigStore>()(
@@ -78,6 +79,7 @@ export const useKeySequencerConfig = create<KeySequencerConfigStore>()(
       setEnharmonicPreference: (enharmonicPreference) =>
         set({ enharmonicPreference }),
       setVoiceAnnounce: (voiceAnnounce) => set({ voiceAnnounce }),
+      setLoadedKeyDrillId: (loadedKeyDrillId) => set({ loadedKeyDrillId }),
     }),
     {
       name: "practice-prodigy:key-sequencer-config:v1",

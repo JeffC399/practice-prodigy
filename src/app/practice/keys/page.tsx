@@ -1,9 +1,10 @@
 "use client";
 
-import { KeyRound, Play } from "lucide-react";
+import { KeyRound, Play, Save, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
 import {
@@ -11,7 +12,25 @@ import {
   ORDERING_STRATEGY_DISPLAY_NAMES,
 } from "@/lib/state/practice-config";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
-import type { KeyPitchClass } from "@/lib/key-sequencer/types";
+import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
+import type {
+  KeyDrill,
+  KeyPitchClass,
+  KeySequencerConfig,
+} from "@/lib/key-sequencer/types";
+
+/**
+ * Strip UI-only state fields from a live config to get the shape we
+ * actually persist inside a KeyDrill. `loadedKeyDrillId` is UI state
+ * (tracks "which drill is loaded"); saving it into another drill would
+ * scramble the cross-drill navigation.
+ */
+function extractKeySequencerConfig(
+  c: KeySequencerConfig,
+): KeySequencerConfig {
+  const { loadedKeyDrillId: _ignored, ...rest } = c;
+  return rest;
+}
 
 /**
  * Key Sequencer setup page — Phase 45.0 scaffolding.
@@ -72,6 +91,95 @@ export default function KeySequencerSetupPage() {
     (s) => s.setEnharmonicPreference,
   );
   const wholeConfig = useKeySequencerConfig();
+  const loadedKeyDrillId = useKeySequencerConfig((s) => s.loadedKeyDrillId);
+  const setLoadedKeyDrillId = useKeySequencerConfig(
+    (s) => s.setLoadedKeyDrillId,
+  );
+  const loadConfig = useKeySequencerConfig((s) => s.loadConfig);
+  const drillsLib = useKeyDrillsLibrary();
+
+  const [saveName, setSaveName] = useState("");
+  const [saveNotes, setSaveNotes] = useState("");
+
+  const sortedDrills = useMemo(
+    () =>
+      [...drillsLib.drills].sort(
+        (a, b) => (b.lastLoadedAt ?? 0) - (a.lastLoadedAt ?? 0),
+      ),
+    [drillsLib.drills],
+  );
+
+  const editingDrill = useMemo(() => {
+    if (!loadedKeyDrillId) return null;
+    return drillsLib.drills.find((d) => d.id === loadedKeyDrillId) ?? null;
+  }, [loadedKeyDrillId, drillsLib.drills]);
+
+  const isDirty = useMemo(() => {
+    if (!editingDrill) return false;
+    const live = JSON.stringify(extractKeySequencerConfig(wholeConfig));
+    const saved = JSON.stringify(
+      extractKeySequencerConfig(editingDrill.config),
+    );
+    return live !== saved;
+  }, [editingDrill, wholeConfig]);
+
+  const handleLaunchDrill = (drill: KeyDrill) => {
+    loadConfig({
+      ...drill.config,
+      loadedKeyDrillId: drill.id,
+    });
+    drillsLib.markDrillLoaded(drill.id);
+    router.push("/practice/keys/session");
+  };
+
+  const handleEditDrill = (drill: KeyDrill) => {
+    loadConfig({
+      ...drill.config,
+      loadedKeyDrillId: drill.id,
+    });
+    // Stay on setup — user tweaks then hits Save changes / Save as new.
+  };
+
+  const handleDuplicateDrill = (drill: KeyDrill) => {
+    const newId = drillsLib.duplicateDrill(drill.id);
+    if (newId) {
+      const dup = drillsLib.drills.find((d) => d.id === newId);
+      if (dup) {
+        loadConfig({ ...dup.config, loadedKeyDrillId: newId });
+      }
+    }
+  };
+
+  const handleDoneEditing = () => setLoadedKeyDrillId(undefined);
+
+  const handleSaveChanges = () => {
+    if (!editingDrill) return;
+    drillsLib.updateDrillConfig(
+      editingDrill.id,
+      extractKeySequencerConfig(wholeConfig),
+    );
+  };
+
+  const handleSaveAsNew = () => {
+    const trimmedName = saveName.trim();
+    if (!trimmedName) return;
+    const newId = drillsLib.saveDrill(
+      trimmedName,
+      extractKeySequencerConfig(wholeConfig),
+      saveNotes.trim() || undefined,
+    );
+    setSaveName("");
+    setSaveNotes("");
+    setLoadedKeyDrillId(newId);
+  };
+
+  const handleDiscardChanges = () => {
+    if (!editingDrill) return;
+    loadConfig({
+      ...editingDrill.config,
+      loadedKeyDrillId: editingDrill.id,
+    });
+  };
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -122,12 +230,97 @@ export default function KeySequencerSetupPage() {
             Compose a key drill
           </h1>
           <p className="text-sm text-muted-foreground leading-6">
-            Pick a pool of keys + layer your own prompt rows on top (in the
-            next slice). Instrument-neutral: silent + metronome only. You
-            play on whatever instrument you like, guided by the key + your
-            prompt words on the Now / Next cards.
+            Pick a pool of keys + layer your own prompt rows on top.
+            Instrument-neutral: silent + metronome only. You play on
+            whatever instrument you like, guided by the key + your prompt
+            words on the Now / Next cards.
           </p>
         </header>
+
+        {/* Your key drills — the saved library at the top of the page.
+            Same location + pattern as /practice's Quick Start section. */}
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Your key drills
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Your saved key drills — click a card to launch, pencil to
+              edit, copy to duplicate.
+            </p>
+          </div>
+          {sortedDrills.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
+              No saved key drills yet. Configure one below and hit{" "}
+              <span className="font-medium text-foreground">
+                Save as drill
+              </span>{" "}
+              to add it here.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {sortedDrills.map((d) => (
+                <KeyDrillCard
+                  key={d.id}
+                  drill={d}
+                  isEditing={d.id === loadedKeyDrillId}
+                  onLaunch={handleLaunchDrill}
+                  onEdit={handleEditDrill}
+                  onDuplicate={handleDuplicateDrill}
+                  onDelete={(id) => {
+                    drillsLib.deleteDrill(id);
+                    if (id === loadedKeyDrillId) setLoadedKeyDrillId(undefined);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Editing badge — visible when the live config was loaded from
+            a saved drill. Save changes / Discard / Done editing. */}
+        {editingDrill && (
+          <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="font-mono text-xs uppercase tracking-wider text-primary">
+                Editing drill · {editingDrill.name}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {isDirty && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSaveChanges}
+                      className="rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/25"
+                    >
+                      Save changes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDiscardChanges}
+                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-destructive/50"
+                    >
+                      Discard changes
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={handleDoneEditing}
+                  className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Done editing
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Edit the pool, prompt rows, tempo, or session settings below —
+              they all apply to this drill. Click{" "}
+              <span className="font-medium text-foreground">Save changes</span>{" "}
+              to commit them.
+            </p>
+          </div>
+        )}
 
         {/* Key pool */}
         <section className="flex flex-col gap-4">
@@ -253,6 +446,48 @@ export default function KeySequencerSetupPage() {
             each keystroke. */}
         <section className="flex flex-col gap-3">
           <KeySequencerLivePreview config={wholeConfig} />
+        </section>
+
+        {/* Save-as-drill form — always visible, saves the current live
+            config as a new library entry. Save changes on an existing
+            loaded drill goes through the editing-badge above. */}
+        <section className="flex flex-col gap-3 rounded-md border border-border bg-card/40 p-4">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Save as drill
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Snapshot the current setup into your library — appears at the
+              top of this page for one-click re-launch.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value.slice(0, 80))}
+              placeholder="Drill name (e.g. Morning warmup)"
+              className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+              disabled={keyPool.length === 0}
+            />
+            <button
+              type="button"
+              onClick={handleSaveAsNew}
+              disabled={!saveName.trim() || keyPool.length === 0}
+              className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Save className="h-4 w-4" aria-hidden="true" />
+              Save as new drill
+            </button>
+          </div>
+          <textarea
+            value={saveNotes}
+            onChange={(e) => setSaveNotes(e.target.value.slice(0, 300))}
+            placeholder="Notes (optional) — e.g. Slow at 60. Focus on left-hand timing."
+            rows={2}
+            className="resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:text-foreground focus:outline-none"
+            disabled={keyPool.length === 0}
+          />
         </section>
 
         {/* Launch — go to the drill session. */}
