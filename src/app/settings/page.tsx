@@ -1235,20 +1235,20 @@ function PreviewCard() {
 function PreviewCardInner() {
   return (
     <>
-      {/* Phase 34.7.9 — Bumped size from text-base (16px) to text-lg
-          (18px), restored font-semibold. This is the definitive fix
-          for perceived softness after 34.7.6 – 34.7.8 exhausted the
-          smaller-tweak options. At 16px, ClearType has too little
-          pixel real estate to render semibold Geist Sans crisply;
-          the interpolated variable-font weight compounds the issue.
-          At 18px, each glyph gets ~13% more subpixel headroom and
-          the heading renders as sharp as the body text below. Also
-          matches how design shops targeting Windows-first UIs
-          (Linear, Vercel, Notion) size their card titles: 18px+ for
-          crisp semibold rendering, not 16px. tracking-tight stays
-          removed from Phase 34.7.7 (at 18px it would compute to
-          -0.45px which is still tight for adjacent-glyph edges). */}
-      <h3 className="text-lg font-semibold text-card-foreground">
+      {/* Phase 34.7.10 — Per user feedback ("put the same font in
+          Practice Prodigy that you use in other areas"), matching the
+          "Your preferences" H1 pattern verbatim, just scaled to a
+          card-title size. That H1 renders crisply on Windows Chrome
+          in the exact same viewport, so its class combination is the
+          reference for what works: `font-semibold tracking-tight` on
+          the default `text-foreground` color. At text-xl (20px), the
+          glyphs get enough subpixel headroom for semibold to render
+          sharp on ClearType, and the -0.5px tracking is proportionally
+          airy (vs the -0.4px at 16px that was crowded). Dropped
+          `text-card-foreground` in favor of the default `text-
+          foreground` (pure white in dark palettes) — matches the
+          H1 exactly for consistent contrast/rendering. */}
+      <h3 className="text-xl font-semibold tracking-tight text-foreground">
         Practice Prodigy
       </h3>
       <p className="text-xs text-muted-foreground leading-relaxed">
