@@ -278,6 +278,14 @@ export type UserPrefs = {
    * user clicks the "Got it" / X dismiss action, then never again.
    */
   hasSeenOnboarding: boolean;
+  /**
+   * Phase 44 — id of the last release note the user dismissed. When
+   * the top entry in RELEASE_NOTES has a different id, the "What's
+   * new" modal auto-opens on first mount. Undefined = first-ever
+   * install; we DON'T auto-open in that case (the onboarding hint
+   * already covers first-run guidance).
+   */
+  lastSeenReleaseId?: string;
   // Phase 34 — Appearance overhaul.
   /** Predefined palette; `default` = the original brand scheme. */
   themePalette: ThemePalette;
@@ -434,6 +442,8 @@ type UserPrefsStore = UserPrefs & {
   setHighContrast: (value: boolean) => void;
   /** Mark the first-visit onboarding hint as dismissed. */
   dismissOnboarding: () => void;
+  /** Phase 44 — Stamp the id of the release note the user just saw. */
+  markReleaseNoteSeen: (id: string) => void;
   /** Reset all prefs to defaults. Used by the future Settings reset action. */
   resetAll: () => void;
   /** Reset ONLY the Phase 34 appearance fields to their defaults. */
@@ -484,6 +494,7 @@ export const useUserPrefs = create<UserPrefsStore>()(
       setCornerRadius: (cornerRadius) => set({ cornerRadius }),
       setHighContrast: (highContrast) => set({ highContrast }),
       dismissOnboarding: () => set({ hasSeenOnboarding: true }),
+      markReleaseNoteSeen: (id) => set({ lastSeenReleaseId: id }),
       resetAll: () => set(DEFAULT_USER_PREFS),
       resetAppearance: () =>
         set({
