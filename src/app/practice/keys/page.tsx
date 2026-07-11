@@ -187,6 +187,13 @@ export default function KeySequencerSetupPage() {
     setMounted(true);
   }, []);
 
+  // Phase 45.5 — seed starter templates on first install. Guarded by
+  // seededStartersVersion inside the library store so this only runs
+  // once per user regardless of how many times they visit the page.
+  useEffect(() => {
+    if (mounted) drillsLib.seedStartersIfNeeded();
+  }, [mounted, drillsLib]);
+
   const toggleKey = (k: KeyPitchClass) => {
     if (keyPool.includes(k)) {
       setKeyPool(keyPool.filter((x) => x !== k));

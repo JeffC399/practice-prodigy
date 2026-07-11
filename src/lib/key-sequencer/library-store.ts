@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { STARTER_TEMPLATES } from "./starter-templates";
 import {
   newKeyDrillId,
   type KeyDrill,
@@ -13,6 +14,12 @@ import {
 
 type KeyDrillsLibraryStore = {
   drills: KeyDrill[];
+  /**
+   * Phase 45.5 — starter-template seed guard. Bumped when we ship a
+   * new seed pass so existing users can also get new templates by
+   * pushing this number up.
+   */
+  seededStartersVersion?: number;
   saveDrill: (
     name: string,
     config: KeySequencerConfig,
@@ -29,7 +36,17 @@ type KeyDrillsLibraryStore = {
   /** Duplicate an existing drill; returns the new id or null on miss. */
   duplicateDrill: (id: string) => string | null;
   deleteDrill: (id: string) => void;
+  /**
+   * Phase 45.5 — Seed the STARTER_TEMPLATES into the library on first
+   * install. Guarded by `seededStartersVersion` — only runs when the
+   * store hasn't seen the current seed version. Safe to call from a
+   * setup page mount effect.
+   */
+  seedStartersIfNeeded: () => void;
 };
+
+/** Current seed pass; bump to re-seed for existing users. */
+const SEED_VERSION = 1;
 
 export const useKeyDrillsLibrary = create<KeyDrillsLibraryStore>()(
   persist(
@@ -116,6 +133,26 @@ export const useKeyDrillsLibrary = create<KeyDrillsLibraryStore>()(
         set((state) => ({
           drills: state.drills.filter((d) => d.id !== id),
         })),
+      seedStartersIfNeeded: () => {
+        const state = get();
+        // Already seeded this version? Nothing to do.
+        if ((state.seededStartersVersion ?? 0) >= SEED_VERSION) return;
+        const now = Date.now();
+        const seeded: KeyDrill[] = STARTER_TEMPLATES.map((t, i) => ({
+          id: newKeyDrillId(),
+          name: t.name,
+          notes: t.notes,
+          config: t.config,
+          // Stagger createdAt so the "recently launched" sort has a
+          // stable default order matching the template array order.
+          createdAt: now - (STARTER_TEMPLATES.length - i),
+          updatedAt: now - (STARTER_TEMPLATES.length - i),
+        }));
+        set({
+          drills: [...state.drills, ...seeded],
+          seededStartersVersion: SEED_VERSION,
+        });
+      },
     }),
     {
       name: "practice-prodigy:key-drills-library:v1",
