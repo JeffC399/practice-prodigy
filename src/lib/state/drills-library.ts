@@ -42,6 +42,14 @@ type DrillsLibraryStore = {
   renameDrill: (id: string, name: string) => void;
   /** Stamp lastLoadedAt — call when the user launches a drill. */
   markDrillLoaded: (id: string) => void;
+  /**
+   * Phase 42 — Duplicate an existing drill into a new entry.
+   * Returns the new drill's id. Name gets " (copy)" appended so users
+   * can find and rename the clone without confusing it with the
+   * original. `lastLoadedAt` is intentionally cleared so the copy
+   * sorts to the top of "recently modified" but not "recently used."
+   */
+  duplicateDrill: (id: string) => string | null;
   deleteDrill: (id: string) => void;
 };
 
@@ -53,7 +61,7 @@ function newDrillId(): string {
 
 export const useDrillsLibrary = create<DrillsLibraryStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       drills: [],
       saveDrill: (name, config, notes) => {
         const id = newDrillId();
@@ -110,6 +118,33 @@ export const useDrillsLibrary = create<DrillsLibraryStore>()(
             d.id === id ? { ...d, lastLoadedAt: Date.now() } : d,
           ),
         })),
+      duplicateDrill: (id) => {
+        const src = get().drills.find((d) => d.id === id);
+        if (!src) return null;
+        const newId = newDrillId();
+        const now = Date.now();
+        // Deep-clone the config so future edits to the copy don't
+        // mutate the original's config object (structuredClone is
+        // safe here — PracticeConfig is JSON-serializable data).
+        const clonedConfig: PracticeConfig =
+          typeof structuredClone === "function"
+            ? structuredClone(src.config)
+            : JSON.parse(JSON.stringify(src.config));
+        set((state) => ({
+          drills: [
+            ...state.drills,
+            {
+              id: newId,
+              name: `${src.name} (copy)`,
+              notes: src.notes,
+              config: clonedConfig,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        }));
+        return newId;
+      },
       deleteDrill: (id) =>
         set((state) => ({
           drills: state.drills.filter((d) => d.id !== id),

@@ -82,6 +82,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Copy,
   GripVertical,
   ListChecks,
   Lock,
@@ -885,18 +886,30 @@ export default function PracticeSetupPage() {
             subtitle="Your saved sessions — click a card to launch, pencil to edit."
           >
             {userDrills.length === 0 ? (
-              <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
-                No saved drills yet. Configure one below and click{" "}
-                <span className="font-medium text-foreground">
-                  Save as drill
-                </span>{" "}
-                to add it here — or expand the{" "}
-                <span className="font-medium text-foreground">
-                  Built-in drills
-                </span>{" "}
-                library below to launch one of the 10 drills that ship
-                with Practice Prodigy.
-              </p>
+              <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  No saved drills yet. Configure one below and click{" "}
+                  <span className="font-medium text-foreground">
+                    Save as drill
+                  </span>{" "}
+                  to add it here — or launch a starter to hear how it
+                  works in one click.
+                </p>
+                {/* Phase 42 — one-click "Try a sample drill" button.
+                    Picks the first shipped drill (typically the
+                    friendliest starter) so first-time users can jump
+                    straight into practice without configuring first. */}
+                {SHIPPED_DRILLS.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleLoadDrill(SHIPPED_DRILLS[0])}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                  >
+                    <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                    Try a sample drill
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {userDrills.map((drill) => (
@@ -907,6 +920,10 @@ export default function PracticeSetupPage() {
                     isShipped={false}
                     onLaunch={handleLoadDrill}
                     onEdit={handleEditDrill}
+                    onDuplicate={(d) => {
+                      const newId = drillsLib.duplicateDrill(d.id);
+                      if (newId) handleEditDrill({ ...d, id: newId });
+                    }}
                     onDelete={drillsLib.deleteDrill}
                   />
                 ))}
@@ -1022,6 +1039,18 @@ export default function PracticeSetupPage() {
                   isShipped={true}
                   onLaunch={handleLoadDrill}
                   onEdit={handleEditDrill}
+                  onDuplicate={(d) => {
+                    // Save the shipped drill as a new user-owned copy
+                    // via saveDrill (duplicateDrill only works for
+                    // user drills). Open it in edit mode so users can
+                    // customize the copy immediately.
+                    const newId = drillsLib.saveDrill(
+                      `${d.name} (copy)`,
+                      d.config,
+                      d.notes,
+                    );
+                    handleEditDrill({ ...d, id: newId });
+                  }}
                   onDelete={drillsLib.deleteDrill}
                 />
               ))}
@@ -2407,6 +2436,7 @@ function DrillCard({
   isShipped,
   onLaunch,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   drill: Drill;
@@ -2415,6 +2445,8 @@ function DrillCard({
   isShipped: boolean;
   onLaunch: (drill: Drill) => void;
   onEdit: (drill: Drill) => void;
+  /** Phase 42 — one-click clone. Undefined on shipped drills. */
+  onDuplicate?: (drill: Drill) => void;
   onDelete: (id: string) => void;
 }) {
   const c = drill.config;
@@ -2508,6 +2540,17 @@ function DrillCard({
             >
               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
+            {onDuplicate && (
+              <button
+                type="button"
+                onClick={() => onDuplicate(drill)}
+                aria-label={`Duplicate drill ${drill.name}`}
+                title="Duplicate this drill"
+                className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground/50 hover:bg-border/60 hover:text-foreground transition-colors"
+              >
+                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
             {!isShipped && (
               <button
                 type="button"

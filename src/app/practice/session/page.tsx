@@ -29,6 +29,7 @@ import {
   usePracticeConfig,
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary } from "@/lib/state/drills-library";
+import { SHIPPED_DRILLS } from "@/lib/data/shipped-drills";
 import { useResumeSession } from "@/lib/state/resume-session";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { AnimatePresence, motion } from "framer-motion";
@@ -80,8 +81,13 @@ export default function PracticeSessionPage() {
 
   // When the user launched this session from a Quick Start card, anchor
   // their context by showing the drill's name in the header.
+  // Phase 42 — also look up shipped drills so launching a built-in
+  // library drill shows its name in the session header (previously
+  // only user drills were matched).
   const currentDrill = config.loadedDrillId
-    ? drillsLib.drills.find((d) => d.id === config.loadedDrillId) ?? null
+    ? (drillsLib.drills.find((d) => d.id === config.loadedDrillId) ??
+        SHIPPED_DRILLS.find((d) => d.id === config.loadedDrillId) ??
+        null)
     : null;
 
   const isIdle = state.phase === "idle";
