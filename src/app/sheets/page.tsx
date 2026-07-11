@@ -157,19 +157,22 @@ export default function SheetsLibraryPage() {
           <div className="flex flex-1 items-center gap-2">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              {/* Phase 36.1.1 — `appearance-none` strips Chrome's
-                  default search-bezel rendering. Without it, the
-                  input's outer box is 36px but Chrome draws an
-                  internal decorative rounded rectangle smaller
-                  than the box, so the search bar visually looks
-                  shorter than the sibling buttons (which use
-                  `appearance: button` and fill the whole box). */}
+              {/* Phase 36.1.3 — `type="text"` instead of `type="search"`.
+                  Even with `appearance-none`, Chrome retains subtle
+                  vertical-metric differences for search inputs vs
+                  plain text inputs that made the search bar visually
+                  read as a slightly different height than the sibling
+                  `<button>` Import + New sheet controls. Plain text
+                  input renders with the same box metrics as the
+                  buttons. Also matched Import's `font-medium` +
+                  `text-muted-foreground` so the placeholder text
+                  weight + baseline align identically. */}
               <input
-                type="search"
+                type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search title, composer, style, key…"
-                className="h-9 w-full appearance-none rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
+                className="h-9 w-full appearance-none rounded-md border border-border bg-background pl-8 pr-3 text-sm font-medium text-muted-foreground placeholder:text-muted-foreground/70 placeholder:font-normal focus:outline-none focus:border-primary/40"
                 aria-label="Search sheets"
               />
             </div>
