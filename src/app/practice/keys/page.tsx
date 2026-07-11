@@ -1,7 +1,8 @@
 "use client";
 
-import { KeyRound } from "lucide-react";
+import { KeyRound, Play } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
@@ -58,6 +59,7 @@ function keyDisplay(k: KeyPitchClass, pref: "auto" | "sharps" | "flats") {
 }
 
 export default function KeySequencerSetupPage() {
+  const router = useRouter();
   const keyPool = useKeySequencerConfig((s) => s.keyPool);
   const setKeyPool = useKeySequencerConfig((s) => s.setKeyPool);
   const keyOrdering = useKeySequencerConfig((s) => s.keyOrdering);
@@ -253,20 +255,17 @@ export default function KeySequencerSetupPage() {
           <KeySequencerLivePreview config={wholeConfig} />
         </section>
 
-        {/* Launch placeholder — session page ships in Slice 45.2 */}
-        <section className="flex items-center justify-between rounded-md border border-border bg-card/40 p-5">
-          <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-foreground">
-              Drill screen
-            </span>
-            <span className="text-xs text-muted-foreground leading-relaxed">
-              Session page ships in Slice 45.2 — Now / Next cards, metronome,
-              count-in, ±5 BPM controls.
-            </span>
-          </div>
-          <span className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            In build
-          </span>
+        {/* Launch — go to the drill session. */}
+        <section className="flex items-center justify-center py-2">
+          <button
+            type="button"
+            onClick={() => router.push("/practice/keys/session")}
+            disabled={keyPool.length === 0}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-8 py-3 text-lg font-medium text-primary-foreground shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Play className="h-5 w-5" aria-hidden="true" />
+            Start drill
+          </button>
         </section>
 
         {/* Foothold link back home */}

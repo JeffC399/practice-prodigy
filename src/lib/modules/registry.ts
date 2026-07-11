@@ -104,7 +104,7 @@ export const MODULES: ModuleEntry[] = [
     id: "key-sequencer",
     name: "Key Sequencer",
     shortName: "Key Sequencer",
-    status: "in-build",
+    status: "live",
     bucket: "now",
     route: "/practice/keys",
     description:
