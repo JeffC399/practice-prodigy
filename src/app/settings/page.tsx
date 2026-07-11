@@ -240,7 +240,16 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-semibold tracking-tight">
             Your preferences
           </h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          {/* Phase 34.7.6 — `leading-relaxed` on text-sm (14px) gives
+              a fractional 22.75px line-height, which propagates a
+              half-pixel Y cascade through the flex-col gap-10 layout
+              and puts the "Practice Prodigy" preview h3 on a
+              fractional Y coordinate. Fractional-Y text on Windows
+              Chrome renders soft (vertical anti-aliasing to smooth
+              the subpixel baseline). Swapping to `leading-6` (24px
+              integer) keeps comfortable spacing and eliminates the
+              downstream half-pixel accumulation. */}
+          <p className="text-sm text-muted-foreground leading-6">
             Cross-module choices that apply everywhere. Per-drill and
             per-sheet settings always override these defaults — this
             page sets the fallback values when a drill or sheet
