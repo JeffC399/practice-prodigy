@@ -4,6 +4,7 @@ import {
   Ear,
   Eye,
   FileMusic,
+  KeyRound,
   ListMusic,
   Mic,
   Music,
@@ -98,6 +99,18 @@ export const MODULES: ModuleEntry[] = [
       "Chromatic tuner via microphone input. Real-time pitch detection (autocorrelation), big note display, cents needle, configurable A4 reference (415–466 Hz for baroque / 432 / standard / 442 / 444). Works for any monophonic instrument: bass, guitar, voice.",
     icon: Mic,
     routeMatch: (p) => p.startsWith("/tuner"),
+  },
+  {
+    id: "key-sequencer",
+    name: "Key Sequencer",
+    shortName: "Key Sequencer",
+    status: "in-build",
+    bucket: "now",
+    route: "/practice/keys",
+    description:
+      "Composability-first: pick a pool of 12 keys + layer up to 3 rows of your own prompt words on top (quality, pattern, direction, or anything you type). Each measure surfaces one key + one word per row. Instrument-neutral — silent + metronome only. See KEY-SEQUENCER-DESIGN.md.",
+    icon: KeyRound,
+    routeMatch: (p) => p.startsWith("/practice/keys"),
   },
   {
     id: "scales",
