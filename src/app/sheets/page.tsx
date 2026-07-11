@@ -267,63 +267,85 @@ export default function SheetsLibraryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {/* Phase 41 — Card layout redesign:
+                • Full-width thumbnail (fills the card via ResizeObserver
+                  scale — no more dead space on the right at wider grid
+                  columns).
+                • Title + metadata in a padded body block below.
+                • Edit / delete icons docked in a border-top footer bar
+                  at the bottom, normalized to identical inline-flex
+                  h-7 w-7 boxes so link vs button rendering can't nudge
+                  their alignment.
+                • Whole card body (thumbnail + metadata) is one <Link>
+                  so the entire surface opens the view page. */}
             {filteredSheets.map((sheet) => (
               <div
                 key={sheet.id}
-                className="group relative flex flex-col gap-2 rounded-xl border border-border bg-card/40 p-4 hover:border-primary/40 transition-colors"
+                className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card/40 transition-all hover:border-primary/40 hover:shadow-md"
               >
                 <Link
                   href={`/sheets/${sheet.id}`}
-                  className="flex flex-col gap-2"
+                  className="flex flex-col"
+                  aria-label={`Open ${sheet.title || "Untitled"}`}
                 >
-                  {/* Phase 36 — live-rendered thumbnail. Reuses SheetSurface
-                      at native paper width and scales the whole render down
-                      via CSS transform, cropped to a fixed rectangle showing
-                      the title block + first line of music. */}
                   <SheetThumbnail sheet={sheet} />
-                  <span className="text-base font-medium text-foreground truncate pr-16">
-                    {sheet.title || "Untitled"}
-                  </span>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {sheet.composer ? `${sheet.composer} · ` : ""}
-                    {sheet.keyTonic} {sheet.keyMode} ·{" "}
-                    {sheet.timeSignature.beatsPerMeasure}/
-                    {sheet.timeSignature.beatUnit} ·{" "}
-                    {sheet.measures.length} bar
-                    {sheet.measures.length === 1 ? "" : "s"}
-                  </span>
-                  {sheet.style && (
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-                      {sheet.style}
+                  <div className="flex flex-col gap-1.5 p-4">
+                    <span className="text-base font-medium text-foreground line-clamp-2">
+                      {sheet.title || "Untitled"}
                     </span>
-                  )}
+                    <span className="text-xs text-muted-foreground truncate">
+                      {sheet.composer ? `${sheet.composer} · ` : ""}
+                      {sheet.keyTonic} {sheet.keyMode} ·{" "}
+                      {sheet.timeSignature.beatsPerMeasure}/
+                      {sheet.timeSignature.beatUnit} ·{" "}
+                      {sheet.measures.length} bar
+                      {sheet.measures.length === 1 ? "" : "s"}
+                    </span>
+                    {sheet.style && (
+                      <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                        {sheet.style}
+                      </span>
+                    )}
+                  </div>
                 </Link>
-                <div className="absolute right-2 top-2 flex items-center gap-1">
+                <div className="flex items-center justify-end gap-1 border-t border-border/60 bg-background/30 px-3 py-2">
                   <Link
                     href={`/sheets/${sheet.id}/edit`}
-                    className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     aria-label={`Edit ${sheet.title}`}
+                    title="Edit"
                   >
                     <Pencil className="h-4 w-4" />
                   </Link>
                   {confirmDeleteId === sheet.id ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        deleteSheet(sheet.id);
-                        setConfirmDeleteId(null);
-                      }}
-                      className="rounded-md bg-destructive px-2 py-1 text-[11px] font-medium text-destructive-foreground hover:opacity-90 transition-opacity"
-                      aria-label="Confirm delete"
-                    >
-                      Confirm
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="inline-flex h-7 items-center justify-center rounded-md border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label="Cancel delete"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          deleteSheet(sheet.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="inline-flex h-7 items-center justify-center rounded-md bg-destructive px-2 text-[11px] font-medium text-destructive-foreground transition-opacity hover:opacity-90"
+                        aria-label="Confirm delete"
+                      >
+                        Confirm
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(sheet.id)}
-                      className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       aria-label={`Delete ${sheet.title}`}
+                      title="Delete"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
