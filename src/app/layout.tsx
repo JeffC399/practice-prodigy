@@ -68,7 +68,17 @@ export default function RootLayout({
       // Dark by default per design system. A future ThemeProvider will
       // toggle this class based on stored user preference + system
       // preference; for now we ship dark.
-      className={`dark ${GeistSans.variable} ${GeistMono.variable} ${patrickHand.variable} h-full antialiased`}
+      //
+      // Phase 34.7.3 — Removed the `antialiased` Tailwind class. It
+      // sets `-webkit-font-smoothing: antialiased` which force-disables
+      // ClearType subpixel rendering on Windows/Chrome and switches
+      // ALL text to grayscale antialiasing. Small text looks fine
+      // either way, but larger bold text (like the "Practice Prodigy"
+      // preview heading) rendered visibly soft compared to native
+      // subpixel AA. Letting the browser default rules apply gives
+      // Windows users ClearType (sharpest) and macOS users the OS
+      // default, which is what design systems generally want.
+      className={`dark ${GeistSans.variable} ${GeistMono.variable} ${patrickHand.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
