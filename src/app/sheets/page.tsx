@@ -147,7 +147,12 @@ export default function SheetsLibraryPage() {
           </p>
         </header>
 
-        {/* Toolbar: search + new sheet + import */}
+        {/* Toolbar: search + new sheet + import.
+            Phase 36.1 — All three controls share a fixed `h-9` (36px)
+            so their heights match visually. Previously each used
+            `py-1.5` which resolved to different intrinsic heights
+            because the buttons carry icons (h-4 = 16px) while the
+            input relied on browser default sizing. */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 items-center gap-2">
             <div className="relative flex-1">
@@ -157,14 +162,14 @@ export default function SheetsLibraryPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search title, composer, style, key…"
-                className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
+                className="h-9 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40"
                 aria-label="Search sheets"
               />
             </div>
             <button
               type="button"
               onClick={handleImport}
-              className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
               title="Import a .json sheet shared with you"
             >
               <Upload className="h-4 w-4" />
@@ -182,7 +187,7 @@ export default function SheetsLibraryPage() {
           <button
             type="button"
             onClick={handleCreate}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             <Plus className="h-4 w-4" />
             New sheet
