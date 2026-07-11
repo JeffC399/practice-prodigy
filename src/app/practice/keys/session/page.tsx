@@ -1,7 +1,15 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Minus, Pause, Play, Plus, Square } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronsRight,
+  Minus,
+  Play,
+  Plus,
+  RotateCcw,
+  Square,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMetronome } from "@/lib/audio/use-metronome";
@@ -9,6 +17,7 @@ import { keyDisplay } from "@/lib/key-sequencer/display";
 import { buildKeySequence } from "@/lib/key-sequencer/sequencer";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
 import { BPM_MAX, BPM_MIN } from "@/lib/state/practice-config";
+import { useUserPrefs } from "@/lib/state/user-prefs";
 
 /**
  * Key Sequencer drill screen — Phase 45.2.
@@ -29,6 +38,7 @@ import { BPM_MAX, BPM_MIN } from "@/lib/state/practice-config";
 
 export default function KeySequencerSessionPage() {
   const config = useKeySequencerConfig();
+  const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const { state, start, stop } = useMetronome();
 
   const [mounted, setMounted] = useState(false);
@@ -105,6 +115,99 @@ export default function KeySequencerSessionPage() {
     useKeySequencerConfig.getState().setBpm(next);
   };
 
+  const halveBpm = () => {
+    const next = Math.max(BPM_MIN, Math.round(config.bpm / 2));
+    useKeySequencerConfig.getState().setBpm(next);
+  };
+
+  const doubleBpm = () => {
+    const next = Math.min(BPM_MAX, config.bpm * 2);
+    useKeySequencerConfig.getState().setBpm(next);
+  };
+
+  /**
+   * Restart the current key run — jump back to the first measure of
+   * the currently-playing key. Uses a fresh Start with initialBeatIndex
+   * pointing at the first play beat of the current key group.
+   */
+  const restartCurrentKey = useCallback(async () => {
+    if (!isPlaying) return;
+    // Find the first measure of the current key run.
+    const firstMeasureIdx = currentStepIdx - (currentStep?.measureInRun ?? 0);
+    const firstBeat = firstMeasureIdx * beatsPerMeasure;
+    stop();
+    await start({
+      bpm: config.bpm,
+      beatsPerMeasure,
+      beatUnit: config.timeSignature.beatUnit,
+      countInBeats: 0,
+      initialBeatIndex: firstBeat,
+      totalPlayingBeats: config.repeatIndefinitely
+        ? undefined
+        : totalPlayingBeats,
+    });
+  }, [
+    isPlaying,
+    currentStepIdx,
+    currentStep,
+    beatsPerMeasure,
+    stop,
+    start,
+    config.bpm,
+    config.timeSignature.beatUnit,
+    config.repeatIndefinitely,
+    totalPlayingBeats,
+  ]);
+
+  /**
+   * Skip forward to the first measure of the NEXT key run. Same
+   * initialBeatIndex trick as restart.
+   */
+  const skipToNextKey = useCallback(async () => {
+    if (!isPlaying) return;
+    if (!currentStep) return;
+    // Beat where the current key run ends.
+    const currentRunStart = currentStepIdx - currentStep.measureInRun;
+    // Advance past the current key group + any rest measures after it.
+    let nextRunStart = currentRunStart + config.measuresPerKey;
+    while (
+      nextRunStart < steps.length &&
+      steps[nextRunStart].isRest
+    ) {
+      nextRunStart++;
+    }
+    if (nextRunStart >= steps.length) {
+      // Nothing to skip to — just stop.
+      stop();
+      return;
+    }
+    const firstBeat = nextRunStart * beatsPerMeasure;
+    stop();
+    await start({
+      bpm: config.bpm,
+      beatsPerMeasure,
+      beatUnit: config.timeSignature.beatUnit,
+      countInBeats: 0,
+      initialBeatIndex: firstBeat,
+      totalPlayingBeats: config.repeatIndefinitely
+        ? undefined
+        : totalPlayingBeats,
+    });
+  }, [
+    isPlaying,
+    currentStep,
+    currentStepIdx,
+    config.measuresPerKey,
+    steps,
+    beatsPerMeasure,
+    stop,
+    start,
+    config.bpm,
+    config.timeSignature.beatUnit,
+    config.repeatIndefinitely,
+    totalPlayingBeats,
+  ]);
+
   // Space = Start/Stop. Guarded so users can type in inputs.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -160,7 +263,17 @@ export default function KeySequencerSessionPage() {
             {config.repeatIndefinitely ? "loop" : `${config.repetitions} passes`}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={halveBpm}
+            disabled={config.bpm <= BPM_MIN}
+            className="flex h-8 items-center justify-center rounded-md border border-border bg-background px-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+            aria-label="Halve tempo"
+            title="÷2 BPM"
+          >
+            ÷2
+          </button>
           <button
             type="button"
             onClick={() => bumpBpm(-5)}
@@ -184,6 +297,16 @@ export default function KeySequencerSessionPage() {
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
+          <button
+            type="button"
+            onClick={doubleBpm}
+            disabled={config.bpm >= BPM_MAX}
+            className="flex h-8 items-center justify-center rounded-md border border-border bg-background px-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+            aria-label="Double tempo"
+            title="×2 BPM"
+          >
+            ×2
+          </button>
         </div>
       </header>
 
@@ -193,15 +316,55 @@ export default function KeySequencerSessionPage() {
           <EmptyPoolState />
         ) : (
           <>
-            <div className="flex w-full max-w-3xl flex-col items-center gap-6">
-              <NowCard
-                step={currentStep}
-                isIdle={isIdle}
-                isCountIn={isCountIn}
-                config={config}
-              />
-              <NextCard step={nextStep} config={config} />
-            </div>
+            {practiceLayout === "two-pane" ? (
+              <div className="grid w-full max-w-4xl grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
+                <NowCard
+                  step={currentStep}
+                  isIdle={isIdle}
+                  isCountIn={isCountIn}
+                  config={config}
+                />
+                <TwoPaneNextCard step={nextStep} config={config} />
+              </div>
+            ) : (
+              <div className="flex w-full max-w-3xl flex-col items-center gap-6">
+                <NowCard
+                  step={currentStep}
+                  isIdle={isIdle}
+                  isCountIn={isCountIn}
+                  config={config}
+                />
+                <NextCard step={nextStep} config={config} />
+              </div>
+            )}
+
+            {/* Session controls: restart current + skip */}
+            {(isPlaying || isCountIn) && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={restartCurrentKey}
+                  disabled={!isPlaying}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-40"
+                  aria-label="Restart current key"
+                  title="Restart current key"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Restart key
+                </button>
+                <button
+                  type="button"
+                  onClick={skipToNextKey}
+                  disabled={!isPlaying}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-40"
+                  aria-label="Skip to next key"
+                  title="Skip to next key"
+                >
+                  Skip next
+                  <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            )}
 
             <BeatDots
               beatsPerMeasure={beatsPerMeasure}
@@ -357,6 +520,61 @@ function NextCard({
           <div className="flex flex-col items-center">
             {step.rowWords.map((w, i) => (
               <span key={i} className="text-xs text-muted-foreground/80">
+                {w || <span className="opacity-40">—</span>}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Two-pane variant of the Next card — equal-weight side-by-side
+ * pane matching the Bass Arpeggios two-pane layout convention. The
+ * key + words are sized larger than the single-pane Next preview so
+ * both panes read as balanced peers.
+ */
+function TwoPaneNextCard({
+  step,
+  config,
+}: {
+  step: import("@/lib/key-sequencer/sequencer").KeySequencerStep | null;
+  config: import("@/lib/key-sequencer/types").KeySequencerConfig;
+}) {
+  if (!step) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/60 bg-background/20 px-6 py-8 text-muted-foreground/60">
+        <span className="font-mono text-xs uppercase tracking-wider">Next</span>
+        <span className="text-sm">— end —</span>
+      </div>
+    );
+  }
+  const enharmonicPreference = config.enharmonicPreference ?? "auto";
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-border bg-card/40 px-6 py-8">
+      <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+        Next
+      </span>
+      {step.isRest ? (
+        <span className="text-5xl font-semibold text-muted-foreground/70">
+          Rest
+        </span>
+      ) : (
+        <>
+          <span className="text-7xl font-semibold text-foreground/70 leading-none">
+            {step.key
+              ? keyDisplay(
+                  step.key,
+                  enharmonicPreference,
+                  config.keyOrdering,
+                )
+              : "—"}
+          </span>
+          <div className="flex flex-col items-center gap-1">
+            {step.rowWords.map((w, i) => (
+              <span key={i} className="text-base text-muted-foreground/80">
                 {w || <span className="opacity-40">—</span>}
               </span>
             ))}
