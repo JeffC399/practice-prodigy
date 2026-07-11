@@ -4,6 +4,7 @@ import { FileMusic, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SheetThumbnail } from "@/components/sheets/sheet-thumbnail";
 import { decodeSheet } from "@/lib/sheets/share";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
@@ -241,12 +242,17 @@ export default function SheetsLibraryPage() {
             {filteredSheets.map((sheet) => (
               <div
                 key={sheet.id}
-                className="group relative flex flex-col gap-1.5 rounded-xl border border-border bg-card/40 p-4 hover:border-primary/40 transition-colors"
+                className="group relative flex flex-col gap-2 rounded-xl border border-border bg-card/40 p-4 hover:border-primary/40 transition-colors"
               >
                 <Link
                   href={`/sheets/${sheet.id}`}
-                  className="flex flex-col gap-1.5"
+                  className="flex flex-col gap-2"
                 >
+                  {/* Phase 36 — live-rendered thumbnail. Reuses SheetSurface
+                      at native paper width and scales the whole render down
+                      via CSS transform, cropped to a fixed rectangle showing
+                      the title block + first line of music. */}
+                  <SheetThumbnail sheet={sheet} />
                   <span className="text-base font-medium text-foreground truncate pr-16">
                     {sheet.title || "Untitled"}
                   </span>
