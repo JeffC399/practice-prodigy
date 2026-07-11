@@ -1896,6 +1896,29 @@ export default function SheetEditorPage() {
                 ))}
               </select>
             </label>
+            {/* Phase 40 — Pickup (anacrusis). The FIRST measure of the
+                sheet is treated as a partial bar with `pickup` beats
+                instead of the full time-signature beatsPerMeasure. */}
+            <label className="flex flex-col gap-1 text-xs">
+              Pickup (beats)
+              <input
+                type="number"
+                min={0}
+                max={sheet.timeSignature.beatsPerMeasure - 0.5}
+                step={0.5}
+                value={sheet.pickup ?? 0}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isFinite(v) || v <= 0) {
+                    updateMeta("pickup", undefined);
+                  } else {
+                    updateMeta("pickup", v);
+                  }
+                }}
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm w-32"
+                title="Pickup / anacrusis — a partial first measure that leads into the downbeat. 0 = no pickup."
+              />
+            </label>
             {/* Phase 32.1 — Clef selection. Treble is standard for
                 lead sheets; bass is the pro answer for melodies that
                 live in the low bass range where treble + 15mb still

@@ -415,11 +415,58 @@ export type Sheet = {
    * on note density. When unset the renderer defaults to 4.
    */
   measuresPerLine?: 4 | 6 | 8;
+  /**
+   * Phase 40 — Pickup measure (anacrusis) length in beats.
+   *
+   * When set, the FIRST measure of the sheet is treated as a partial
+   * bar with only `pickup` beats instead of the full `beatsPerMeasure`.
+   * Classic "0 to 3" pickup that leads into the first full downbeat.
+   * Valid range: 0.5 to beatsPerMeasure - 0.5 (fractional to support
+   * dotted-quarter pickups etc.). Unset = no pickup, first measure is
+   * a normal full-length bar.
+   *
+   * Renderer: measure 0's VexFlow Voice uses this as its numBeats.
+   * Audio engine: uses `getMeasureBeats(sheet, mi)` for cumulative
+   * beat offsets so playback timing lines up correctly.
+   */
+  pickup?: number;
   createdAt: number;
   updatedAt: number;
   /** Last time the sheet was opened. */
   lastOpenedAt?: number;
 };
+
+/**
+ * Phase 40 — Returns how many beats measure `mi` in `sheet` occupies.
+ *
+ * Measure 0 respects the sheet's pickup (anacrusis) when set;
+ * all other measures use the sheet's time-signature beatsPerMeasure.
+ * Used by both the renderer (Voice numBeats) and the audio engine
+ * (cumulative startBeat calculations) so pickup timing is consistent
+ * across visual + audio.
+ */
+export function getMeasureBeats(sheet: Sheet, measureIdx: number): number {
+  if (measureIdx === 0 && typeof sheet.pickup === "number" && sheet.pickup > 0) {
+    return sheet.pickup;
+  }
+  return sheet.timeSignature.beatsPerMeasure;
+}
+
+/**
+ * Phase 40 — Cumulative beat offset at the START of measure `mi`.
+ *
+ * Sums `getMeasureBeats` for measures 0..mi-1. Used by the audio
+ * engine to compute the correct `startBeat` for each event so pickup
+ * shifting doesn't misalign subsequent measures.
+ */
+export function beatOffsetForMeasure(
+  sheet: Sheet,
+  measureIdx: number,
+): number {
+  let sum = 0;
+  for (let i = 0; i < measureIdx; i++) sum += getMeasureBeats(sheet, i);
+  return sum;
+}
 
 export function newSheetId(): string {
   return `sheet_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

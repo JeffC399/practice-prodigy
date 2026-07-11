@@ -17,11 +17,12 @@ import {
 } from "vexflow";
 import type { PitchClass } from "@/lib/music/chord";
 import { renderChord } from "@/lib/music/render-chord";
-import type {
-  MelodyNote,
-  Sheet,
-  SheetMeasure,
-  SheetOctavaShift,
+import {
+  getMeasureBeats,
+  type MelodyNote,
+  type Sheet,
+  type SheetMeasure,
+  type SheetOctavaShift,
 } from "@/lib/sheets/types";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 
@@ -999,8 +1000,12 @@ export function SheetSurface({
           measureClef,
           noteColoring,
         );
+        // Phase 40 — pickup measure: measure 0 uses sheet.pickup when
+        // set, all others use the sheet's beatsPerMeasure. Strict mode
+        // stays off so under-filled bars render without VexFlow
+        // throwing (already the existing behavior).
         const voice = new Voice({
-          numBeats: sheet.timeSignature.beatsPerMeasure,
+          numBeats: getMeasureBeats(sheet, measureIdx),
           beatValue: sheet.timeSignature.beatUnit,
         });
         voice.setStrict(false);

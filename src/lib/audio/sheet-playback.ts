@@ -13,6 +13,7 @@ import type {
 import {
   DEFAULT_SHEET_MIXER,
   MELODY_DURATION_BEATS,
+  getMeasureBeats,
 } from "@/lib/sheets/types";
 import {
   loadChordVoice,
@@ -265,7 +266,21 @@ class SheetPlayback {
         }))
       : expandFormPlayOrder(sheet.measures);
     const totalPlaySteps = playOrder.length;
-    const totalMeasureBeats = totalPlaySteps * beatsPerMeasure;
+
+    // Phase 40 — pickup measure support. Build a cumulative beat-offset
+    // per play step so measure 0 (or whichever step maps to source
+    // measure 0) can contribute pickup-beats instead of a full bar.
+    // Handles both pickup AND form-marking repeats correctly: if a
+    // section replay re-uses a measure, its beat contribution comes
+    // from getMeasureBeats(sheet, mi) which returns the sheet's
+    // beatsPerMeasure for any measure except source-index 0 with pickup.
+    const stepBeatOffsets: number[] = [];
+    let cumBeats = 0;
+    for (let step = 0; step < totalPlaySteps; step++) {
+      stepBeatOffsets.push(cumBeats);
+      cumBeats += getMeasureBeats(sheet, playOrder[step].sourceMeasureIdx);
+    }
+    const totalMeasureBeats = cumBeats;
 
     // 1) Chord events. Iterate the expanded play order so a section
     // played twice via `𝄆 ... 𝄇` schedules its chord events twice
@@ -279,7 +294,8 @@ class SheetPlayback {
         (a, b) => a.beat - b.beat,
       );
       for (const cb of sorted) {
-        const start = step * beatsPerMeasure + (cb.beat - 1);
+        // Phase 40 — use per-step cumulative offset (handles pickup).
+        const start = stepBeatOffsets[step] + (cb.beat - 1);
         const midi = chordToMidiNotes(cb.chord, CHORD_OCTAVE, cb.bass);
         flatChords.push({ startBeat: start, midi });
       }
@@ -333,7 +349,8 @@ class SheetPlayback {
       for (const n of melody) {
         flatMelody.push({
           note: n,
-          startBeat: step * beatsPerMeasure + cursor,
+          // Phase 40 — use per-step cumulative offset (handles pickup).
+          startBeat: stepBeatOffsets[step] + cursor,
           sourceMeasureIdx: mi,
         });
         cursor += beatsForDuration(n.duration, n.dotted);
