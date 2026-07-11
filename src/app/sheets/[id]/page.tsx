@@ -64,7 +64,7 @@ export default function SheetViewPage() {
 
   if (!mounted) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Loading sheet…
         </div>
@@ -74,7 +74,7 @@ export default function SheetViewPage() {
 
   if (!sheet) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="flex flex-col items-center gap-3 text-center">
           <p className="text-sm text-muted-foreground">Sheet not found.</p>
           <Link
@@ -112,7 +112,7 @@ export default function SheetViewPage() {
   // Phase 38 — mobile responsiveness pass (padding + wrap toolbar +
   // horizontal-scroll sheet wrapper).
   return (
-    <main className="flex flex-1 flex-col items-center px-3 py-4 sm:px-6 sm:py-8">
+    <main id="main-content" className="flex flex-1 flex-col items-center px-3 py-4 sm:px-6 sm:py-8">
       <div className="flex w-full max-w-5xl flex-col gap-6">
         {/* Toolbar — hidden in print. Phase 34.7: Play is now the
             primary CTA (consume the sheet); Share, Print, Edit are

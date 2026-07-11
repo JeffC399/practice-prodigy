@@ -135,7 +135,7 @@ export default function TunerPage() {
 
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-8">
+    <main id="main-content" className="flex flex-1 flex-col items-center px-6 py-8">
       <div className="flex w-full max-w-3xl flex-col gap-8">
         {/* Header */}
         <header className="flex flex-col gap-2">

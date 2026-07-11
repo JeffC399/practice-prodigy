@@ -125,7 +125,7 @@ export default function SheetsLibraryPage() {
 
   if (!mounted) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Loading sheets…
         </div>
@@ -134,7 +134,7 @@ export default function SheetsLibraryPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-8">
+    <main id="main-content" className="flex flex-1 flex-col items-center px-6 py-8">
       <div className="flex w-full max-w-3xl flex-col gap-8">
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold tracking-tight">

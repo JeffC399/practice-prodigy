@@ -218,7 +218,7 @@ export default function SettingsPage() {
 
   if (!mounted) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Loading settings…
         </div>
@@ -227,7 +227,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-12">
+    <main id="main-content" className="flex flex-1 flex-col items-center px-6 py-12">
       <div className="flex w-full max-w-3xl flex-col gap-10">
         {/* Phase 34.7 — Back button so Settings isn't a dead-end.
             Returns to whatever page the user was on before clicking

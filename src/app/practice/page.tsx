@@ -529,7 +529,7 @@ export default function PracticeSetupPage() {
 
   if (!mounted) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Loading setup…
         </div>
@@ -598,7 +598,7 @@ export default function PracticeSetupPage() {
       } measures${prepSummary}`;
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main id="main-content" className="flex flex-1 flex-col">
       {/* Page sub-header. The brand link + module switcher live in the
           persistent shell above; this just labels the current surface. */}
       <header className="flex items-center justify-end border-b border-border px-6 py-2">

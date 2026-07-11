@@ -673,7 +673,7 @@ export default function PracticeSessionPage() {
   };
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main id="main-content" className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Link

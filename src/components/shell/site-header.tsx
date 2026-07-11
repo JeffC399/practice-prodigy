@@ -81,6 +81,7 @@ function ModuleSwitcher({ current }: { current: ModuleEntry | null }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={`Practice Prodigy modules${current ? ` — currently ${current.shortName}` : ""}`}
         className="flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:border-primary/50 hover:bg-background/80 transition-colors"
       >
         {CurrentIcon && (

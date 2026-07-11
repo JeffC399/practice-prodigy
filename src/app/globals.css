@@ -633,6 +633,16 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Phase 39 — a11y: visible focus ring on every interactive
+   * element for keyboard navigation. `:focus-visible` fires ONLY
+   * for keyboard focus (not click), so mouse users don't see a ring
+   * when they click a button but Tab users get a clear 2px ring in
+   * the current palette's primary color. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
   body {
     /* Phase 34.7.4 — Dropped `antialiased` here too. Same reason as
      * the Phase 34.7.3 removal from <html>: it forces

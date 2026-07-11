@@ -50,7 +50,7 @@ function SharedSheetContent() {
 
   if (!sheet) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-lg font-semibold">Couldn’t load this shared sheet.</p>
           <p className="max-w-md text-sm text-muted-foreground">
@@ -78,7 +78,7 @@ function SharedSheetContent() {
   };
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-8">
+    <main id="main-content" className="flex flex-1 flex-col items-center px-6 py-8">
       <div className="flex w-full max-w-4xl flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link

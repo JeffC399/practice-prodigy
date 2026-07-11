@@ -5,6 +5,7 @@ import { Patrick_Hand } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/shell/service-worker-register";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
+import { SkipLink } from "@/components/shell/skip-link";
 import { ThemeApplicator } from "@/components/shell/theme-applicator";
 import "./globals.css";
 
@@ -83,6 +84,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeApplicator />
+        {/* Phase 39 — a11y: keyboard-only skip link. First Tab press
+            on any page reveals it; clicking / Enter focuses the
+            #main-content anchor on each page's <main> element. */}
+        <SkipLink />
         <SiteHeader />
         {children}
         <SiteFooter />

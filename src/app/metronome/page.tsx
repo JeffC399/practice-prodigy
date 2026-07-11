@@ -248,7 +248,7 @@ export default function MetronomePage() {
 
   if (!mounted) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Loading metronome…
         </div>
@@ -257,7 +257,7 @@ export default function MetronomePage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-8">
+    <main id="main-content" className="flex flex-1 flex-col items-center px-6 py-8">
       <div className="flex w-full max-w-3xl flex-col gap-8">
         {/* Header */}
         <header className="flex flex-col gap-2">

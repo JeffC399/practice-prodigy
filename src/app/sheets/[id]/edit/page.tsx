@@ -732,7 +732,7 @@ export default function SheetEditorPage() {
 
   if (!mounted) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Loading sheet…
         </div>
@@ -742,7 +742,7 @@ export default function SheetEditorPage() {
 
   if (!sheet) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="flex flex-col items-center gap-3 text-center">
           <p className="text-sm text-muted-foreground">Sheet not found.</p>
           <Link
@@ -1221,10 +1221,9 @@ export default function SheetEditorPage() {
 
   return (
     <main
-      // Phase 38 — mobile responsiveness pass: shrunk container padding
-      // (px-3 sm:px-6) so the max-w-4xl inner block gets the full width
-      // on narrow viewports, and py-8 → py-4 sm:py-8 for more vertical
-      // breathing room on mobile.
+      id="main-content"
+      // Phase 38 — mobile responsiveness pass.
+      // Phase 39 — a11y: id targets the skip-link.
       className="flex flex-1 flex-col items-center px-3 py-4 sm:px-6 sm:py-8"
     >
       {/* Phase 31.6 — keyboard shortcuts help modal. Opens on `?` or
