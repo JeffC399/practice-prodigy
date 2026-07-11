@@ -8,8 +8,11 @@ import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
 import {
+  BPM_MAX,
+  BPM_MIN,
   ORDERING_STRATEGIES,
   ORDERING_STRATEGY_DISPLAY_NAMES,
+  TIME_SIGNATURES,
 } from "@/lib/state/practice-config";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
 import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
@@ -91,6 +94,32 @@ export default function KeySequencerSetupPage() {
     (s) => s.setEnharmonicPreference,
   );
   const wholeConfig = useKeySequencerConfig();
+  const bpm = useKeySequencerConfig((s) => s.bpm);
+  const setBpm = useKeySequencerConfig((s) => s.setBpm);
+  const timeSignature = useKeySequencerConfig((s) => s.timeSignature);
+  const setTimeSignature = useKeySequencerConfig((s) => s.setTimeSignature);
+  const measuresPerKey = useKeySequencerConfig((s) => s.measuresPerKey);
+  const setMeasuresPerKey = useKeySequencerConfig(
+    (s) => s.setMeasuresPerKey,
+  );
+  const repetitions = useKeySequencerConfig((s) => s.repetitions);
+  const setRepetitions = useKeySequencerConfig((s) => s.setRepetitions);
+  const repeatIndefinitely = useKeySequencerConfig(
+    (s) => s.repeatIndefinitely,
+  );
+  const setRepeatIndefinitely = useKeySequencerConfig(
+    (s) => s.setRepeatIndefinitely,
+  );
+  const restMeasuresBetweenKeys = useKeySequencerConfig(
+    (s) => s.restMeasuresBetweenKeys,
+  );
+  const setRestMeasuresBetweenKeys = useKeySequencerConfig(
+    (s) => s.setRestMeasuresBetweenKeys,
+  );
+  const countInMeasures = useKeySequencerConfig((s) => s.countInMeasures);
+  const setCountInMeasures = useKeySequencerConfig(
+    (s) => s.setCountInMeasures,
+  );
   const loadedKeyDrillId = useKeySequencerConfig((s) => s.loadedKeyDrillId);
   const setLoadedKeyDrillId = useKeySequencerConfig(
     (s) => s.setLoadedKeyDrillId,
@@ -455,6 +484,156 @@ export default function KeySequencerSetupPage() {
           <KeySequencerLivePreview config={wholeConfig} />
         </section>
 
+        {/* Session settings — tempo, meter, session length, rest,
+            count-in. Kept as one focused section so users can dial
+            in the drill's feel in one place. */}
+        <section className="flex flex-col gap-4 rounded-md border border-border bg-card/40 p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Session settings
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Tempo, meter, how long each key surfaces, and how many
+              times the sequence repeats.
+            </p>
+          </div>
+
+          {/* Tempo — slider + numeric input */}
+          <label className="flex flex-col gap-2 text-xs">
+            <div className="flex items-baseline justify-between">
+              <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                Tempo
+              </span>
+              <span className="font-mono text-sm text-foreground">
+                ♩ = {bpm}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={BPM_MIN}
+              max={BPM_MAX}
+              step={1}
+              value={bpm}
+              onChange={(e) => setBpm(parseInt(e.target.value, 10))}
+              className="w-full accent-[color:var(--primary)]"
+              aria-label="Tempo BPM"
+            />
+          </label>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                Time signature
+              </span>
+              <select
+                value={`${timeSignature.beatsPerMeasure}/${timeSignature.beatUnit}`}
+                onChange={(e) => {
+                  const found = TIME_SIGNATURES.find(
+                    (ts) =>
+                      `${ts.beatsPerMeasure}/${ts.beatUnit}` === e.target.value,
+                  );
+                  if (found) setTimeSignature(found);
+                }}
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              >
+                {TIME_SIGNATURES.map((ts) => (
+                  <option
+                    key={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                    value={`${ts.beatsPerMeasure}/${ts.beatUnit}`}
+                  >
+                    {ts.beatsPerMeasure}/{ts.beatUnit}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                Measures per key
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={16}
+                step={1}
+                value={measuresPerKey}
+                onChange={(e) =>
+                  setMeasuresPerKey(
+                    Math.max(1, Math.min(16, parseInt(e.target.value, 10) || 1)),
+                  )
+                }
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                Rest measures between keys
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={4}
+                step={1}
+                value={restMeasuresBetweenKeys}
+                onChange={(e) =>
+                  setRestMeasuresBetweenKeys(
+                    Math.max(0, Math.min(4, parseInt(e.target.value, 10) || 0)),
+                  )
+                }
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                Count-in measures
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={1}
+                value={countInMeasures}
+                onChange={(e) =>
+                  setCountInMeasures(
+                    Math.max(0, Math.min(2, parseInt(e.target.value, 10) || 0)),
+                  )
+                }
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={repeatIndefinitely}
+              onChange={(e) => setRepeatIndefinitely(e.target.checked)}
+              className="h-4 w-4 accent-[color:var(--primary)]"
+            />
+            <span>Loop indefinitely (Stop when you're done)</span>
+          </label>
+
+          {!repeatIndefinitely && (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                Number of passes
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={64}
+                step={1}
+                value={repetitions}
+                onChange={(e) =>
+                  setRepetitions(
+                    Math.max(1, Math.min(64, parseInt(e.target.value, 10) || 1)),
+                  )
+                }
+                className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              />
+            </label>
+          )}
+        </section>
+
         {/* Save-as-drill form — always visible, saves the current live
             config as a new library entry. Save changes on an existing
             loaded drill goes through the editing-badge above. */}
@@ -498,7 +677,7 @@ export default function KeySequencerSetupPage() {
         </section>
 
         {/* Launch — go to the drill session. */}
-        <section className="flex items-center justify-center py-2">
+        <section className="flex flex-col items-center gap-2 py-2">
           <button
             type="button"
             onClick={() => router.push("/practice/keys/session")}
@@ -508,6 +687,13 @@ export default function KeySequencerSetupPage() {
             <Play className="h-5 w-5" aria-hidden="true" />
             Start drill
           </button>
+          <p className="text-[11px] text-muted-foreground/70">
+            Space to Start / Stop once you're in the drill screen. Press{" "}
+            <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+              ?
+            </kbd>{" "}
+            anywhere to see all shortcuts.
+          </p>
         </section>
 
         {/* Foothold link back home */}

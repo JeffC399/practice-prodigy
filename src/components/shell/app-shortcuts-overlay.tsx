@@ -35,6 +35,12 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    title: "Key Sequencer session",
+    shortcuts: [
+      { keys: ["Space"], description: "Start / Stop the drill" },
+    ],
+  },
+  {
     title: "Lead Sheet editor",
     shortcuts: [
       {
