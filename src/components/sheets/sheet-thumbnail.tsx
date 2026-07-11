@@ -59,11 +59,11 @@ export function SheetThumbnail({ sheet }: { sheet: Sheet }) {
   if (isEmpty) {
     return (
       <div
-        className="flex w-full items-center justify-center border-b border-border/60 bg-muted/20"
+        className="flex w-full flex-col items-center justify-center gap-1.5 border-b border-border/60 bg-muted/20 text-muted-foreground/60"
         style={{ aspectRatio: THUMB_ASPECT }}
-        aria-hidden="true"
       >
-        <FileMusic className="h-8 w-8 text-muted-foreground/30" />
+        <FileMusic className="h-8 w-8" aria-hidden="true" />
+        <span className="text-xs">Empty — start writing</span>
       </div>
     );
   }

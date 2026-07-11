@@ -8,6 +8,7 @@ import { SheetThumbnail } from "@/components/sheets/sheet-thumbnail";
 import { decodeSheet } from "@/lib/sheets/share";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useUserPrefs } from "@/lib/state/user-prefs";
+import { formatRelativeTime } from "@/lib/util/relative-time";
 
 /**
  * /sheets — lead-sheet library landing page.
@@ -306,9 +307,23 @@ export default function SheetsLibraryPage() {
                         {sheet.style}
                       </span>
                     )}
+                    {/* Phase 41.1 — "Edited N ago" timestamp using the
+                        sheet's updatedAt. Locale-aware via Intl. */}
+                    <span
+                      className="text-[11px] text-muted-foreground/60"
+                      title={new Date(sheet.updatedAt).toLocaleString()}
+                    >
+                      Edited {formatRelativeTime(sheet.updatedAt)}
+                    </span>
                   </div>
                 </Link>
-                <div className="flex items-center justify-end gap-1 border-t border-border/60 bg-background/30 px-3 py-2">
+                {/* Phase 41.1 — Icons hidden by default on non-touch
+                    devices; revealed on card hover OR when any child
+                    receives keyboard focus. Mobile keeps them visible
+                    because there's no hover state on touch. Uses
+                    opacity + pointer-events so the layout stays
+                    stable when they toggle. */}
+                <div className="flex items-center justify-end gap-1 border-t border-border/60 bg-background/30 px-3 py-2 opacity-100 transition-opacity md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto md:group-focus-within:opacity-100 md:group-focus-within:pointer-events-auto">
                   <Link
                     href={`/sheets/${sheet.id}/edit`}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
