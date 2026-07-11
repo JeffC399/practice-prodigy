@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { sheetPlayback } from "@/lib/audio/sheet-playback";
+import { PrintPolish } from "@/components/sheets/print-polish";
 import { ShareModal } from "@/components/sheets/share-modal";
 import { SheetSurface } from "@/components/sheets/sheet-surface";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
@@ -187,12 +188,17 @@ export default function SheetViewPage() {
         onClose={() => setShareOpen(false)}
       />
 
-      {/* @media print rules: hide chrome, ensure clean page */}
+      {/* Phase 37 — professional print polish: page numbers +
+          copyright footer + break-inside guard. Injected via a
+          dedicated component that both the view and edit pages
+          import so print output stays consistent. */}
+      <PrintPolish copyright={sheet.copyright} />
+
+      {/* @media print rules for THIS page (hide chrome, force
+          light background, strip shadow from the paper). Page-
+          level footer/margin rules live in <PrintPolish>. */}
       <style jsx global>{`
         @media print {
-          @page {
-            margin: 0.5in;
-          }
           body {
             background: white !important;
             color: black !important;
