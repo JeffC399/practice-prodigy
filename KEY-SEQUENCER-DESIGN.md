@@ -113,6 +113,23 @@ type KeySequencerConfig = {
 
   // For future extension — enharmonic display preference.
   enharmonicPreference?: "sharps" | "flats" | "auto";
+
+  /**
+   * Voice announcement (TTS). When enabled, the browser's built-in
+   * `speechSynthesis` API reads the upcoming key + prompt-row words
+   * aloud a few beats before each measure change. Great for eyes-off
+   * practice — the user can look at their instrument instead of the
+   * screen. Silent by default (off).
+   */
+  voiceAnnounce?: {
+    enabled: boolean;
+    /** How many beats before the next measure to fire the utterance. Default 2. */
+    leadBeats: number;
+    /** Voice rate multiplier (0.5–2.0). Default 1.0. */
+    rate: number;
+    /** Utterance format template — read left to right, joined with pauses. */
+    template: "key-then-rows" | "key-only";
+  };
 };
 
 /** Saved drill in the user's Key Sequencer library. Parallels Drill. */
@@ -161,8 +178,9 @@ Standard collapsible-section layout matching `/practice`:
 6. **Tempo & meter** — reuse from Bass Arpeggios setup.
 7. **Session length** — measures per key + repetitions or loop, reuse.
 8. **Display** — layout picker (single-pane / two-pane), reuse.
-9. **Preview** — mini-render of the first 4 measures worth of Now/Next cards. Live-updates as the user edits.
-10. **Save / launch** — save-as-drill + launch button.
+9. **Voice announcement** (optional, opt-in) — toggle + rate slider + lead-beats picker + template picker. When enabled, browser TTS reads the upcoming key + row words a couple beats before each measure change. Great for eyes-off practice on any instrument.
+10. **Preview** — mini-render of the first 4 measures worth of Now/Next cards. Live-updates as the user edits.
+11. **Save / launch** — save-as-drill + launch button.
 
 ### 4.2 `/practice/keys/session` — Drill screen
 
@@ -175,6 +193,7 @@ Identical shell to `/practice/session`:
 - Beat display + count-in ring + progress bar — reused
 - Two-pane variant — reused
 - Space to start/stop, arrow-keys ±5 BPM, ×2/÷2 buttons — reused
+- **Voice announcement** (when enabled on the drill): a tick on every measure schedules an `SpeechSynthesisUtterance` `voiceAnnounce.leadBeats` beats before the next measure. Utterance text follows the template (`"key-then-rows"` = "A-flat. Minor seventh. Ascending." / `"key-only"` = "A-flat."). Enharmonic pronunciation respects the display preference. Cancels on Stop / pause / page unmount so no orphaned utterances.
 
 ---
 
@@ -235,8 +254,9 @@ Starter templates are just seeded `KeyDrill` entries — same data type as user 
 - PromptRowEditor component (~200 lines)
 - Sequence-generation helper (`keySequencerAtStep(config, measureIdx)`) (~100 lines)
 - Starter templates data (~150 lines)
+- Voice-announcement helper (`speakUpcoming(text, rate)`) using `window.speechSynthesis` (~50 lines) — cancellable, guards against unsupported browsers (older mobile Safari) with a silent no-op fallback.
 
-Total ~1,830 lines of new code. Comparable to Bass Arpeggios' scope but simpler because no audio-engine work is needed.
+Total ~1,880 lines of new code. Comparable to Bass Arpeggios' scope but simpler because no audio-engine work is needed.
 
 ### 7.3 Module registration
 
@@ -257,8 +277,9 @@ Ordered so each slice is independently shippable:
 | **45.4** | Save-as-drill + drill library on setup page (KeyDrillCard + list). Duplicate / rename / delete. | 0.5 session |
 | **45.5** | Starter template seeding on first install. | 0.25 session |
 | **45.6** | Polish — rest measures between keys, enharmonic preference, empty-state, keyboard shortcuts, a11y pass. | 0.5 session |
+| **45.7** | Voice announcement (browser TTS via `speechSynthesis`). Setup toggles + rate slider + lead-beats + template. Cancellable, browser-support-guarded. | 0.5 session |
 
-Total: **~5 sessions** (rough; comparable to LSB Basic Tier pacing).
+Total: **~5.5 sessions** (rough; comparable to LSB Basic Tier pacing).
 
 ---
 
