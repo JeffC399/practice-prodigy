@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { APP_VERSION, BUILD_SHA_SHORT } from "@/lib/build-info";
+import { AppShortcutsTrigger } from "./app-shortcuts-trigger";
 import { FeedbackTrigger } from "./feedback-trigger";
 
 /**
@@ -41,6 +42,10 @@ export function SiteFooter() {
           + items-center on the parent guarantees all four sit on the
           same y-coordinate regardless of the underlying element type. */}
       <div className="flex flex-nowrap items-center gap-4 whitespace-nowrap leading-none">
+        {/* Phase 43 — app-wide keyboard shortcuts. `?` opens it from
+            anywhere except inside the Lead Sheet editor (which owns
+            `?` for its own richer editor-specific shortcuts overlay). */}
+        <AppShortcutsTrigger />
         <FeedbackTrigger />
         <Link
           href="/settings"
