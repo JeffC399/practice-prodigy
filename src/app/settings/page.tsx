@@ -1235,7 +1235,19 @@ function PreviewCard() {
 function PreviewCardInner() {
   return (
     <>
-      <h3 className="text-base font-semibold tracking-tight text-card-foreground">
+      {/* Phase 34.7.7 — Removed `tracking-tight` from this specific
+          h3. `tracking-tight` = letter-spacing: -0.025em. At text-3xl
+          (30px, used by "Your preferences") that's -0.75px — airy
+          relative to the glyph size. At text-base (16px, used here),
+          the same rule collapses to -0.4px, which is aggressive
+          enough to pull adjacent semibold glyphs so close their
+          anti-aliased edges nearly overlap. The eye interprets the
+          overlap as edge fuzz — reads as "blurry" even though each
+          glyph is individually crisp with ClearType. Default letter-
+          spacing gives the letters room to breathe and resolves the
+          perceived softness. All pixel-alignment / compositing /
+          filter conditions were already verified optimal in 34.7.6. */}
+      <h3 className="text-base font-semibold text-card-foreground">
         Practice Prodigy
       </h3>
       <p className="text-xs text-muted-foreground leading-relaxed">
