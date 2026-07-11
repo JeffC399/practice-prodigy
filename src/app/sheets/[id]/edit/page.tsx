@@ -1220,7 +1220,13 @@ export default function SheetEditorPage() {
   };
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-8">
+    <main
+      // Phase 38 — mobile responsiveness pass: shrunk container padding
+      // (px-3 sm:px-6) so the max-w-4xl inner block gets the full width
+      // on narrow viewports, and py-8 → py-4 sm:py-8 for more vertical
+      // breathing room on mobile.
+      className="flex flex-1 flex-col items-center px-3 py-4 sm:px-6 sm:py-8"
+    >
       {/* Phase 31.6 — keyboard shortcuts help modal. Opens on `?` or
           via the ? button in the header; closes on Escape or click on
           the backdrop. */}
@@ -1237,8 +1243,12 @@ export default function SheetEditorPage() {
       {/* Phase 24c.2: max-w bumped 3xl → 4xl to fit US Letter
           (816px) sheet preview without horizontal scroll. */}
       <div className="flex w-full max-w-4xl flex-col gap-8">
-        {/* Header: back link + view-mode link */}
-        <div className="flex items-center justify-between">
+        {/* Header: back link + view-mode link.
+            Phase 38 — `flex-wrap` on the outer row + `flex-wrap
+            justify-end` on the toolbar so the 8+ buttons don't jam
+            into a single overflowing row on narrow viewports. On
+            desktop the layout is unchanged. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/sheets"
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -1246,7 +1256,7 @@ export default function SheetEditorPage() {
             <ArrowLeft className="h-4 w-4" />
             All sheets
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {/* Phase 31.3 — "Saved" indicator. Flashes for ~1.8s after
                 each mutation via the effects above. Cmd/Ctrl+S also
                 triggers the flash as a reassurance. */}
@@ -2474,7 +2484,11 @@ export default function SheetEditorPage() {
               proportionally. Overlay children (selection / caret /
               lyric) scale together because they're position: absolute
               inside this wrapper — zoom applies to their coord space
-              as well. */}
+              as well.
+              Phase 38: `overflow-x-auto` on an outer wrapper so mobile
+              viewports (which are narrower than 816px) can scroll
+              horizontally to see the whole sheet, instead of clipping. */}
+          <div className="overflow-x-auto">
           <div
             className="relative"
             style={{
@@ -2541,6 +2555,7 @@ export default function SheetEditorPage() {
                 onSelectionChange={setSelection}
               />
             )}
+          </div>
           </div>
           {editorMode === "lyrics" && eligibleLyricPositions.length === 0 && (
             <p className="rounded-md border border-border bg-card/40 px-3 py-2 text-[11px] text-muted-foreground">

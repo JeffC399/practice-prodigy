@@ -109,14 +109,17 @@ export default function SheetViewPage() {
     }
   };
 
+  // Phase 38 — mobile responsiveness pass (padding + wrap toolbar +
+  // horizontal-scroll sheet wrapper).
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-8">
+    <main className="flex flex-1 flex-col items-center px-3 py-4 sm:px-6 sm:py-8">
       <div className="flex w-full max-w-5xl flex-col gap-6">
         {/* Toolbar — hidden in print. Phase 34.7: Play is now the
             primary CTA (consume the sheet); Share, Print, Edit are
             secondary. Order matches the edit page's toolbar so the two
-            views feel continuous. */}
-        <div className="flex items-center justify-between print:hidden">
+            views feel continuous. Phase 38 — flex-wrap so mobile
+            viewports don't overflow the toolbar row. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <Link
             href="/sheets"
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -175,8 +178,10 @@ export default function SheetViewPage() {
         </div>
 
         {/* The printable sheet itself — light paper surface with
-            continuous staff engraving (Phase 24b.3 rework). */}
-        <div className="sheet-print-wrap">
+            continuous staff engraving (Phase 24b.3 rework).
+            Phase 38 — `overflow-x-auto` so narrow viewports scroll
+            horizontally instead of clipping the 816px paper. */}
+        <div className="sheet-print-wrap overflow-x-auto">
           <SheetSurface sheet={sheet} measuresPerLine={sheet.measuresPerLine} />
         </div>
       </div>
