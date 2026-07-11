@@ -176,10 +176,17 @@ export default function SheetsLibraryPage() {
                 aria-label="Search sheets"
               />
             </div>
+            {/* Phase 36.1.4 — Both toolbar buttons share:
+                • min-w-[128px] so their footprints are identical
+                  rectangles even though "New sheet" is longer text.
+                • min-h-9 max-h-9 in addition to h-9 so no browser
+                  rendering pass can nudge the height off 36px.
+                • justify-center so their icon+text center inside the
+                  fixed-width box. */}
             <button
               type="button"
               onClick={handleImport}
-              className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              className="flex h-9 min-h-9 max-h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
               title="Import a .json sheet shared with you"
             >
               <Upload className="h-4 w-4" />
@@ -198,14 +205,13 @@ export default function SheetsLibraryPage() {
               1px border on the sibling Search + Import controls, so
               the interior colored fill on all three occupies the
               same 34px (36 total − 1 top border − 1 bottom border).
-              Without the transparent border, this button's solid
-              teal fill uses the full 36px and looks visually
-              "chunkier" than the bordered controls, even though the
-              DOM height is identical. */}
+              Phase 36.1.4 — matches Import's min-w-[128px] +
+              min-h-9 max-h-9 + justify-center so both buttons share
+              an identical rectangle footprint. */}
           <button
             type="button"
             onClick={handleCreate}
-            className="flex h-9 items-center gap-1.5 rounded-md border border-transparent bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="flex h-9 min-h-9 max-h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-md border border-transparent bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             <Plus className="h-4 w-4" />
             New sheet
