@@ -1235,19 +1235,18 @@ function PreviewCard() {
 function PreviewCardInner() {
   return (
     <>
-      {/* Phase 34.7.7 — Removed `tracking-tight` from this specific
-          h3. `tracking-tight` = letter-spacing: -0.025em. At text-3xl
-          (30px, used by "Your preferences") that's -0.75px — airy
-          relative to the glyph size. At text-base (16px, used here),
-          the same rule collapses to -0.4px, which is aggressive
-          enough to pull adjacent semibold glyphs so close their
-          anti-aliased edges nearly overlap. The eye interprets the
-          overlap as edge fuzz — reads as "blurry" even though each
-          glyph is individually crisp with ClearType. Default letter-
-          spacing gives the letters room to breathe and resolves the
-          perceived softness. All pixel-alignment / compositing /
-          filter conditions were already verified optimal in 34.7.6. */}
-      <h3 className="text-base font-semibold text-card-foreground">
+      {/* Phase 34.7.8 — Dropped font weight from 600 (semibold) to
+          500 (medium). Semibold at 16px is a known awkward spot on
+          Windows ClearType: strokes are thick enough that each takes
+          2–3 pixels of anti-aliasing, but glyphs aren't big enough
+          for the anti-aliasing to smooth cleanly. Variable-font
+          weights 400 and 700 typically have hand-hinted masters;
+          in-between weights (500, 600) are interpolated and tend to
+          render slightly softer. Weight 500 renders crisper than
+          600 while staying visually distinct from the 400-weight
+          body copy below. Phase 34.7.7 dropped tracking-tight (the
+          letter-spacing issue); this is the paired weight fix. */}
+      <h3 className="text-base font-medium text-card-foreground">
         Practice Prodigy
       </h3>
       <p className="text-xs text-muted-foreground leading-relaxed">
