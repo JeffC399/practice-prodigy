@@ -186,7 +186,7 @@ export default function SheetsLibraryPage() {
             <button
               type="button"
               onClick={handleImport}
-              className="flex h-9 min-h-9 max-h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              className="flex h-9 min-h-9 max-h-9 w-36 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
               title="Import a .json sheet shared with you"
             >
               <Upload className="h-4 w-4" />
@@ -211,7 +211,7 @@ export default function SheetsLibraryPage() {
           <button
             type="button"
             onClick={handleCreate}
-            className="flex h-9 min-h-9 max-h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-md border border-transparent bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="flex h-9 min-h-9 max-h-9 w-36 items-center justify-center gap-1.5 rounded-md border border-transparent bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             <Plus className="h-4 w-4" />
             New sheet
