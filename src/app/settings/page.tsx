@@ -1235,18 +1235,20 @@ function PreviewCard() {
 function PreviewCardInner() {
   return (
     <>
-      {/* Phase 34.7.8 — Dropped font weight from 600 (semibold) to
-          500 (medium). Semibold at 16px is a known awkward spot on
-          Windows ClearType: strokes are thick enough that each takes
-          2–3 pixels of anti-aliasing, but glyphs aren't big enough
-          for the anti-aliasing to smooth cleanly. Variable-font
-          weights 400 and 700 typically have hand-hinted masters;
-          in-between weights (500, 600) are interpolated and tend to
-          render slightly softer. Weight 500 renders crisper than
-          600 while staying visually distinct from the 400-weight
-          body copy below. Phase 34.7.7 dropped tracking-tight (the
-          letter-spacing issue); this is the paired weight fix. */}
-      <h3 className="text-base font-medium text-card-foreground">
+      {/* Phase 34.7.9 — Bumped size from text-base (16px) to text-lg
+          (18px), restored font-semibold. This is the definitive fix
+          for perceived softness after 34.7.6 – 34.7.8 exhausted the
+          smaller-tweak options. At 16px, ClearType has too little
+          pixel real estate to render semibold Geist Sans crisply;
+          the interpolated variable-font weight compounds the issue.
+          At 18px, each glyph gets ~13% more subpixel headroom and
+          the heading renders as sharp as the body text below. Also
+          matches how design shops targeting Windows-first UIs
+          (Linear, Vercel, Notion) size their card titles: 18px+ for
+          crisp semibold rendering, not 16px. tracking-tight stays
+          removed from Phase 34.7.7 (at 18px it would compute to
+          -0.45px which is still tight for adjacent-glyph edges). */}
+      <h3 className="text-lg font-semibold text-card-foreground">
         Practice Prodigy
       </h3>
       <p className="text-xs text-muted-foreground leading-relaxed">
