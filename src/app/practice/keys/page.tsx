@@ -21,6 +21,10 @@ import type {
   KeyPitchClass,
   KeySequencerConfig,
 } from "@/lib/key-sequencer/types";
+import {
+  isVoiceAnnounceSupported,
+  speakUpcoming,
+} from "@/lib/key-sequencer/voice-announce";
 
 /**
  * Strip UI-only state fields from a live config to get the shape we
@@ -120,6 +124,9 @@ export default function KeySequencerSetupPage() {
   const setCountInMeasures = useKeySequencerConfig(
     (s) => s.setCountInMeasures,
   );
+  const voiceAnnounce = useKeySequencerConfig((s) => s.voiceAnnounce);
+  const setVoiceAnnounce = useKeySequencerConfig((s) => s.setVoiceAnnounce);
+  const ttsSupported = isVoiceAnnounceSupported();
   const loadedKeyDrillId = useKeySequencerConfig((s) => s.loadedKeyDrillId);
   const setLoadedKeyDrillId = useKeySequencerConfig(
     (s) => s.setLoadedKeyDrillId,
@@ -631,6 +638,130 @@ export default function KeySequencerSetupPage() {
                 className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               />
             </label>
+          )}
+        </section>
+
+        {/* Voice announcement — optional browser TTS reads the upcoming
+            key + row words a beat or two before each change. Great for
+            eyes-off practice on any instrument. */}
+        <section className="flex flex-col gap-3 rounded-md border border-border bg-card/40 p-5">
+          <div className="flex items-baseline justify-between">
+            <div className="flex flex-col gap-1">
+              <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                Voice announcement
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Optional — the browser will read the upcoming key + words
+                aloud a couple beats before each change. Great for
+                eyes-off practice.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={voiceAnnounce?.enabled ?? false}
+                onChange={(e) =>
+                  setVoiceAnnounce({
+                    enabled: e.target.checked,
+                    leadBeats: voiceAnnounce?.leadBeats ?? 2,
+                    rate: voiceAnnounce?.rate ?? 1.0,
+                    template: voiceAnnounce?.template ?? "key-then-rows",
+                  })
+                }
+                disabled={!ttsSupported}
+                className="h-4 w-4 accent-[color:var(--primary)]"
+              />
+              <span>Enabled</span>
+            </label>
+          </div>
+          {!ttsSupported && (
+            <p className="rounded-md border border-border/60 bg-background/40 px-3 py-2 text-[11px] text-muted-foreground">
+              Your browser doesn&rsquo;t support speech synthesis. Try
+              Chrome, Edge, Firefox, or Safari.
+            </p>
+          )}
+          {ttsSupported && voiceAnnounce?.enabled && (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                    Template
+                  </span>
+                  <select
+                    value={voiceAnnounce.template}
+                    onChange={(e) =>
+                      setVoiceAnnounce({
+                        ...voiceAnnounce,
+                        template: e.target.value as
+                          | "key-then-rows"
+                          | "key-only",
+                      })
+                    }
+                    className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  >
+                    <option value="key-then-rows">
+                      Key + rows ("A flat. Minor 7. Ascending.")
+                    </option>
+                    <option value="key-only">Key only ("A flat.")</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                    Lead beats
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={4}
+                    step={1}
+                    value={voiceAnnounce.leadBeats}
+                    onChange={(e) =>
+                      setVoiceAnnounce({
+                        ...voiceAnnounce,
+                        leadBeats: Math.max(
+                          1,
+                          Math.min(4, parseInt(e.target.value, 10) || 2),
+                        ),
+                      })
+                    }
+                    className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                    Rate ({voiceAnnounce.rate.toFixed(2)}×)
+                  </span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2.0}
+                    step={0.1}
+                    value={voiceAnnounce.rate}
+                    onChange={(e) =>
+                      setVoiceAnnounce({
+                        ...voiceAnnounce,
+                        rate: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full accent-[color:var(--primary)]"
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  speakUpcoming(
+                    voiceAnnounce.template === "key-only"
+                      ? "A flat."
+                      : "A flat. Minor 7. Ascending.",
+                    voiceAnnounce.rate,
+                  )
+                }
+                className="self-start rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              >
+                Test voice
+              </button>
+            </div>
           )}
         </section>
 

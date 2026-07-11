@@ -13,9 +13,13 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMetronome } from "@/lib/audio/use-metronome";
-import { keyDisplay } from "@/lib/key-sequencer/display";
+import { keyDisplay, keySpokenForm } from "@/lib/key-sequencer/display";
 import { buildKeySequence } from "@/lib/key-sequencer/sequencer";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
+import {
+  cancelVoiceAnnounce,
+  speakUpcoming,
+} from "@/lib/key-sequencer/voice-announce";
 import { BPM_MAX, BPM_MIN } from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 
@@ -207,6 +211,79 @@ export default function KeySequencerSessionPage() {
     config.repeatIndefinitely,
     totalPlayingBeats,
   ]);
+
+  // Phase 45.7 — voice announcement scheduling. Fires an utterance
+  // `leadBeats` beats BEFORE each measure change (or on beat 1 of
+  // measure 1 as a heads-up). Uses lastAnnouncedStep to fire once per
+  // upcoming measure. Cancels on stop / unmount below.
+  const [lastAnnouncedStep, setLastAnnouncedStep] = useState<number>(-1);
+  const va = config.voiceAnnounce;
+  useEffect(() => {
+    if (!va?.enabled) return;
+    if (!isPlaying) return;
+    if (currentStepIdx < 0) return;
+
+    // Beat within the CURRENT measure (1..beatsPerMeasure).
+    const beat = state.beatInMeasure;
+    if (beat === 0) return;
+
+    const leadBeats = Math.max(1, Math.min(4, va.leadBeats));
+    // Fire when we're `leadBeats` beats away from the end of the
+    // current measure, OR immediately on beat 1 of the very first
+    // measure so the user gets an initial heads-up.
+    const isFirstBeatOfFirstMeasure =
+      beat === 1 && currentStepIdx === 0 && lastAnnouncedStep !== 0;
+    const isLeadIntoNext =
+      beat >= beatsPerMeasure - leadBeats + 1 &&
+      currentStepIdx + 1 < steps.length &&
+      lastAnnouncedStep !== currentStepIdx + 1;
+
+    if (!isFirstBeatOfFirstMeasure && !isLeadIntoNext) return;
+
+    const targetIdx = isFirstBeatOfFirstMeasure ? 0 : currentStepIdx + 1;
+    const target = steps[targetIdx];
+    if (!target || target.isRest || !target.key) {
+      setLastAnnouncedStep(targetIdx);
+      return;
+    }
+
+    const spokenKey = keySpokenForm(
+      target.key,
+      config.enharmonicPreference ?? "auto",
+      config.keyOrdering,
+    );
+    const text =
+      va.template === "key-only"
+        ? `${spokenKey}.`
+        : [spokenKey, ...target.rowWords.filter((w) => w.length > 0)]
+            .join(". ") + ".";
+    speakUpcoming(text, va.rate);
+    setLastAnnouncedStep(targetIdx);
+  }, [
+    va,
+    isPlaying,
+    state.beatInMeasure,
+    currentStepIdx,
+    beatsPerMeasure,
+    steps,
+    config.enharmonicPreference,
+    config.keyOrdering,
+    lastAnnouncedStep,
+  ]);
+
+  // Cancel any pending utterance whenever the drill stops OR the
+  // component unmounts.
+  useEffect(() => {
+    if (!isPlaying && !isCountIn) cancelVoiceAnnounce();
+  }, [isPlaying, isCountIn]);
+  useEffect(() => {
+    return () => cancelVoiceAnnounce();
+  }, []);
+
+  // Reset the "last announced" tracker whenever a fresh Start happens.
+  useEffect(() => {
+    if (isCountIn) setLastAnnouncedStep(-1);
+  }, [isCountIn]);
 
   // Space = Start/Stop. Guarded so users can type in inputs.
   useEffect(() => {
