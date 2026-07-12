@@ -16,6 +16,7 @@ import {
 } from "@/lib/music/arpeggio";
 import { useCustomPatternsLibrary } from "@/lib/state/custom-patterns-library";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
+import { OnboardingCard } from "@/components/shared/onboarding-card";
 import { CustomPatternEditor } from "@/components/practice/custom-pattern-editor";
 import { notesToDegreeString } from "@/lib/music/custom-patterns";
 import {
@@ -843,73 +844,37 @@ export default function PracticeSetupPage() {
             </div>
           )}
 
-          {/* First-visit onboarding hint (Phase 17). Dismissible
-              welcome card that surfaces only until the user clicks
-              "Got it" — then sticks dismissed in user-prefs. Frames
-              the three high-leverage starting points so a first-time
-              tester knows what to try without having to discover the
-              app surface-by-surface. */}
-          {!hasSeenOnboarding && (
-            <div className="relative rounded-lg border border-primary/40 bg-primary/5 px-5 py-4">
-              <button
-                type="button"
-                onClick={() => dismissOnboarding()}
-                className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                aria-label="Dismiss welcome message"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <h3 className="text-sm font-semibold text-primary pr-8">
-                Welcome to Practice Prodigy
-              </h3>
-              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                Three quick things to try:
-              </p>
-              <ol className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
-                <li className="flex gap-2">
-                  <span className="font-mono text-primary shrink-0">1.</span>
-                  <span>
-                    <span className="font-medium text-foreground">
-                      Tap a Built-in drill below
-                    </span>{" "}
-                    to launch a ready-made arpeggio session.
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-mono text-primary shrink-0">2.</span>
-                  <span>
-                    In the{" "}
-                    <span className="font-medium text-foreground">
-                      Pattern
-                    </span>{" "}
-                    section, hit{" "}
-                    <span className="font-medium text-foreground">
-                      + New custom pattern
-                    </span>{" "}
-                    to author your own arpeggio shape.
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-mono text-primary shrink-0">3.</span>
-                  <span>
-                    Try{" "}
-                    <span className="font-medium text-foreground">
-                      Start from: Random
-                    </span>{" "}
-                    for an expert-mode inversion drill that re-rolls
-                    every measure.
-                  </span>
-                </li>
-              </ol>
-              <button
-                type="button"
-                onClick={() => dismissOnboarding()}
-                className="mt-3 rounded-md border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-              >
-                Got it
-              </button>
-            </div>
-          )}
+          {/* Phase 61 — First-visit onboarding hint. Extracted to a
+              shared component so Key Sequencer can render the same
+              card with its own module-specific copy. The card is
+              dismissible and never resurfaces (persisted in user-prefs
+              as hasSeenOnboarding). */}
+          <OnboardingCard
+            visible={!hasSeenOnboarding}
+            onDismiss={dismissOnboarding}
+            title="Welcome to Arpeggios"
+            intro="Three quick things to try:"
+            bullets={[
+              {
+                heading: "Tap a Built-in drill below",
+                body: "to launch a ready-made arpeggio session.",
+              },
+              {
+                heading: "+ New custom pattern",
+                body: (
+                  <>
+                    in the <strong className="font-medium text-foreground">Pattern</strong>{" "}
+                    section — author your own arpeggio shape (1-3-5-7,
+                    1-♭3-5-8, whatever you're drilling).
+                  </>
+                ),
+              },
+              {
+                heading: "Start from: Random",
+                body: "for an expert-mode inversion drill that re-rolls every measure.",
+              },
+            ]}
+          />
 
           {/* Your drills + Your patterns — the two user-owned libraries,
               paired at the top so "everything I've saved" reads as one

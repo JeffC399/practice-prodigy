@@ -273,11 +273,21 @@ export type UserPrefs = {
   /** How the arpeggio pattern label renders on the drill screen. */
   patternDisplay: PatternDisplay;
   /**
-   * Has the user dismissed the first-visit onboarding hint on
-   * /practice? Defaults false — the welcome card shows once until the
-   * user clicks the "Got it" / X dismiss action, then never again.
+   * Has the user dismissed the first-visit onboarding hint on the
+   * Arpeggios setup page (/practice)? Defaults false — the welcome
+   * card shows once until the user clicks "Got it" / X, then never
+   * again. Kept as `hasSeenOnboarding` (rather than the more precise
+   * `hasSeenArpeggiosOnboarding`) so already-dismissed users don't
+   * see the card reappear after Phase 61.
    */
   hasSeenOnboarding: boolean;
+  /**
+   * Phase 61 — Has the user dismissed the first-visit onboarding
+   * hint on the Key Sequencer setup page (/practice/keys)? Parallel
+   * to `hasSeenOnboarding` — each module has its own onboarding card
+   * with module-specific copy, and each is dismissed independently.
+   */
+  hasSeenKeySequencerOnboarding: boolean;
   /**
    * Phase 44 — id of the last release note the user dismissed. When
    * the top entry in RELEASE_NOTES has a different id, the "What's
@@ -327,6 +337,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   notationDefault: "jazz-minus",
   patternDisplay: "name",
   hasSeenOnboarding: false,
+  hasSeenKeySequencerOnboarding: false,
   // Phase 34 defaults preserve the original brand look.
   themePalette: "default",
   customAccent: null,
@@ -442,6 +453,11 @@ type UserPrefsStore = UserPrefs & {
   setHighContrast: (value: boolean) => void;
   /** Mark the first-visit onboarding hint as dismissed. */
   dismissOnboarding: () => void;
+  /**
+   * Phase 61 — Mark the Key Sequencer's first-visit onboarding hint as
+   * dismissed. Parallel to `dismissOnboarding` (which is Arpeggios-only).
+   */
+  dismissKeySequencerOnboarding: () => void;
   /** Phase 44 — Stamp the id of the release note the user just saw. */
   markReleaseNoteSeen: (id: string) => void;
   /** Reset all prefs to defaults. Used by the future Settings reset action. */
@@ -494,6 +510,8 @@ export const useUserPrefs = create<UserPrefsStore>()(
       setCornerRadius: (cornerRadius) => set({ cornerRadius }),
       setHighContrast: (highContrast) => set({ highContrast }),
       dismissOnboarding: () => set({ hasSeenOnboarding: true }),
+      dismissKeySequencerOnboarding: () =>
+        set({ hasSeenKeySequencerOnboarding: true }),
       markReleaseNoteSeen: (id) => set({ lastSeenReleaseId: id }),
       resetAll: () => set(DEFAULT_USER_PREFS),
       resetAppearance: () =>

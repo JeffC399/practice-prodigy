@@ -16,6 +16,7 @@ import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
+import { OnboardingCard } from "@/components/shared/onboarding-card";
 import {
   BPM_MAX,
   BPM_MIN,
@@ -158,6 +159,16 @@ export default function KeySequencerSetupPage() {
   // Phase 46 — user's practice layout preference (single / two pane).
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const setPracticeLayout = useUserPrefs((s) => s.setPracticeLayout);
+
+  // Phase 61 — first-visit onboarding hint. Persists in user-prefs
+  // separately from the Arpeggios hint so each module can be dismissed
+  // independently.
+  const hasSeenOnboarding = useUserPrefs(
+    (s) => s.hasSeenKeySequencerOnboarding,
+  );
+  const dismissOnboarding = useUserPrefs(
+    (s) => s.dismissKeySequencerOnboarding,
+  );
 
   // Phase 47 — both sections collapsible with summary chips.
   const [customOpen, setCustomOpen] = useState(true);
@@ -414,6 +425,42 @@ export default function KeySequencerSetupPage() {
             words on the Now / Next cards.
           </p>
         </header>
+
+        {/* Phase 61 — First-visit onboarding hint. Shared component
+            (used on both /practice and /practice/keys) with module-
+            specific copy. Dismissable; persists in user-prefs. */}
+        <OnboardingCard
+          visible={!hasSeenOnboarding}
+          onDismiss={dismissOnboarding}
+          title="Welcome to Key Sequencer"
+          intro="Three quick things to try:"
+          bullets={[
+            {
+              heading: "Tap a Built-in drill below",
+              body: "to launch a ready-made key drill on any instrument.",
+            },
+            {
+              heading: "+ Add a prompt row",
+              body: (
+                <>
+                  in a saved drill — layer scale names, arpeggios,
+                  finger patterns, or anything else you want to see
+                  alongside each key.
+                </>
+              ),
+            },
+            {
+              heading: "Voice announce",
+              body: (
+                <>
+                  turn it on to hear the upcoming key spoken aloud a
+                  beat before the change. Useful when your eyes are on
+                  the fretboard, not the screen.
+                </>
+              ),
+            },
+          ]}
+        />
 
         {/* Your Custom Drills — user-owned, top of page. Collapsible
             with summary chip when closed (mirrors Bass Arpeggios'
