@@ -408,27 +408,67 @@ export default function KeySequencerSessionPage() {
           <EmptyPoolState />
         ) : (
           <>
-            {practiceLayout === "two-pane" ? (
-              <div className="grid w-full max-w-4xl grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
-                <NowCard
-                  step={currentStep}
-                  isIdle={isIdle}
-                  isCountIn={isCountIn}
-                  config={config}
-                />
-                <TwoPaneNextCard step={nextStep} config={config} />
-              </div>
-            ) : (
-              <div className="flex w-full max-w-3xl flex-col items-center gap-6">
-                <NowCard
-                  step={currentStep}
-                  isIdle={isIdle}
-                  isCountIn={isCountIn}
-                  config={config}
-                />
-                <NextCard step={nextStep} config={config} />
-              </div>
-            )}
+            {(() => {
+              // Phase 51 — During prep the Next panel disappears
+              // completely (Arpeggios pattern), and the Now panel's
+              // pulsing ring keys off beatTick so it flashes ON each
+              // metronome click. beatTick = step + measure + beat so
+              // it advances exactly once per audible beat.
+              const isPrep = !!currentStep && currentStep.isRest;
+              const isPreparing = isCountIn || isPrep;
+              const beatTick =
+                currentStepIdx * 100 +
+                state.measureInSession * 10 +
+                state.beatInMeasure;
+              return practiceLayout === "two-pane" ? (
+                <div className="grid w-full max-w-4xl grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
+                  <NowCard
+                    step={currentStep}
+                    isIdle={isIdle}
+                    isCountIn={isCountIn}
+                    config={config}
+                    beatTick={beatTick}
+                  />
+                  <AnimatePresence initial={false}>
+                    {!isPreparing && (
+                      <motion.div
+                        key="next-panel"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                      >
+                        <TwoPaneNextCard step={nextStep} config={config} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="flex w-full max-w-3xl flex-col items-center gap-6">
+                  <NowCard
+                    step={currentStep}
+                    isIdle={isIdle}
+                    isCountIn={isCountIn}
+                    config={config}
+                    beatTick={beatTick}
+                  />
+                  <AnimatePresence initial={false}>
+                    {!isPreparing && (
+                      <motion.div
+                        key="next-panel-single"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                        className="w-full"
+                      >
+                        <NextCard step={nextStep} config={config} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })()}
 
             {/* Session controls: restart current + skip */}
             {(isPlaying || isCountIn) && (
@@ -503,68 +543,82 @@ function NowCard({
   isIdle,
   isCountIn,
   config,
+  beatTick,
 }: {
   step: import("@/lib/key-sequencer/sequencer").KeySequencerStep | null;
   isIdle: boolean;
   isCountIn: boolean;
   config: import("@/lib/key-sequencer/types").KeySequencerConfig;
+  /**
+   * Phase 51 — Re-keyed each beat during prep so the pulsing ring
+   * animation re-mounts and flashes ON every metronome click.
+   * Matches Arpeggios' two-pane Now-panel pulse behavior exactly.
+   */
+  beatTick: number;
 }) {
   const isPrep = !!step && step.isRest;
-  const label = isCountIn || isPrep ? "Get ready" : "Now";
-  const emphasis = isIdle || isCountIn || isPrep ? "opacity-60" : "";
+  const isPreparing = isCountIn || isPrep;
+  const label = isPreparing ? "Get ready" : "Now";
+  const emphasis = isIdle ? "opacity-35" : isPreparing ? "opacity-60" : "";
   const displayStep = step ?? {
     isRest: false,
     key: config.keyPool[0] ?? null,
     rowWords: config.promptRows.map(() => "—"),
     measureInRun: 0,
     passIndex: 0,
+    upcomingKey: undefined as
+      | import("@/lib/key-sequencer/types").KeyPitchClass
+      | undefined,
   };
 
   const enharmonicPreference = config.enharmonicPreference ?? "auto";
+
+  // During prep we show the UPCOMING key (what you're getting ready
+  // to play). During play we show the current step's key.
+  const bigKey = displayStep.isRest
+    ? (displayStep.upcomingKey ?? null)
+    : displayStep.key;
 
   return (
     <div
       className={`relative flex w-full flex-col items-center gap-4 rounded-xl border-2 border-primary/40 bg-primary/5 px-6 py-8 transition-opacity ${emphasis}`}
     >
-      <span className="font-mono text-xs uppercase tracking-wider text-primary">
+      {/* Phase 51 — Beat-synced pulsing ring during prep. Matches
+          Arpeggios' Now-panel treatment: re-key on beatTick so the
+          initial → animate transition fires ON each audio click. */}
+      {isPreparing && (
+        <motion.span
+          key={beatTick}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0.25 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-1 rounded-xl ring-4 ring-primary"
+        />
+      )}
+      <span className="relative z-10 font-mono text-xs uppercase tracking-wider text-primary">
         {label}
       </span>
       <AnimatePresence mode="wait">
         <motion.div
-          key={`${displayStep.key}-${displayStep.rowWords.join("|")}`}
+          // Key change re-triggers the fade only when the KEY OR PREP
+          // STATE changes — not on every beat tick.
+          key={`${bigKey}-${isPrep ? "prep" : "play"}-${displayStep.rowWords.join("|")}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.18 }}
-          className="flex flex-col items-center gap-2"
+          className="relative z-10 flex flex-col items-center gap-2"
         >
-          {displayStep.isRest ? (
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-4xl font-semibold text-muted-foreground">
-                Get ready
-              </span>
-              {displayStep.upcomingKey && (
-                <span className="text-2xl font-semibold text-foreground/70">
-                  →{" "}
-                  {keyDisplay(
-                    displayStep.upcomingKey,
-                    enharmonicPreference,
-                    config.keyOrdering,
-                  )}
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="text-8xl font-semibold text-foreground leading-none">
-              {displayStep.key
-                ? keyDisplay(
-                    displayStep.key,
-                    enharmonicPreference,
-                    config.keyOrdering,
-                  )
-                : "—"}
-            </span>
-          )}
+          <span className="text-8xl font-semibold text-foreground leading-none">
+            {bigKey
+              ? keyDisplay(
+                  bigKey,
+                  enharmonicPreference,
+                  config.keyOrdering,
+                )
+              : "—"}
+          </span>
           {!displayStep.isRest && (
             <div className="flex flex-col items-center gap-1">
               {displayStep.rowWords.map((w, i) => (
