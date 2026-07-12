@@ -1,16 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowLeft,
-  ChevronsRight,
-  Minus,
-  Play,
-  Plus,
-  RotateCcw,
-  Shuffle,
-  Square,
-} from "lucide-react";
+import { ArrowLeft, Minus, Play, Plus, Square } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMetronome } from "@/lib/audio/use-metronome";
@@ -21,11 +12,7 @@ import {
   cancelVoiceAnnounce,
   speakUpcoming,
 } from "@/lib/key-sequencer/voice-announce";
-import {
-  BPM_MAX,
-  BPM_MIN,
-  RANDOM_ORDERING_STRATEGIES,
-} from "@/lib/state/practice-config";
+import { BPM_MAX, BPM_MIN } from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 
 /**
@@ -156,87 +143,10 @@ export default function KeySequencerSessionPage() {
   };
 
   /**
-   * Restart the current key run — jump back to the first measure of
-   * the currently-playing key. Uses a fresh Start with initialBeatIndex
-   * pointing at the first play beat of the current key group.
+   * Phase 53 — Restart-current-key / skip-next-key removed per
+   * user request (2026-07-12). The Space keyboard shortcut plus
+   * Stop / Start covers the same intent with less UI clutter.
    */
-  const restartCurrentKey = useCallback(async () => {
-    if (!isPlaying) return;
-    // Find the first measure of the current key run.
-    const firstMeasureIdx = currentStepIdx - (currentStep?.measureInRun ?? 0);
-    const firstBeat = firstMeasureIdx * beatsPerMeasure;
-    stop();
-    await start({
-      bpm: config.bpm,
-      beatsPerMeasure,
-      beatUnit: config.timeSignature.beatUnit,
-      countInBeats: 0,
-      initialBeatIndex: firstBeat,
-      totalPlayingBeats: config.repeatIndefinitely
-        ? undefined
-        : totalPlayingBeats,
-    });
-  }, [
-    isPlaying,
-    currentStepIdx,
-    currentStep,
-    beatsPerMeasure,
-    stop,
-    start,
-    config.bpm,
-    config.timeSignature.beatUnit,
-    config.repeatIndefinitely,
-    totalPlayingBeats,
-  ]);
-
-  /**
-   * Skip forward to the first measure of the NEXT key run. Same
-   * initialBeatIndex trick as restart.
-   */
-  const skipToNextKey = useCallback(async () => {
-    if (!isPlaying) return;
-    if (!currentStep) return;
-    // Beat where the current key run ends.
-    const currentRunStart = currentStepIdx - currentStep.measureInRun;
-    // Advance past the current key group + any rest measures after it.
-    let nextRunStart = currentRunStart + config.measuresPerKey;
-    while (
-      nextRunStart < steps.length &&
-      steps[nextRunStart].isRest
-    ) {
-      nextRunStart++;
-    }
-    if (nextRunStart >= steps.length) {
-      // Nothing to skip to — just stop.
-      stop();
-      return;
-    }
-    const firstBeat = nextRunStart * beatsPerMeasure;
-    stop();
-    await start({
-      bpm: config.bpm,
-      beatsPerMeasure,
-      beatUnit: config.timeSignature.beatUnit,
-      countInBeats: 0,
-      initialBeatIndex: firstBeat,
-      totalPlayingBeats: config.repeatIndefinitely
-        ? undefined
-        : totalPlayingBeats,
-    });
-  }, [
-    isPlaying,
-    currentStep,
-    currentStepIdx,
-    config.measuresPerKey,
-    steps,
-    beatsPerMeasure,
-    stop,
-    start,
-    config.bpm,
-    config.timeSignature.beatUnit,
-    config.repeatIndefinitely,
-    totalPlayingBeats,
-  ]);
 
   // Phase 45.7 — voice announcement scheduling. Fires an utterance
   // `leadBeats` beats BEFORE each measure change (or on beat 1 of
@@ -419,6 +329,21 @@ export default function KeySequencerSessionPage() {
           <EmptyPoolState />
         ) : (
           <>
+            {/* Phase 53 — PhaseBadge above the panes, matching Arpeggios.
+                Dot + label: "Ready" / "Count-in · N" / "Get Ready" /
+                "Measure N of M". Same colors, same pulse behavior. */}
+            <PhaseBadge
+              isIdle={isIdle}
+              isCountIn={isCountIn}
+              isPlaying={isPlaying}
+              isTransition={isPlaying && !!currentStep?.isRest}
+              countInRemaining={state.countInBeatsRemaining}
+              measure={state.measureInSession}
+              totalMeasures={
+                config.repeatIndefinitely ? null : steps.length
+              }
+            />
+
             {(() => {
               // Phase 51 — During prep the Next panel disappears
               // completely (Arpeggios pattern), and the Now panel's
@@ -481,34 +406,6 @@ export default function KeySequencerSessionPage() {
               );
             })()}
 
-            {/* Session controls: restart current + skip */}
-            {(isPlaying || isCountIn) && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={restartCurrentKey}
-                  disabled={!isPlaying}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-40"
-                  aria-label="Restart current key"
-                  title="Restart current key"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                  Restart key
-                </button>
-                <button
-                  type="button"
-                  onClick={skipToNextKey}
-                  disabled={!isPlaying}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-40"
-                  aria-label="Skip to next key"
-                  title="Skip to next key"
-                >
-                  Skip next
-                  <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
-              </div>
-            )}
-
             <BeatDots
               beatsPerMeasure={beatsPerMeasure}
               currentBeat={state.beatInMeasure}
@@ -516,25 +413,6 @@ export default function KeySequencerSessionPage() {
               isCountIn={isCountIn}
               countInRemaining={state.countInBeatsRemaining}
             />
-
-            {/* Phase 52 — Shuffle preview. Visible only when idle
-                AND the current key ordering is random. Re-seeds the
-                sequence so users can preview a different random
-                order before starting. Non-random orderings are
-                deterministic, so no shuffle needed. */}
-            {isIdle &&
-              RANDOM_ORDERING_STRATEGIES.has(config.keyOrdering) && (
-                <button
-                  type="button"
-                  onClick={() => setSessionSeed(Date.now())}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                  aria-label="Shuffle the random sequence"
-                  title="Preview a different random sequence"
-                >
-                  <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
-                  Shuffle preview
-                </button>
-              )}
 
             <button
               type="button"
@@ -616,9 +494,10 @@ function NowCard({
     <div
       className={`relative flex w-full flex-col items-center gap-4 rounded-xl border-2 border-primary/40 bg-primary/5 px-6 py-8 transition-opacity ${emphasis}`}
     >
-      {/* Phase 51 — Beat-synced pulsing ring during prep. Matches
-          Arpeggios' Now-panel treatment: re-key on beatTick so the
-          initial → animate transition fires ON each audio click. */}
+      {/* Phase 53 — Beat-synced pulsing ring during prep. Matches
+          Arpeggios exactly: ring-4 ring-primary + amber boxShadow
+          glow, re-keyed on beatTick so the initial → animate fires
+          on each audio click. */}
       {isPreparing && (
         <motion.span
           key={beatTick}
@@ -627,6 +506,7 @@ function NowCard({
           transition={{ duration: 0.4, ease: "easeOut" }}
           aria-hidden="true"
           className="pointer-events-none absolute -inset-1 rounded-xl ring-4 ring-primary"
+          style={{ boxShadow: "0 0 18px 2px rgba(245, 158, 11, 0.7)" }}
         />
       )}
       <span className="relative z-10 font-mono text-xs uppercase tracking-wider text-primary">
@@ -694,20 +574,20 @@ function NextCard({
         Next
       </span>
       {step.isRest ? (
-        <div className="flex flex-col items-center">
-          <span className="text-base font-medium text-muted-foreground">
-            (prep)
+        // Rest / prep measure — show upcoming key only, no "(prep)"
+        // decoration. The pulsing Now panel + PhaseBadge already
+        // communicate the prep state.
+        step.upcomingKey ? (
+          <span className="text-3xl font-semibold text-foreground/70 leading-none">
+            {keyDisplay(
+              step.upcomingKey,
+              enharmonicPreference,
+              config.keyOrdering,
+            )}
           </span>
-          {step.upcomingKey && (
-            <span className="text-2xl font-semibold text-foreground/70 leading-none">
-              {keyDisplay(
-                step.upcomingKey,
-                enharmonicPreference,
-                config.keyOrdering,
-              )}
-            </span>
-          )}
-        </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">— end —</span>
+        )
       ) : (
         <>
           <span className="text-3xl font-semibold text-foreground leading-none">
@@ -760,20 +640,19 @@ function TwoPaneNextCard({
         Next
       </span>
       {step.isRest ? (
-        <div className="flex flex-col items-center gap-2">
-          <span className="text-2xl font-semibold text-muted-foreground/70">
-            (prep)
+        // Rest / prep measure — show upcoming key only, no "(prep)"
+        // decoration. See single-pane NextCard.
+        step.upcomingKey ? (
+          <span className="text-7xl font-semibold text-foreground/60 leading-none">
+            {keyDisplay(
+              step.upcomingKey,
+              enharmonicPreference,
+              config.keyOrdering,
+            )}
           </span>
-          {step.upcomingKey && (
-            <span className="text-6xl font-semibold text-foreground/60 leading-none">
-              {keyDisplay(
-                step.upcomingKey,
-                enharmonicPreference,
-                config.keyOrdering,
-              )}
-            </span>
-          )}
-        </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">— end —</span>
+        )
       ) : (
         <>
           <span className="text-7xl font-semibold text-foreground/70 leading-none">
@@ -794,6 +673,61 @@ function TwoPaneNextCard({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Phase 53 — PhaseBadge port from the Arpeggios session page. Unifies
+ * the "we're preparing" treatment across the two modules: pulsing
+ * primary dot + primary-tinted label during count-in AND inter-key
+ * prep windows. Idle → grey dot, playing → solid primary dot.
+ */
+function PhaseBadge({
+  isIdle,
+  isCountIn,
+  isPlaying,
+  isTransition,
+  countInRemaining,
+  measure,
+  totalMeasures,
+}: {
+  isIdle: boolean;
+  isCountIn: boolean;
+  isPlaying: boolean;
+  isTransition: boolean;
+  countInRemaining: number;
+  measure: number;
+  totalMeasures: number | null;
+}) {
+  const isPreparing = isCountIn || isTransition;
+  let label: string;
+  if (isIdle) {
+    label = "Ready";
+  } else if (isCountIn) {
+    label = `Count-in · ${countInRemaining}`;
+  } else if (isTransition) {
+    label = "Get Ready";
+  } else if (isPlaying) {
+    label =
+      totalMeasures === null
+        ? `Measure ${measure}`
+        : `Measure ${measure} of ${totalMeasures}`;
+  } else {
+    label = "";
+  }
+  return (
+    <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+      <span
+        className={`inline-block h-2 w-2 rounded-full transition-colors ${
+          isPreparing
+            ? "bg-primary animate-pulse"
+            : isPlaying
+              ? "bg-primary"
+              : "bg-muted-foreground/40"
+        }`}
+      />
+      <span className={isPreparing ? "text-primary" : ""}>{label}</span>
     </div>
   );
 }

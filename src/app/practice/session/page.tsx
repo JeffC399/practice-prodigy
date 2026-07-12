@@ -974,6 +974,10 @@ export default function PracticeSessionPage() {
               </>
             )}
           </button>
+          {/* Phase 53 — parity with Key Sequencer. */}
+          <p className="text-xs text-muted-foreground">
+            Space to Start / Stop
+          </p>
         </div>
       </div>
       {completedSummary && (
