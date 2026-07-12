@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Minus, Play, Plus, Settings2, Square } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { keyDisplay, keySpokenForm } from "@/lib/key-sequencer/display";
 import { buildKeySequence } from "@/lib/key-sequencer/sequencer";
@@ -131,19 +132,29 @@ export default function KeySequencerSessionPage() {
     else handleStart();
   }, [isPlaying, isCountIn, handleStop, handleStart]);
 
+  // Phase 59 — mid-drill tempo changes now push to the running
+  // metronome transport (metronomeEngine.setBpm) so the change takes
+  // effect at the next tick without a Stop+Start. Matches Arpeggios
+  // (see practice/session/page.tsx bumpBpm / scaleBpm).
   const bumpBpm = (delta: number) => {
     const next = Math.min(BPM_MAX, Math.max(BPM_MIN, config.bpm + delta));
+    if (next === config.bpm) return;
     useKeySequencerConfig.getState().setBpm(next);
+    metronomeEngine.setBpm(next);
   };
 
   const halveBpm = () => {
     const next = Math.max(BPM_MIN, Math.round(config.bpm / 2));
+    if (next === config.bpm) return;
     useKeySequencerConfig.getState().setBpm(next);
+    metronomeEngine.setBpm(next);
   };
 
   const doubleBpm = () => {
     const next = Math.min(BPM_MAX, config.bpm * 2);
+    if (next === config.bpm) return;
     useKeySequencerConfig.getState().setBpm(next);
+    metronomeEngine.setBpm(next);
   };
 
   /**
@@ -699,40 +710,47 @@ function TwoPaneNextCard({
       <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
         Next
       </span>
-      {step.isRest ? (
-        // Rest / prep measure — show upcoming key only, no "(prep)"
-        // decoration. See single-pane NextCard.
-        step.upcomingKey ? (
-          <span className="text-7xl font-semibold text-foreground/60 leading-none">
-            {keyDisplay(
-              step.upcomingKey,
-              enharmonicPreference,
-              config.keyOrdering,
-            )}
-          </span>
+      {/* Phase 59 — content wrapped in a flex flex-col gap-2 div that
+          mirrors NowCard's motion.div wrapper exactly. Matching the
+          internal spacing (gap-2) AND the text sizes (text-8xl key +
+          text-lg row words) means both panes have identical content
+          height, which makes the "NOW" and "NEXT" labels align on the
+          same Y coordinate. Arpeggios matches sizes and uses opacity
+          (text-foreground/40) alone to de-emphasize Next. */}
+      <div className="flex flex-col items-center gap-2">
+        {step.isRest ? (
+          step.upcomingKey ? (
+            <span className="text-8xl font-semibold text-foreground/40 leading-none">
+              {keyDisplay(
+                step.upcomingKey,
+                enharmonicPreference,
+                config.keyOrdering,
+              )}
+            </span>
+          ) : (
+            <span className="text-sm text-muted-foreground">— end —</span>
+          )
         ) : (
-          <span className="text-sm text-muted-foreground">— end —</span>
-        )
-      ) : (
-        <>
-          <span className="text-7xl font-semibold text-foreground/70 leading-none">
-            {step.key
-              ? keyDisplay(
-                  step.key,
-                  enharmonicPreference,
-                  config.keyOrdering,
-                )
-              : "—"}
-          </span>
-          <div className="flex flex-col items-center gap-1">
-            {step.rowWords.map((w, i) => (
-              <span key={i} className="text-base text-muted-foreground/80">
-                {w || <span className="opacity-40">—</span>}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
+          <>
+            <span className="text-8xl font-semibold text-foreground/40 leading-none">
+              {step.key
+                ? keyDisplay(
+                    step.key,
+                    enharmonicPreference,
+                    config.keyOrdering,
+                  )
+                : "—"}
+            </span>
+            <div className="flex flex-col items-center gap-1">
+              {step.rowWords.map((w, i) => (
+                <span key={i} className="text-lg text-muted-foreground/60">
+                  {w || <span className="opacity-40">—</span>}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
