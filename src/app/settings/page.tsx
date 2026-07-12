@@ -13,6 +13,13 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BackButton } from "@/components/shell/back-button";
+import { CollapsibleSection } from "@/components/shared/collapsible-section";
+import {
+  SETTINGS_TABS,
+  SettingsTabsShell,
+  useSettingsTab,
+  type SettingsTabId,
+} from "@/components/settings/settings-tabs-shell";
 import {
   decodeAppearance,
   encodeAppearance,
@@ -94,6 +101,29 @@ import {
  * layer for when a drill / sheet doesn't specify its own value.
  */
 export default function SettingsPage() {
+  // Phase 63 — Active tab. Persists in localStorage so the user
+  // returns to the tab they left. Falls back to "appearance" (the
+  // biggest surface, and the most common landing intent).
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(() => {
+    if (typeof window === "undefined") return "appearance";
+    const stored = window.localStorage.getItem(
+      "practice-prodigy:settings-tab:v1",
+    );
+    if (stored && SETTINGS_TABS.some((t) => t.id === stored)) {
+      return stored as SettingsTabId;
+    }
+    return "appearance";
+  });
+  const handleTabChange = (t: SettingsTabId) => {
+    setActiveTab(t);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        "practice-prodigy:settings-tab:v1",
+        t,
+      );
+    }
+  };
+
   // Existing prefs (Phase 9 + earlier).
   const theme = useUserPrefs((s) => s.theme);
   const setTheme = useUserPrefs((s) => s.setTheme);
@@ -228,7 +258,7 @@ export default function SettingsPage() {
 
   return (
     <main id="main-content" className="flex flex-1 flex-col items-center px-6 py-12">
-      <div className="flex w-full max-w-3xl flex-col gap-10">
+      <div className="flex w-full max-w-5xl flex-col gap-10">
         {/* Phase 34.7 — Back button so Settings isn't a dead-end.
             Returns to whatever page the user was on before clicking
             the settings link. Shared component with the Roadmap page. */}
@@ -250,34 +280,45 @@ export default function SettingsPage() {
               integer) keeps comfortable spacing and eliminates the
               downstream half-pixel accumulation. */}
           <p className="text-sm text-muted-foreground leading-6">
-            Cross-module choices that apply everywhere. Per-drill and
-            per-sheet settings always override these defaults — this
-            page sets the fallback values when a drill or sheet
-            doesn&rsquo;t specify its own.
+            Cross-module choices that apply everywhere. Pick a section
+            in the sidebar — each row shows its current value inline,
+            so you can scan without opening anything. Per-drill and
+            per-sheet settings always override these defaults.
           </p>
         </div>
 
-        {/* Phase 34.1 — Live preview card. Everything above shows here
-            immediately as the user tweaks sliders / toggles / palettes
-            below. No round-trip required — the preview reads from the
-            same active CSS variables ThemeApplicator writes to <html>.
-            Phase 34.2 — sticky wrapper + optional Compare view. */}
-        <AppearancePreview
-          pinned={previewPinned}
-          onTogglePin={() => setPreviewPinned((v) => !v)}
-          snapshot={snapshot}
-          isDirty={isDirty}
-          onRevert={revertToSnapshot}
-          compareOpen={compareOpen}
-          onToggleCompare={() => setCompareOpen((v) => !v)}
-        />
+        {/* Phase 63 — Tabbed shell wraps every section below. Sections
+            self-filter via `tab` prop + SettingsTabContext. The live
+            preview card is Appearance-only, so it renders inside the
+            shell only when the appearance tab is active. */}
+        <SettingsTabsShell
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        >
+          {activeTab === "appearance" && (
+            // Phase 34.1 — Live preview card. Everything below shows
+            // here immediately as the user tweaks sliders / toggles /
+            // palettes. Phase 34.2 added sticky wrapper + Compare view.
+            <AppearancePreview
+              pinned={previewPinned}
+              onTogglePin={() => setPreviewPinned((v) => !v)}
+              snapshot={snapshot}
+              isDirty={isDirty}
+              onRevert={revertToSnapshot}
+              compareOpen={compareOpen}
+              onToggleCompare={() => setCompareOpen((v) => !v)}
+            />
+          )}
 
         {/* Phase 34.2 — Preset moods bundle. One-click starting points
             for common scenarios. Applies a partial appearance slice
             through the store's atomic applyMood action. */}
         <SettingsSection
+          tab="appearance"
           title="Preset moods"
           description="One-click bundles for common practice scenarios. Applying a mood only touches the fields it defines — everything else stays as you set it."
+          summary={`${APPEARANCE_MOODS.length} bundles · Late-night / Bright / Focus / Classroom`}
+          defaultOpen
         >
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {APPEARANCE_MOODS.map((mood) => (
@@ -293,8 +334,15 @@ export default function SettingsPage() {
         {/* APPEARANCE — the flagship visual section. Theme, palette,
             accent, custom accent, and auto-by-time all live here. */}
         <SettingsSection
+          tab="appearance"
           title="Theme & palette"
           description="Overall look. Palettes ship with matching light + dark variants; pick a mode below to see either."
+          summary={
+            <>
+              {THEME_MODE_DISPLAY_NAMES[theme]} · {THEME_PALETTE_DISPLAY_NAMES[themePalette]}
+              {autoThemeByTime ? " · Auto by time" : ""}
+            </>
+          }
           headerAction={
             <ResetButton onClick={resetAppearance} label="Reset appearance" />
           }
@@ -343,8 +391,14 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          tab="appearance"
           title="Accent color"
           description="Applies to primary buttons, active toggles, focus rings, and the app-wide highlight color. Pick a preset swatch, or set a fully custom color."
+          summary={
+            customAccent
+              ? `Custom · ${customAccent}`
+              : ACCENT_PALETTE_DISPLAY_NAMES[accent]
+          }
         >
           <SettingsField label="Preset swatches">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -419,8 +473,16 @@ export default function SettingsPage() {
             an inverse filter so engraved notation and Boomwhacker
             colors always read true. */}
         <SettingsSection
+          tab="appearance"
           title="Fine tuning"
           description="Micro-adjustments that layer on top of the palette. Screen dimming and saturation affect only the app UI — your sheet-music surface always renders at 100/100 so notation and Boomwhacker colors stay true."
+          summary={
+            <>
+              {uiBrightness}% intensity · {uiSaturation}% saturation ·{" "}
+              {CORNER_RADIUS_DISPLAY_NAMES[cornerRadius]} corners
+              {highContrast ? " · High contrast" : ""}
+            </>
+          }
         >
           <SettingsField
             label={`Theme intensity — ${uiBrightness}%`}
@@ -481,8 +543,15 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          tab="appearance"
           title="Typography & density"
           description="Text sizing, spacing, and font choices across the whole app."
+          summary={
+            <>
+              {UI_FONT_DISPLAY_NAMES[uiFont]} · {FONT_SCALE_DISPLAY_NAMES[fontScale]} ·{" "}
+              {UI_DENSITY_DISPLAY_NAMES[uiDensity]}
+            </>
+          }
         >
           <SettingsField label="Font scale">
             <ChipRow
@@ -539,8 +608,16 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          tab="music-display"
           title="Lead sheet appearance"
           description="Paper color and note coloring for the Lead Sheet Builder."
+          summary={
+            <>
+              {PAPER_COLOR_DISPLAY_NAMES[paperColor]} paper ·{" "}
+              {CHORD_FONT_DISPLAY_NAMES[chordFontDefault]} chords ·{" "}
+              {NOTE_COLORING_DISPLAY_NAMES[noteColoring]} notes
+            </>
+          }
         >
           <SettingsField label="Paper color">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -588,8 +665,16 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          tab="accessibility"
           title="Accessibility"
           description="Motion + click-target adjustments. The app also respects your OS's reduced-motion setting automatically."
+          summary={
+            <>
+              {reduceMotion ? "Reduce motion" : "Full motion"} ·{" "}
+              {largerTargets ? "Larger targets" : "Standard targets"}
+              {highContrast ? " · High contrast" : ""}
+            </>
+          }
         >
           <SettingsField
             label="Reduce motion"
@@ -615,8 +700,10 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          tab="practice"
           title="Practice screen layout"
-          description="Only affects the Bass Arpeggios drill screen."
+          description="Applies to every drill module — Arpeggios, Key Sequencer, and Scale Driller."
+          summary={PRACTICE_LAYOUT_DISPLAY_NAMES[practiceLayout]}
         >
           <SettingsField label="Layout">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -653,8 +740,10 @@ export default function SettingsPage() {
         {/* NOTATION — global default chord notation style. The Setup
             screen's per-drill picker remains the override path. */}
         <SettingsSection
+          tab="music-display"
           title="Notation"
           description="Chord-symbol style applied across the app. The Setup screen's per-drill picker overrides this default."
+          summary={NOTATION_STYLE_DISPLAY_NAMES[notationDefault]}
         >
           <SettingsField label="Default chord-notation style">
             <select
@@ -678,8 +767,10 @@ export default function SettingsPage() {
             subtitle on drill screen). When a drill is set to "Follow
             global", THIS is the value it uses. */}
         <SettingsSection
+          tab="music-display"
           title="Pattern display"
           description="Global default for the pattern subtitle under each chord during a drill. Drills can override this per-drill on the setup screen."
+          summary={PATTERN_DISPLAY_LABELS[patternDisplay]}
         >
           <SettingsField label="Pattern subtitle">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -718,8 +809,10 @@ export default function SettingsPage() {
             elsewhere. Great for teachers sending exact setups to
             students. */}
         <SettingsSection
+          tab="appearance"
           title="Share appearance"
           description="Copy your current look as a short code. Anyone with the code — or another device of yours — can paste it here to apply the exact same appearance."
+          summary="Copy or paste an appearance code"
         >
           <ShareAppearance
             currentSlice={currentAppearance}
@@ -732,8 +825,11 @@ export default function SettingsPage() {
             device before cloud sync ships, and for testers who want
             to send their state for debugging. */}
         <SettingsSection
+          tab="data-account"
           title="Data"
           description="Back up your drills and preferences, or restore from a saved bundle."
+          summary="Export drills, sheets, and preferences"
+          defaultOpen
         >
           <DataExport drillsCount={drillsLib.drills.length} />
         </SettingsSection>
@@ -742,7 +838,10 @@ export default function SettingsPage() {
           title="Account & sync"
           description="Sign in to back up your drills to the cloud and sync across devices."
           stub
+          tab="data-account"
+          summary="Coming soon"
         />
+        </SettingsTabsShell>
       </div>
     </main>
   );
@@ -754,13 +853,62 @@ function SettingsSection({
   stub,
   headerAction,
   children,
+  tab,
+  summary,
+  defaultOpen,
 }: {
   title: string;
   description: string;
   stub?: boolean;
   headerAction?: React.ReactNode;
   children?: React.ReactNode;
+  /**
+   * Phase 63 — Tab filter. When provided, this section only renders
+   * when the active Settings tab (from `useSettingsTab`) matches. All
+   * sections carry this in the post-Phase-63 page so the tabbed shell
+   * can filter them via context without JSX restructuring.
+   */
+  tab?: SettingsTabId;
+  /**
+   * Phase 63 — When provided, the section renders in the compact
+   * collapsible form (summary line visible; expand to reveal). When
+   * omitted, the section renders in its original expanded card form.
+   * Useful for sections with no summary state (e.g. Preset moods).
+   */
+  summary?: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
+  const activeTab = useSettingsTab();
+  if (tab && tab !== activeTab) return null;
+
+  // Collapsible form — used when caller supplies a summary. Wraps the
+  // description + children inside the CollapsibleSection's expanded
+  // area so opening the section still gives the user context.
+  if (summary) {
+    return (
+      <CollapsibleSection
+        title={title}
+        summary={
+          stub ? (
+            <span className="text-muted-foreground/70">Coming soon</span>
+          ) : (
+            summary
+          )
+        }
+        defaultOpen={defaultOpen}
+      >
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {description}
+        </p>
+        {headerAction && !stub && (
+          <div className="flex justify-end">{headerAction}</div>
+        )}
+        {children && <div className="flex flex-col gap-4">{children}</div>}
+      </CollapsibleSection>
+    );
+  }
+
+  // Legacy expanded form — used when no summary applies.
   return (
     <section
       className={`flex flex-col gap-4 rounded-md border bg-background/30 p-5 ${
