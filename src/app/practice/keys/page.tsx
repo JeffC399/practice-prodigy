@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
@@ -161,6 +161,20 @@ export default function KeySequencerSetupPage() {
   // Phase 47 — both sections collapsible with summary chips.
   const [customOpen, setCustomOpen] = useState(true);
   const [builtInsOpen, setBuiltInsOpen] = useState(true);
+
+  // Phase 49 — Edit-click feedback:
+  // • justLoadedDrillId flags the drill card that was just clicked so
+  //   the editing badge can pulse briefly (2s auto-clear).
+  // • editingBadgeRef targets the scroll destination.
+  const [justLoadedDrillId, setJustLoadedDrillId] = useState<string | null>(
+    null,
+  );
+  const editingBadgeRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!justLoadedDrillId) return;
+    const t = setTimeout(() => setJustLoadedDrillId(null), 2200);
+    return () => clearTimeout(t);
+  }, [justLoadedDrillId]);
   const reset = useKeySequencerConfig((s) => s.reset);
   const handleCreateNewExercise = () => {
     // Reset to defaults (matches DEFAULT_KEY_SEQUENCER_CONFIG shape)
@@ -230,7 +244,18 @@ export default function KeySequencerSetupPage() {
       ...drill.config,
       loadedKeyDrillId: drill.id,
     });
-    // Stay on setup — user tweaks then hits Save changes / Save as new.
+    // Phase 49 — visual feedback on Edit click:
+    // (1) Trigger the "just loaded" pulse on the editing badge,
+    // (2) Scroll the badge into view so the user immediately sees
+    //     the "you're editing X" affordance appear.
+    setJustLoadedDrillId(drill.id);
+    // Defer the scroll one frame so the badge has mounted.
+    requestAnimationFrame(() => {
+      editingBadgeRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   };
 
   const handleDuplicateDrill = (drill: KeyDrill) => {
@@ -243,7 +268,11 @@ export default function KeySequencerSetupPage() {
     }
   };
 
-  const handleDoneEditing = () => setLoadedKeyDrillId(undefined);
+  const handleDoneEditing = () => {
+    // Phase 49 — Done editing returns to a fresh blank canvas so the
+    // next setup starts clean, matching the page-open behavior.
+    reset();
+  };
 
   const handleSaveChanges = () => {
     if (!editingDrill) return;
@@ -291,6 +320,19 @@ export default function KeySequencerSetupPage() {
     drillsLib.seedStartersIfNeeded();
     drillsLib.reflagLegacyStartersIfNeeded();
   }, [mounted, drillsLib]);
+
+  // Phase 49 — Fresh-slate on page open. Whatever config was persisted
+  // from a previous visit is discarded so the user lands on a blank
+  // setup. If they want to continue a saved drill, they click its
+  // card in Your Custom Drills / Built-in Drills. Runs exactly once
+  // after mount using a ref so hot-reloads don't retrigger.
+  const didInitialResetRef = useRef(false);
+  useEffect(() => {
+    if (!mounted) return;
+    if (didInitialResetRef.current) return;
+    didInitialResetRef.current = true;
+    reset();
+  }, [mounted, reset]);
 
   const toggleKey = (k: KeyPitchClass) => {
     if (keyPool.includes(k)) {
@@ -512,22 +554,38 @@ export default function KeySequencerSetupPage() {
           )}
         </section>
 
-        {/* Editing badge — visible when the live config was loaded from
-            a saved drill. Save changes / Discard / Done editing. */}
+        {/* Editing badge — visible when the live config was loaded
+            from a saved drill. Phase 49 — visually louder + a pulse
+            ring for ~2s after the user just clicked Edit, so the
+            state change is impossible to miss. Ref target for the
+            auto-scroll on Edit click. */}
         {editingDrill && (
-          <div className="flex flex-col gap-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="font-mono text-xs uppercase tracking-wider text-primary">
-                Editing drill · {editingDrill.name}
-              </span>
+          <div
+            ref={editingBadgeRef}
+            className={`flex flex-col gap-3 rounded-lg border-2 border-primary/60 bg-primary/10 px-5 py-4 shadow-md transition-all ${
+              justLoadedDrillId === editingDrill.id
+                ? "ring-4 ring-primary/40 animate-pulse"
+                : ""
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
+                  Now editing
+                </span>
+                <span className="text-lg font-semibold text-foreground">
+                  {editingDrill.name}
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {isDirty && (
                   <>
                     <button
                       type="button"
                       onClick={handleSaveChanges}
-                      className="rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/25"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
                     >
+                      <Save className="h-3.5 w-3.5" aria-hidden="true" />
                       Save changes
                     </button>
                     <button
@@ -549,10 +607,13 @@ export default function KeySequencerSetupPage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Edit the pool, prompt rows, tempo, or session settings below —
-              they all apply to this drill. Click{" "}
+              The sections below have been populated with this drill&rsquo;s
+              settings. Edit anything — the pool, prompt rows, tempo,
+              session settings — and click{" "}
               <span className="font-medium text-foreground">Save changes</span>{" "}
-              to commit them.
+              to commit them, or{" "}
+              <span className="font-medium text-foreground">Done editing</span>{" "}
+              to return to a blank canvas.
             </p>
           </div>
         )}

@@ -54,7 +54,14 @@ export const useKeySequencerConfig = create<KeySequencerConfigStore>()(
     (set) => ({
       ...DEFAULT_KEY_SEQUENCER_CONFIG,
       loadConfig: (config) => set({ ...config }),
-      reset: () => set({ ...DEFAULT_KEY_SEQUENCER_CONFIG }),
+      reset: () =>
+        set({
+          ...DEFAULT_KEY_SEQUENCER_CONFIG,
+          // Phase 49 — reset also clears the loaded-drill link so the
+          // editing badge disappears and Done Editing returns to a
+          // truly blank canvas.
+          loadedKeyDrillId: undefined,
+        }),
       setKeyPool: (keyPool) => set({ keyPool }),
       setKeyOrdering: (keyOrdering) => set({ keyOrdering }),
       setPromptRows: (promptRows) => set({ promptRows }),

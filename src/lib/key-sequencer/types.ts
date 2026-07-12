@@ -184,9 +184,15 @@ export function newPromptRowId(): string {
  * comfortable practice tempo. Users add prompt rows on top of this
  * as they define what they want to practice.
  */
+/**
+ * Fresh-slate defaults. Phase 49 — key pool starts EMPTY so the setup
+ * page is a blank canvas whenever the user lands on it with no drill
+ * loaded. Prompt rows also start empty. Session settings sit at
+ * sensible starting values (♩=90 4/4).
+ */
 export const DEFAULT_KEY_SEQUENCER_CONFIG: KeySequencerConfig = {
-  keyPool: ["C", "F", "A#", "D#", "G#", "C#", "F#", "B", "E", "A", "D", "G"],
-  keyOrdering: "cycleOf5ths",
+  keyPool: [],
+  keyOrdering: "custom",
   promptRows: [],
   restMeasuresBetweenKeys: 0,
   transitionUnit: "measures",

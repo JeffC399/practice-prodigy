@@ -45,12 +45,17 @@ export function KeyDrillCard({
 
   return (
     <div
-      className={`group flex flex-col overflow-hidden rounded-lg border bg-background/40 transition-all ${
+      className={`group relative flex flex-col overflow-hidden rounded-lg border-2 bg-background/40 transition-all ${
         isEditing
-          ? "border-primary/60 bg-primary/5"
+          ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-md"
           : "border-border hover:border-primary/60 hover:bg-primary/5 hover:shadow-md"
       }`}
     >
+      {isEditing && (
+        <div className="absolute right-2 top-2 z-10 rounded-full bg-primary px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-primary-foreground shadow">
+          Editing
+        </div>
+      )}
       {/* Body — full clickable area launches the drill. */}
       <button
         type="button"
