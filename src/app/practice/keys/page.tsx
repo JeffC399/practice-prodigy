@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
+import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
 import {
   BPM_MAX,
   BPM_MIN,
@@ -810,18 +811,12 @@ export default function KeySequencerSetupPage() {
               <span className="font-mono uppercase tracking-wider text-muted-foreground">
                 Measures each key stays
               </span>
-              <input
-                type="number"
+              <ClampedNumberInput
+                value={measuresPerKey}
                 min={1}
                 max={16}
-                step={1}
-                value={measuresPerKey}
-                onChange={(e) =>
-                  setMeasuresPerKey(
-                    Math.max(1, Math.min(16, parseInt(e.target.value, 10) || 1)),
-                  )
-                }
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                onChange={setMeasuresPerKey}
+                ariaLabel="Measures each key stays"
               />
               <span className="text-[10px] text-muted-foreground/70">
                 How long each key stays before advancing. Set to 1 for a fresh key every measure.
@@ -832,31 +827,23 @@ export default function KeySequencerSetupPage() {
                 Prep between keys
               </span>
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={transitionUnit === "measures" ? 4 : 16}
-                  step={1}
+                <ClampedNumberInput
+                  className="w-20"
                   value={
                     transitionUnit === "measures"
                       ? transitionMeasures
                       : transitionBeats
                   }
-                  onChange={(e) => {
-                    const v = Math.max(
-                      0,
-                      Math.min(
-                        transitionUnit === "measures" ? 4 : 16,
-                        parseInt(e.target.value, 10) || 0,
-                      ),
-                    );
+                  min={0}
+                  max={transitionUnit === "measures" ? 4 : 16}
+                  onChange={(v) => {
                     if (transitionUnit === "measures") {
                       setTransitionMeasures(v);
                     } else {
                       setTransitionBeats(v);
                     }
                   }}
-                  className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  ariaLabel="Prep between keys"
                 />
                 <select
                   value={transitionUnit}
@@ -879,18 +866,12 @@ export default function KeySequencerSetupPage() {
               <span className="font-mono uppercase tracking-wider text-muted-foreground">
                 Count-in measures
               </span>
-              <input
-                type="number"
+              <ClampedNumberInput
+                value={countInMeasures}
                 min={0}
                 max={2}
-                step={1}
-                value={countInMeasures}
-                onChange={(e) =>
-                  setCountInMeasures(
-                    Math.max(0, Math.min(2, parseInt(e.target.value, 10) || 0)),
-                  )
-                }
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                onChange={setCountInMeasures}
+                ariaLabel="Count-in measures"
               />
             </label>
           </div>
@@ -910,18 +891,13 @@ export default function KeySequencerSetupPage() {
               <span className="font-mono uppercase tracking-wider text-muted-foreground">
                 Number of passes
               </span>
-              <input
-                type="number"
+              <ClampedNumberInput
+                className="w-32"
+                value={repetitions}
                 min={1}
                 max={64}
-                step={1}
-                value={repetitions}
-                onChange={(e) =>
-                  setRepetitions(
-                    Math.max(1, Math.min(64, parseInt(e.target.value, 10) || 1)),
-                  )
-                }
-                className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                onChange={setRepetitions}
+                ariaLabel="Number of passes"
               />
             </label>
           )}
@@ -1037,22 +1013,14 @@ export default function KeySequencerSetupPage() {
                   <span className="font-mono uppercase tracking-wider text-muted-foreground">
                     Lead beats
                   </span>
-                  <input
-                    type="number"
+                  <ClampedNumberInput
+                    value={voiceAnnounce.leadBeats}
                     min={1}
                     max={4}
-                    step={1}
-                    value={voiceAnnounce.leadBeats}
-                    onChange={(e) =>
-                      setVoiceAnnounce({
-                        ...voiceAnnounce,
-                        leadBeats: Math.max(
-                          1,
-                          Math.min(4, parseInt(e.target.value, 10) || 2),
-                        ),
-                      })
+                    onChange={(v) =>
+                      setVoiceAnnounce({ ...voiceAnnounce, leadBeats: v })
                     }
-                    className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    ariaLabel="Lead beats"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-xs">
