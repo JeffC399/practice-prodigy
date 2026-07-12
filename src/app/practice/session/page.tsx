@@ -527,9 +527,22 @@ export default function PracticeSessionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStartFromUrl, resumeFromUrl, isIdle]);
 
-  // Phase 55 — Space to Start/Stop. Guarded so users can type Space
-  // in inputs without hijacking the shortcut. Matches Key Sequencer's
-  // implementation exactly so the two modules feel identical.
+  // Phase 55 / 58 — Space to Start/Stop. Guarded so users can type
+  // Space in inputs without hijacking the shortcut.
+  //
+  // Phase 58 fix: handleToggle in Arpeggios is defined inline (not
+  // useCallback) and closes over isIdle. Registering the keydown
+  // listener once at mount with empty deps captured the initial
+  // isIdle=true forever — every Space press then took the "start
+  // fresh drill" branch instead of the "stop currently-playing
+  // drill" branch. Users saw the drill jump back to count-in on a
+  // single Space press instead of the expected stop-then-restart.
+  //
+  // Fix: keep a ref pointing at the LATEST handleToggle. The keydown
+  // handler calls through the ref, so it always sees the current
+  // isIdle/state.phase and takes the correct branch.
+  const handleToggleRef = useRef(handleToggle);
+  handleToggleRef.current = handleToggle;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
@@ -543,13 +556,10 @@ export default function PracticeSessionPage() {
         return;
       }
       e.preventDefault();
-      handleToggle();
+      handleToggleRef.current();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-    // handleToggle identity is unstable but the ref-based state inside
-    // makes each fresh call correct; no dep needed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist a resume snapshot on each play-measure boundary. The
