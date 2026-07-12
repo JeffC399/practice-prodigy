@@ -8,6 +8,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  Shuffle,
   Square,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,7 +21,11 @@ import {
   cancelVoiceAnnounce,
   speakUpcoming,
 } from "@/lib/key-sequencer/voice-announce";
-import { BPM_MAX, BPM_MIN } from "@/lib/state/practice-config";
+import {
+  BPM_MAX,
+  BPM_MIN,
+  RANDOM_ORDERING_STRATEGIES,
+} from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 
 /**
@@ -86,11 +91,15 @@ export default function KeySequencerSessionPage() {
     );
   }, [state.phase, state.absoluteBeat, beatsPerMeasure, steps.length]);
 
-  const currentStep = currentStepIdx >= 0 ? steps[currentStepIdx] : null;
-  const nextStep =
-    currentStepIdx >= 0 && currentStepIdx + 1 < steps.length
-      ? steps[currentStepIdx + 1]
-      : null;
+  // Phase 52 — DISPLAY step differs from LOGIC step when idle. While
+  // idle we want to preview the sequence's actual first step (which
+  // for random orderings requires the sessionSeed we'd use at Start).
+  // For play control (restartCurrentKey / skipToNextKey) we still
+  // gate on `currentStepIdx >= 0` because those are only meaningful
+  // when actually playing.
+  const displayStepIdx = currentStepIdx >= 0 ? currentStepIdx : 0;
+  const currentStep = steps[displayStepIdx] ?? null;
+  const nextStep = steps[displayStepIdx + 1] ?? null;
 
   const isIdle = state.phase === "idle";
   const isCountIn = state.phase === "count-in";
@@ -99,7 +108,9 @@ export default function KeySequencerSessionPage() {
   const handleStart = useCallback(async () => {
     if (isPlaying || isCountIn) return;
     if (config.keyPool.length === 0) return;
-    setSessionSeed(Date.now());
+    // Phase 52 — do NOT regenerate sessionSeed here. The user must
+    // see the same first-key preview they get when they hit Start.
+    // Seed is set once on mount + refreshable via the Shuffle button.
     await start({
       bpm: config.bpm,
       beatsPerMeasure,
@@ -506,6 +517,25 @@ export default function KeySequencerSessionPage() {
               countInRemaining={state.countInBeatsRemaining}
             />
 
+            {/* Phase 52 — Shuffle preview. Visible only when idle
+                AND the current key ordering is random. Re-seeds the
+                sequence so users can preview a different random
+                order before starting. Non-random orderings are
+                deterministic, so no shuffle needed. */}
+            {isIdle &&
+              RANDOM_ORDERING_STRATEGIES.has(config.keyOrdering) && (
+                <button
+                  type="button"
+                  onClick={() => setSessionSeed(Date.now())}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                  aria-label="Shuffle the random sequence"
+                  title="Preview a different random sequence"
+                >
+                  <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
+                  Shuffle preview
+                </button>
+              )}
+
             <button
               type="button"
               onClick={handleToggle}
@@ -560,9 +590,12 @@ function NowCard({
   const isPreparing = isCountIn || isPrep;
   const label = isPreparing ? "Get ready" : "Now";
   const emphasis = isIdle ? "opacity-35" : isPreparing ? "opacity-60" : "";
+  // Phase 52 — the caller now passes an ACTUAL step from the built
+  // sequence for the idle preview (steps[0]) so we never fall back
+  // to raw pool[0]. Empty-pool sanity guard only.
   const displayStep = step ?? {
     isRest: false,
-    key: config.keyPool[0] ?? null,
+    key: null as import("@/lib/key-sequencer/types").KeyPitchClass | null,
     rowWords: config.promptRows.map(() => "—"),
     measureInRun: 0,
     passIndex: 0,
