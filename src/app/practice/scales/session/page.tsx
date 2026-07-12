@@ -309,20 +309,28 @@ export default function ScaleDrillerSessionPage() {
                     config={config}
                     beatTick={beatTick}
                   />
-                  <AnimatePresence initial={false}>
-                    {!isPreparing && (
-                      <motion.div
-                        key="next-panel-single"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeOut" }}
-                        className="w-full"
-                      >
-                        <NextCard step={nextStep} config={config} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* Phase 65 — Fixed-height slot for the Next chip so
+                      the Start button / beat dots below don't jump up
+                      when Next fades out during count-in and prep. The
+                      chip's natural height is ~86px; 6rem (96px) gives
+                      it a small comfort buffer and keeps the layout
+                      perfectly stable through play → prep → play. */}
+                  <div className="w-full min-h-[6rem]">
+                    <AnimatePresence initial={false}>
+                      {!isPreparing && (
+                        <motion.div
+                          key="next-panel-single"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          className="w-full"
+                        >
+                          <NextCard step={nextStep} config={config} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
               );
             })()}

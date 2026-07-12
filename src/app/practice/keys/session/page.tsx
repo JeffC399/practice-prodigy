@@ -445,20 +445,28 @@ export default function KeySequencerSessionPage() {
                     config={config}
                     beatTick={beatTick}
                   />
-                  <AnimatePresence initial={false}>
-                    {!isPreparing && (
-                      <motion.div
-                        key="next-panel-single"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeOut" }}
-                        className="w-full"
-                      >
-                        <NextCard step={nextStep} config={config} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* Phase 65 — Fixed-height slot for the Next chip
+                      so the Start button / beat dots below don't jump
+                      up when Next fades out during count-in and prep.
+                      Key Sequencer's compact NextCard can grow with
+                      prompt rows; 7rem covers the common case of up
+                      to 3 rows without capping. */}
+                  <div className="w-full min-h-[7rem]">
+                    <AnimatePresence initial={false}>
+                      {!isPreparing && (
+                        <motion.div
+                          key="next-panel-single"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          className="w-full"
+                        >
+                          <NextCard step={nextStep} config={config} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
               );
             })()}
