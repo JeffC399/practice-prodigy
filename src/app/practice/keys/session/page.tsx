@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Minus, Play, Plus, Square } from "lucide-react";
+import { Minus, Play, Plus, Settings2, Square } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMetronome } from "@/lib/audio/use-metronome";
@@ -12,7 +12,11 @@ import {
   cancelVoiceAnnounce,
   speakUpcoming,
 } from "@/lib/key-sequencer/voice-announce";
-import { BPM_MAX, BPM_MIN } from "@/lib/state/practice-config";
+import {
+  BPM_MAX,
+  BPM_MIN,
+  RANDOM_ORDERING_STRATEGIES,
+} from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 
 /**
@@ -256,70 +260,100 @@ export default function KeySequencerSessionPage() {
 
   return (
     <main id="main-content" className="flex flex-1 flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
-        <Link
-          href="/practice/keys"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Setup
-        </Link>
+      {/* Phase 56 — Header rebuilt to mirror Arpeggios exactly.
+          Layout: [Setup link] | [status chips] [jump controls]
+          [tempo cluster] [time-sig] [drill length]. Chips use the
+          same font-mono / uppercase / primary-accent conventions. */}
+      <header className="flex items-center justify-between border-b border-border px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/practice/keys"
+            className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Back to setup"
+          >
+            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Setup</span>
+          </Link>
+        </div>
         <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          <span className="text-foreground" title="Beats per minute">
-            ♩ = {config.bpm}
+          {/* Status chips — same treatment as Arpeggios: Random /
+              Loop ∞ / Prep <N><unit>. Primary tint highlights active
+              non-default settings. */}
+          {RANDOM_ORDERING_STRATEGIES.has(config.keyOrdering) && (
+            <span className="text-primary">Random</span>
+          )}
+          {config.repeatIndefinitely && (
+            <span className="text-primary">Loop ∞</span>
+          )}
+          {(() => {
+            const unit = config.transitionUnit ?? "measures";
+            const count =
+              unit === "measures"
+                ? (config.transitionMeasures ?? 0)
+                : (config.transitionBeats ?? 0);
+            return count > 0 ? (
+              <span className="text-primary">
+                Prep {count}
+                {unit === "measures" ? "m" : "b"}
+              </span>
+            ) : null;
+          })()}
+          {/* Tempo cluster — verbatim port from Arpeggios (÷2 / -5 /
+              readout / +5 / ×2 in compact h-5 chips). */}
+          <span className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={halveBpm}
+              disabled={config.bpm <= BPM_MIN}
+              aria-label="Halve tempo"
+              title="Halve tempo (÷2)"
+              className="flex h-5 px-1.5 items-center justify-center rounded-sm border border-border bg-background font-mono text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              &divide;2
+            </button>
+            <button
+              type="button"
+              onClick={() => bumpBpm(-5)}
+              disabled={config.bpm <= BPM_MIN}
+              aria-label="Decrease tempo by 5 BPM"
+              className="flex h-5 w-5 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <Minus className="h-3 w-3" aria-hidden="true" />
+            </button>
+            <span className="text-foreground tabular-nums w-12 text-center">
+              ♩={config.bpm}
+            </span>
+            <button
+              type="button"
+              onClick={() => bumpBpm(+5)}
+              disabled={config.bpm >= BPM_MAX}
+              aria-label="Increase tempo by 5 BPM"
+              className="flex h-5 w-5 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus className="h-3 w-3" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={doubleBpm}
+              disabled={config.bpm >= BPM_MAX}
+              aria-label="Double tempo"
+              title="Double tempo (×2)"
+              className="flex h-5 px-1.5 items-center justify-center rounded-sm border border-border bg-background font-mono text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              &times;2
+            </button>
           </span>
           <span>
             {beatsPerMeasure}/{config.timeSignature.beatUnit}
           </span>
           <span>
             {config.keyPool.length} keys ×{" "}
-            {config.repeatIndefinitely ? "loop" : `${config.repetitions} passes`}
+            {config.repeatIndefinitely
+              ? "loop"
+              : `${config.repetitions} ${
+                  config.repetitions === 1 ? "pass" : "passes"
+                }`}
           </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={halveBpm}
-            disabled={config.bpm <= BPM_MIN}
-            className="flex h-8 items-center justify-center rounded-md border border-border bg-background px-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-            aria-label="Halve tempo"
-            title="÷2 BPM"
-          >
-            ÷2
-          </button>
-          <button
-            type="button"
-            onClick={() => bumpBpm(-5)}
-            disabled={config.bpm <= BPM_MIN}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-            aria-label="Decrease tempo by 5"
-            title="−5 BPM"
-          >
-            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-          <span className="min-w-[3.5rem] text-center font-mono text-sm">
-            ♩={config.bpm}
-          </span>
-          <button
-            type="button"
-            onClick={() => bumpBpm(5)}
-            disabled={config.bpm >= BPM_MAX}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-            aria-label="Increase tempo by 5"
-            title="+5 BPM"
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={doubleBpm}
-            disabled={config.bpm >= BPM_MAX}
-            className="flex h-8 items-center justify-center rounded-md border border-border bg-background px-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-            aria-label="Double tempo"
-            title="×2 BPM"
-          >
-            ×2
-          </button>
         </div>
       </header>
 
