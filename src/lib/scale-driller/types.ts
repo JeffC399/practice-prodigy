@@ -75,6 +75,50 @@ export const SCALE_DISPLAY_NAMES: Record<ScaleQuality, string> = {
 };
 
 /**
+ * Phase 66 — Visual groupings for the setup-page Scales checkbox
+ * grid. Purely a display convention (the sequencer and store don't
+ * consume it), but pedagogically important: putting Church modes
+ * together, Pentatonic + Blues together, etc. teaches the user
+ * "here's where each scale lives in the family tree." Also drives
+ * the quick-preset chips ("Select all Church modes" etc.).
+ */
+export const SCALE_GROUPS: Array<{
+  label: string;
+  /** Slug used by quick-preset chip ids so URL-share codes are stable. */
+  slug: string;
+  qualities: ScaleQuality[];
+}> = [
+  {
+    label: "Church modes",
+    slug: "church",
+    qualities: [
+      "ionian",
+      "dorian",
+      "phrygian",
+      "lydian",
+      "mixolydian",
+      "aeolian",
+      "locrian",
+    ],
+  },
+  {
+    label: "Pentatonic & Blues",
+    slug: "pentatonic",
+    qualities: ["majorPentatonic", "minorPentatonic", "blues"],
+  },
+  {
+    label: "Jazz tension",
+    slug: "jazz-tension",
+    qualities: ["harmonicMinor", "melodicMinor"],
+  },
+  {
+    label: "Symmetric & Chromatic",
+    slug: "symmetric",
+    qualities: ["wholeTone", "diminished", "chromatic"],
+  },
+];
+
+/**
  * Short label used on compact chips + summary lines (setup page). Full
  * names shine on the drill screen; compact labels keep pool summaries
  * readable when many scales are selected.

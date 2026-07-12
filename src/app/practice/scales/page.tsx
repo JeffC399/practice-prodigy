@@ -8,6 +8,7 @@ import {
   Play,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,6 +22,7 @@ import {
   SCALE_DISPLAY_MODE_LABELS,
   SCALE_DISPLAY_MODES,
   SCALE_DISPLAY_NAMES,
+  SCALE_GROUPS,
   SCALE_QUALITIES,
   SCALE_SHORT_LABELS,
   type ScaleDrill,
@@ -492,6 +494,14 @@ export default function ScaleDrillerSetupPage() {
  * row) can drop specific instances via the small "custom picks" list
  * below the matrix.
  */
+/**
+ * Musically meaningful key presets — the flat-side / sharp-side split
+ * mirrors the cycle-of-5ths conventions jazz musicians use.
+ */
+const NATURAL_KEYS: ScalePitchClass[] = ["C", "D", "E", "F", "G", "A", "B"];
+const FLAT_KEYS: ScalePitchClass[] = ["F", "A#", "D#", "G#", "C#", "F#"]; // F, B♭, E♭, A♭, D♭, G♭
+const SHARP_KEYS: ScalePitchClass[] = ["G", "D", "A", "E", "B", "F#"];
+
 function ScalePoolSection({
   scalePool,
   setScalePool,
@@ -508,6 +518,20 @@ function ScalePoolSection({
     const set = new Set<ScalePitchClass>();
     for (const s of scalePool) set.add(s.root);
     return set;
+  }, [scalePool]);
+
+  // Group the pool by root so the preview reads as "one row per key"
+  // instead of a truncated flat list — teaches the cross-product
+  // structure at a glance and stays scannable at 84+ combos.
+  const poolByRoot = useMemo(() => {
+    const map = new Map<ScalePitchClass, ScaleInstance[]>();
+    for (const s of scalePool) {
+      const arr = map.get(s.root) ?? [];
+      arr.push(s);
+      map.set(s.root, arr);
+    }
+    // Preserve the order the roots first appear in the pool.
+    return Array.from(map.entries());
   }, [scalePool]);
 
   const rebuildPool = (
@@ -543,6 +567,50 @@ function ScalePoolSection({
     );
   };
 
+  // Phase 66 — Individual combo removal via × on each pool chip.
+  // Removes only the one specific instance without touching
+  // checkbox state. Note: subsequent bulk checkbox toggles rebuild
+  // the cross-product and will re-introduce this combo. Documented
+  // in the setup-page onboarding card so users know the rule.
+  const removeCombo = (combo: ScaleInstance) => {
+    setScalePool(
+      scalePool.filter(
+        (s) => !(s.root === combo.root && s.quality === combo.quality),
+      ),
+    );
+  };
+
+  // Phase 66 — Manual add of a specific combo (root + quality).
+  // Deduped — appending an existing combo is a no-op.
+  const addCombo = (combo: ScaleInstance) => {
+    if (
+      scalePool.some(
+        (s) => s.root === combo.root && s.quality === combo.quality,
+      )
+    ) {
+      return;
+    }
+    setScalePool([...scalePool, combo]);
+  };
+
+  // Phase 66 — Scale preset chips. Each replaces the current
+  // qualities selection with a musically meaningful subset. Keys
+  // stay whatever the user has set (defaulting to C when empty).
+  const applyScalePreset = (qualities: ScaleQuality[]) => {
+    rebuildPool(
+      qualities,
+      selectedKeys.size > 0 ? [...selectedKeys] : ["C"],
+    );
+  };
+
+  // Phase 66 — Key preset chips. Same shape as scale presets.
+  const applyKeyPreset = (keys: ScalePitchClass[]) => {
+    rebuildPool(
+      selectedQualities.size > 0 ? [...selectedQualities] : ["ionian"],
+      keys,
+    );
+  };
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
@@ -564,32 +632,86 @@ function ScalePoolSection({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-background/30 p-3">
-          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            Scales
-          </span>
-          <div className="grid grid-cols-2 gap-1.5 text-xs">
-            {SCALE_QUALITIES.map((q) => (
-              <label
-                key={q}
-                className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-background/60 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedQualities.has(q)}
-                  onChange={() => toggleQuality(q)}
-                  className="rounded border-border"
-                />
-                <span>{SCALE_DISPLAY_NAMES[q]}</span>
-              </label>
+        {/* Scales box — quick presets + grouped checkboxes. */}
+        <div className="flex flex-col gap-3 rounded-md border border-border/60 bg-background/30 p-3">
+          <div className="flex items-baseline justify-between">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              Scales
+            </span>
+            <span className="font-mono text-[10px] text-muted-foreground/70">
+              {selectedQualities.size} of {SCALE_QUALITIES.length} selected
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <PresetChip
+              label="All"
+              onClick={() => applyScalePreset([...SCALE_QUALITIES])}
+            />
+            {SCALE_GROUPS.map((g) => (
+              <PresetChip
+                key={g.slug}
+                label={g.label}
+                onClick={() => applyScalePreset(g.qualities)}
+              />
+            ))}
+            <PresetChip label="None" onClick={() => applyScalePreset([])} muted />
+          </div>
+          <div className="flex flex-col gap-2 text-xs">
+            {SCALE_GROUPS.map((g) => (
+              <div key={g.slug} className="flex flex-col gap-1">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                  {g.label}
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {g.qualities.map((q) => (
+                    <label
+                      key={q}
+                      className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-background/60 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedQualities.has(q)}
+                        onChange={() => toggleQuality(q)}
+                        className="rounded border-border"
+                      />
+                      <span>{SCALE_DISPLAY_NAMES[q]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-background/30 p-3">
-          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            Keys
-          </span>
+        {/* Keys box — quick presets + 12 checkboxes. */}
+        <div className="flex flex-col gap-3 rounded-md border border-border/60 bg-background/30 p-3">
+          <div className="flex items-baseline justify-between">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              Keys
+            </span>
+            <span className="font-mono text-[10px] text-muted-foreground/70">
+              {selectedKeys.size} of {PITCH_CLASSES.length} selected
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <PresetChip
+              label="All"
+              onClick={() => applyKeyPreset([...PITCH_CLASSES])}
+            />
+            <PresetChip
+              label="Naturals"
+              onClick={() => applyKeyPreset(NATURAL_KEYS)}
+            />
+            <PresetChip
+              label="Flats"
+              onClick={() => applyKeyPreset(FLAT_KEYS)}
+            />
+            <PresetChip
+              label="Sharps"
+              onClick={() => applyKeyPreset(SHARP_KEYS)}
+            />
+            <PresetChip label="None" onClick={() => applyKeyPreset([])} muted />
+          </div>
           <div className="grid grid-cols-4 gap-1.5 text-xs">
             {PITCH_CLASSES.map((k) => (
               <label
@@ -609,24 +731,157 @@ function ScalePoolSection({
         </div>
       </div>
 
+      {/* Pool preview — one row per root, grouped chips, × per chip
+          to remove a single combo. "Add specific combo" popover at
+          the end lets users pick exactly one instance without
+          disturbing the checkbox cross-product. */}
       {scalePool.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {scalePool.slice(0, 24).map((s, i) => (
-            <span
-              key={`${s.root}-${s.quality}-${i}`}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-background/40 px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
-            >
-              {rootDisplay(s.root, "auto")} {SCALE_SHORT_LABELS[s.quality]}
+        <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-background/20 p-3">
+          <div className="flex items-baseline justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              Pool preview · grouped by root
             </span>
-          ))}
-          {scalePool.length > 24 && (
-            <span className="inline-flex items-center rounded-full border border-dashed border-border/70 px-2 py-0.5 font-mono text-[11px] text-muted-foreground/70">
-              +{scalePool.length - 24} more
-            </span>
-          )}
+          </div>
+          <div className="flex flex-col gap-1">
+            {poolByRoot.map(([root, combos]) => (
+              <div
+                key={root}
+                className="flex flex-wrap items-center gap-1.5"
+              >
+                <span className="w-6 shrink-0 font-mono text-[11px] font-semibold text-muted-foreground">
+                  {rootDisplay(root, "auto")}
+                </span>
+                {combos.map((s) => (
+                  <button
+                    key={`${s.root}-${s.quality}`}
+                    type="button"
+                    onClick={() => removeCombo(s)}
+                    aria-label={`Remove ${rootDisplay(s.root, "auto")} ${SCALE_DISPLAY_NAMES[s.quality]}`}
+                    className="group inline-flex items-center gap-1 rounded-full border border-border bg-background/40 px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-500"
+                  >
+                    <span>{SCALE_SHORT_LABELS[s.quality]}</span>
+                    <X
+                      className="h-2.5 w-2.5 opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-hidden="true"
+                    />
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Add specific combo — hand-pick workflow. */}
+      <AddSpecificCombo onAdd={addCombo} />
     </section>
+  );
+}
+
+/**
+ * Small chip button used above each column's checkbox grid to apply
+ * a musically meaningful preset in one click. `muted` variant for
+ * destructive-adjacent actions ("None").
+ */
+function PresetChip({
+  label,
+  onClick,
+  muted,
+}: {
+  label: string;
+  onClick: () => void;
+  muted?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
+        muted
+          ? "border-border/60 bg-transparent text-muted-foreground/70 hover:border-border hover:text-foreground"
+          : "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Inline "+ Add combo" affordance for the hand-pick workflow.
+ * Opens a small popover with root + scale dropdowns; click Add to
+ * append that specific instance to the pool. Deduped by the caller.
+ */
+function AddSpecificCombo({
+  onAdd,
+}: {
+  onAdd: (combo: ScaleInstance) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [root, setRoot] = useState<ScalePitchClass>("C");
+  const [quality, setQuality] = useState<ScaleQuality>("ionian");
+
+  return (
+    <div className="flex flex-col gap-2">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex w-fit items-center gap-1.5 rounded-full border border-dashed border-border/60 px-3 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          <Plus className="h-3 w-3" aria-hidden="true" />
+          Add specific combo
+        </button>
+      ) : (
+        <div className="flex flex-wrap items-end gap-2 rounded-md border border-border/60 bg-background/20 p-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted-foreground">Root</span>
+            <select
+              value={root}
+              onChange={(e) => setRoot(e.target.value as ScalePitchClass)}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+            >
+              {PITCH_CLASSES.map((k) => (
+                <option key={k} value={k}>
+                  {rootDisplay(k, "auto")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted-foreground">Scale</span>
+            <select
+              value={quality}
+              onChange={(e) => setQuality(e.target.value as ScaleQuality)}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+            >
+              {SCALE_QUALITIES.map((q) => (
+                <option key={q} value={q}>
+                  {SCALE_DISPLAY_NAMES[q]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              onAdd({ root, quality });
+            }}
+            className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="rounded-md px-2 py-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
