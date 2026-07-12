@@ -240,6 +240,36 @@ export default function KeySequencerSetupPage() {
     router.push("/practice/keys/session");
   };
 
+  // Phase 60 — Cmd/Ctrl + Enter starts the drill from anywhere on the
+  // setup page (except while typing in an input / textarea, where
+  // Enter has field-specific meaning). Documented in the shortcuts
+  // overlay under Key Sequencer · Setup so users can discover it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      // Guard: don't launch if the pool is empty — the button itself
+      // is disabled in that state, and firing here would just show
+      // the "no keys selected" empty state on the session page.
+      if (useKeySequencerConfig.getState().keyPool.length === 0) return;
+      e.preventDefault();
+      router.push("/practice/keys/session");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // router is a stable singleton from useRouter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleEditDrill = (drill: KeyDrill) => {
     loadConfig({
       ...drill.config,
@@ -1114,8 +1144,12 @@ export default function KeySequencerSetupPage() {
             <Play className="h-5 w-5" aria-hidden="true" />
             Start drill
           </button>
-          <p className="text-[11px] text-muted-foreground/70">
-            Space to Start / Stop once you're in the drill screen. Press{" "}
+          <p className="text-center text-[11px] text-muted-foreground/70">
+            <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+              Cmd/Ctrl + Enter
+            </kbd>{" "}
+            to Start · Space to Start / Stop once you're in the drill
+            screen. Press{" "}
             <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
               ?
             </kbd>{" "}

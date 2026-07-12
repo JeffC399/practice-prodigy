@@ -534,6 +534,33 @@ export default function PracticeSetupPage() {
     router.push("/practice/session");
   };
 
+  // Phase 60 — Cmd/Ctrl + Enter starts the drill from anywhere on the
+  // setup page (except while typing in an input / textarea, where Enter
+  // should submit the field). Documented in the shortcuts overlay
+  // (Arpeggios · Setup section) so users can discover it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      handleStart();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // handleStart is a stable arrow that only depends on the router
+    // (which is a stable singleton from useRouter). Safe to omit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!mounted) {
     return (
       <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
@@ -2290,6 +2317,21 @@ export default function PracticeSetupPage() {
                 aria-hidden="true"
               />
             </button>
+            {/* Phase 60 — Shortcut hint. Small, muted, discovery
+                affordance that also matches the Key Sequencer setup
+                page's footer copy exactly so the two modules feel
+                consistent. */}
+            <p className="text-center text-[11px] text-muted-foreground/70">
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                Cmd/Ctrl + Enter
+              </kbd>{" "}
+              to Start · Space to Start / Stop once you're in the drill
+              screen. Press{" "}
+              <kbd className="rounded border border-border bg-card px-1 font-mono text-[10px]">
+                ?
+              </kbd>{" "}
+              anywhere to see all shortcuts.
+            </p>
 
             {/* Save area — differs depending on whether a Drill is loaded for edit. */}
             {isSavingDrill ? (

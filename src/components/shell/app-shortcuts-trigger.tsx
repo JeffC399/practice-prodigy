@@ -24,9 +24,9 @@ import { AppShortcutsOverlay } from "./app-shortcuts-overlay";
  */
 export function AppShortcutsTrigger() {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   // Lead Sheet editor owns `?` on its own surface.
-  const isSheetEditor = pathname?.includes("/sheets/") && pathname?.endsWith("/edit");
+  const isSheetEditor = pathname.includes("/sheets/") && pathname.endsWith("/edit");
 
   useEffect(() => {
     if (isSheetEditor) return;
@@ -62,7 +62,11 @@ export function AppShortcutsTrigger() {
         <Keyboard className="h-3 w-3" aria-hidden="true" />
         <span>shortcuts</span>
       </button>
-      <AppShortcutsOverlay open={open} onClose={() => setOpen(false)} />
+      <AppShortcutsOverlay
+        open={open}
+        onClose={() => setOpen(false)}
+        pathname={pathname}
+      />
     </>
   );
 }
