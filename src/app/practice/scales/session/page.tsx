@@ -295,7 +295,7 @@ export default function ScaleDrillerSessionPage() {
                         transition={{ duration: 0.25, ease: "easeOut" }}
                         className="w-full"
                       >
-                        <NextCard step={nextStep} config={config} />
+                        <TwoPaneNextCard step={nextStep} config={config} />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -457,7 +457,73 @@ function NowCard({
   );
 }
 
+/**
+ * Compact NextCard — used in the single-pane layout so the drill
+ * screen fits on one viewport without scroll. Small "NEXT" chip
+ * showing the upcoming scale + notes/degrees at 1/3 the visual weight
+ * of the Now panel. Mirrors Key Sequencer's single-pane NextCard.
+ */
 function NextCard({
+  step,
+  config,
+}: {
+  step: import("@/lib/scale-driller/sequencer").ScaleDrillStep | null;
+  config: import("@/lib/scale-driller/types").ScaleDrillConfig;
+}) {
+  if (!step) {
+    return (
+      <div className="flex w-full flex-col items-center gap-1 rounded-md border border-dashed border-border/60 bg-background/30 px-4 py-4 opacity-70">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
+          Next
+        </span>
+        <span className="text-sm text-muted-foreground">— end —</span>
+      </div>
+    );
+  }
+  const enharmonicPreference = config.enharmonicPreference ?? "auto";
+  const bigScale = step.isRest ? step.upcomingScale ?? null : step.scale;
+  const secondary = bigScale
+    ? scaleSecondaryTokens(
+        bigScale,
+        config.displayMode,
+        enharmonicPreference,
+        config.ordering,
+      )
+    : [];
+  return (
+    <div className="flex w-full flex-col items-center gap-1 rounded-md border border-border bg-card/40 px-4 py-3">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        Next
+      </span>
+      <span className="text-3xl font-semibold text-foreground/70 leading-none">
+        {bigScale
+          ? scaleInstanceDisplay(
+              bigScale,
+              enharmonicPreference,
+              config.ordering,
+            )
+          : "—"}
+      </span>
+      {secondary.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-x-2 text-xs text-muted-foreground/70">
+          {secondary.map((tok, i) => (
+            <span key={i} className="tabular-nums">
+              {tok}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Two-pane variant of the Next card — equal-weight side-by-side pane
+ * matching the Arpeggios / Key Sequencer two-pane layout convention.
+ * Same text sizes as the Now pane so the "NEXT" label aligns with
+ * "NOW" on the same Y coordinate.
+ */
+function TwoPaneNextCard({
   step,
   config,
 }: {
