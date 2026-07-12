@@ -289,6 +289,11 @@ export type UserPrefs = {
    */
   hasSeenKeySequencerOnboarding: boolean;
   /**
+   * Phase 62 — Same idea for the Scale Driller setup page
+   * (/practice/scales). Parallel and independent.
+   */
+  hasSeenScaleDrillerOnboarding: boolean;
+  /**
    * Phase 44 — id of the last release note the user dismissed. When
    * the top entry in RELEASE_NOTES has a different id, the "What's
    * new" modal auto-opens on first mount. Undefined = first-ever
@@ -338,6 +343,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   patternDisplay: "name",
   hasSeenOnboarding: false,
   hasSeenKeySequencerOnboarding: false,
+  hasSeenScaleDrillerOnboarding: false,
   // Phase 34 defaults preserve the original brand look.
   themePalette: "default",
   customAccent: null,
@@ -458,6 +464,8 @@ type UserPrefsStore = UserPrefs & {
    * dismissed. Parallel to `dismissOnboarding` (which is Arpeggios-only).
    */
   dismissKeySequencerOnboarding: () => void;
+  /** Phase 62 — Same for the Scale Driller onboarding. */
+  dismissScaleDrillerOnboarding: () => void;
   /** Phase 44 — Stamp the id of the release note the user just saw. */
   markReleaseNoteSeen: (id: string) => void;
   /** Reset all prefs to defaults. Used by the future Settings reset action. */
@@ -512,6 +520,8 @@ export const useUserPrefs = create<UserPrefsStore>()(
       dismissOnboarding: () => set({ hasSeenOnboarding: true }),
       dismissKeySequencerOnboarding: () =>
         set({ hasSeenKeySequencerOnboarding: true }),
+      dismissScaleDrillerOnboarding: () =>
+        set({ hasSeenScaleDrillerOnboarding: true }),
       markReleaseNoteSeen: (id) => set({ lastSeenReleaseId: id }),
       resetAll: () => set(DEFAULT_USER_PREFS),
       resetAppearance: () =>

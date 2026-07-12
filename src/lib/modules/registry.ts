@@ -65,9 +65,12 @@ export const MODULES: ModuleEntry[] = [
       "Drill arpeggio patterns over user-defined chord sequences. Bass-tuned today; guitar + other instruments land with the upcoming instrument selector.",
     icon: Music,
     // Phase 46 — narrow the matcher so /practice/keys (Key Sequencer)
-    // doesn't get swallowed by this "startsWith /practice" match.
+    // doesn't get swallowed. Phase 62 adds /practice/scales to the
+    // exclusion list so the module switcher highlights the right one.
     routeMatch: (p) =>
-      p.startsWith("/practice") && !p.startsWith("/practice/keys"),
+      p.startsWith("/practice") &&
+      !p.startsWith("/practice/keys") &&
+      !p.startsWith("/practice/scales"),
   },
   {
     id: "my-practice",
@@ -119,11 +122,13 @@ export const MODULES: ModuleEntry[] = [
     id: "scales",
     name: "Scale Driller",
     shortName: "Scales",
-    status: "designed",
-    bucket: "next",
+    status: "live",
+    bucket: "now",
+    route: "/practice/scales",
     description:
-      "Drill scales (major, minor pentatonic, modes, whole tone, ...) on the same shared substrate as arpeggios.",
+      "Drill scales (major, modes, pentatonic, blues, harmonic/melodic minor, whole tone, diminished, chromatic) across a user-built pool of scale × key combos. Instrument-neutral: silent + metronome only. See PROJECT-DESIGN.md §11 Phase 62.",
     icon: ListMusic,
+    routeMatch: (p) => p.startsWith("/practice/scales"),
   },
   {
     id: "theory",

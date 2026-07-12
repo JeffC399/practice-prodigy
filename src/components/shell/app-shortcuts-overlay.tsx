@@ -81,6 +81,20 @@ const MODULE_SECTIONS: ShortcutsSection[] = [
     ],
   },
   {
+    title: "Scale Driller · Setup",
+    matches: (p) => p === "/practice/scales",
+    shortcuts: [
+      { keys: ["Cmd/Ctrl + Enter"], description: "Start the drill" },
+    ],
+  },
+  {
+    title: "Scale Driller · Session",
+    matches: (p) => p.startsWith("/practice/scales/session"),
+    shortcuts: [
+      { keys: ["Space"], description: "Start / Stop the drill" },
+    ],
+  },
+  {
     title: "Metronome",
     matches: (p) => p.startsWith("/metronome"),
     shortcuts: [

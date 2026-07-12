@@ -75,6 +75,15 @@ export const SCALE_INTERVALS: Record<string, number[]> = {
   phrygianDominant: [0, 1, 4, 5, 7, 8, 10],
   lydianDominant: [0, 2, 4, 6, 7, 9, 10],
   altered: [0, 1, 3, 4, 6, 8, 10],
+  // Phase 62 — extra scales for the Scale Driller module. Kept in this
+  // same table so any consumer (Arpeggios, Scale Driller, future ear-
+  // training module) sees a unified vocabulary.
+  majorPentatonic: [0, 2, 4, 7, 9], // 5 notes
+  minorPentatonic: [0, 3, 5, 7, 10], // 5 notes
+  blues: [0, 3, 5, 6, 7, 10], // 6 notes — minor pentatonic + ♭5
+  harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+  melodicMinor: [0, 2, 3, 5, 7, 9, 11], // ascending form (jazz melodic minor)
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], // 12 notes
 };
 
 /**
