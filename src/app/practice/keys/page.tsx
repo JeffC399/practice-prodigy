@@ -6,6 +6,7 @@ import {
   KeyRound,
   Play,
   Plus,
+  RotateCcw,
   Save,
 } from "lucide-react";
 import Link from "next/link";
@@ -157,8 +158,9 @@ export default function KeySequencerSetupPage() {
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const setPracticeLayout = useUserPrefs((s) => s.setPracticeLayout);
 
-  // Phase 46 — collapsible starter-templates section.
-  const [templatesOpen, setTemplatesOpen] = useState(true);
+  // Phase 47 — both sections collapsible with summary chips.
+  const [customOpen, setCustomOpen] = useState(true);
+  const [builtInsOpen, setBuiltInsOpen] = useState(true);
   const reset = useKeySequencerConfig((s) => s.reset);
   const handleCreateNewExercise = () => {
     // Reset to defaults (matches DEFAULT_KEY_SEQUENCER_CONFIG shape)
@@ -281,8 +283,13 @@ export default function KeySequencerSetupPage() {
   // Phase 45.5 — seed starter templates on first install. Guarded by
   // seededStartersVersion inside the library store so this only runs
   // once per user regardless of how many times they visit the page.
+  // Phase 47 — retro-flag any drills seeded before the isStarter
+  // field existed, so users who visited between 45.5 and 46 see their
+  // templates in Built-in Drills instead of Your Custom Drills.
   useEffect(() => {
-    if (mounted) drillsLib.seedStartersIfNeeded();
+    if (!mounted) return;
+    drillsLib.seedStartersIfNeeded();
+    drillsLib.reflagLegacyStartersIfNeeded();
   }, [mounted, drillsLib]);
 
   const toggleKey = (k: KeyPitchClass) => {
@@ -335,19 +342,44 @@ export default function KeySequencerSetupPage() {
           </p>
         </header>
 
-        {/* Your key drills — user-owned saves. Separated from
-            templates below so the user's own work is always the top
-            of the page. */}
+        {/* Your Custom Drills — user-owned, top of page. Collapsible
+            with summary chip when closed (mirrors Bass Arpeggios'
+            CollapsibleSection convention). */}
         <section className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div className="flex flex-col gap-1">
-              <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                Your key drills
-              </h2>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Click a card to launch, pencil to edit, copy to duplicate.
-              </p>
-            </div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomOpen((v) => !v)}
+              className="flex items-center gap-2 text-left"
+              aria-expanded={customOpen}
+            >
+              {customOpen ? (
+                <ChevronDown
+                  className="h-3.5 w-3.5 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              ) : (
+                <ChevronRight
+                  className="h-3.5 w-3.5 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              )}
+              <div className="flex flex-col">
+                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                  Your custom drills
+                  <span className="ml-1.5 normal-case tracking-normal font-normal text-muted-foreground/70">
+                    · {userDrills.length}
+                  </span>
+                </span>
+                {!customOpen && (
+                  <span className="text-[11px] text-muted-foreground/70">
+                    {userDrills.length === 0
+                      ? "None saved yet — click to expand."
+                      : `Latest: ${userDrills[0]?.name ?? ""}`}
+                  </span>
+                )}
+              </div>
+            </button>
             <button
               type="button"
               onClick={handleCreateNewExercise}
@@ -358,75 +390,26 @@ export default function KeySequencerSetupPage() {
               Create new exercise
             </button>
           </div>
-          {userDrills.length === 0 ? (
-            <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
-              No saved key drills yet — try a template below, or configure
-              your own and hit{" "}
-              <span className="font-medium text-foreground">
-                Save as drill
-              </span>
-              .
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {userDrills.map((d) => (
-                <KeyDrillCard
-                  key={d.id}
-                  drill={d}
-                  isEditing={d.id === loadedKeyDrillId}
-                  onLaunch={handleLaunchDrill}
-                  onEdit={handleEditDrill}
-                  onDuplicate={handleDuplicateDrill}
-                  onDelete={(id) => {
-                    drillsLib.deleteDrill(id);
-                    if (id === loadedKeyDrillId) setLoadedKeyDrillId(undefined);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Templates — starter drills seeded on first install. In their
-            own collapsible section so users can hide them once they
-            have their own library going. Duplicating a template creates
-            a user-owned copy (with isStarter=false), keeping the
-            original intact. */}
-        {templateDrills.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => setTemplatesOpen((v) => !v)}
-              className="flex items-center gap-2 self-start text-left"
-              aria-expanded={templatesOpen}
-            >
-              {templatesOpen ? (
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-              )}
-              <div className="flex flex-col">
-                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                  Templates
-                  <span className="ml-1.5 normal-case tracking-normal font-normal text-muted-foreground/70">
-                    · {templateDrills.length}
+          {customOpen && (
+            <>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Click a card to launch, pencil to edit, copy to duplicate.
+              </p>
+              {userDrills.length === 0 ? (
+                <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
+                  No custom drills yet — try a template from{" "}
+                  <span className="font-medium text-foreground">
+                    Built-in Drills
+                  </span>{" "}
+                  below, or configure your own and hit{" "}
+                  <span className="font-medium text-foreground">
+                    Save as drill
                   </span>
-                </span>
-                {!templatesOpen && (
-                  <span className="text-[11px] text-muted-foreground/70">
-                    Curated starters — click to expand.
-                  </span>
-                )}
-              </div>
-            </button>
-            {templatesOpen && (
-              <>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Starter templates showing what the module can do. Duplicate one
-                  to make it your own (the original stays here as reference).
+                  .
                 </p>
+              ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {templateDrills.map((d) => (
+                  {userDrills.map((d) => (
                     <KeyDrillCard
                       key={d.id}
                       drill={d}
@@ -442,10 +425,92 @@ export default function KeySequencerSetupPage() {
                     />
                   ))}
                 </div>
-              </>
-            )}
-          </section>
-        )}
+              )}
+            </>
+          )}
+        </section>
+
+        {/* Built-in Drills — the shipped starter templates.
+            Collapsible with the same pattern. Duplicating a built-in
+            creates a user-owned copy; the original stays untouched.
+            "Restore" re-inserts any missing templates the user may
+            have deleted. */}
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setBuiltInsOpen((v) => !v)}
+              className="flex items-center gap-2 text-left"
+              aria-expanded={builtInsOpen}
+            >
+              {builtInsOpen ? (
+                <ChevronDown
+                  className="h-3.5 w-3.5 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              ) : (
+                <ChevronRight
+                  className="h-3.5 w-3.5 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              )}
+              <div className="flex flex-col">
+                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                  Built-in drills
+                  <span className="ml-1.5 normal-case tracking-normal font-normal text-muted-foreground/70">
+                    · {templateDrills.length}
+                  </span>
+                </span>
+                {!builtInsOpen && (
+                  <span className="text-[11px] text-muted-foreground/70">
+                    Curated starters — click to expand.
+                  </span>
+                )}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => drillsLib.restoreMissingStarters()}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              title="Restore any built-in drills you've deleted"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Restore
+            </button>
+          </div>
+          {builtInsOpen && templateDrills.length > 0 && (
+            <>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Shipped with Practice Prodigy. Duplicate one to make it your
+                own — the original stays here for reference.
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {templateDrills.map((d) => (
+                  <KeyDrillCard
+                    key={d.id}
+                    drill={d}
+                    isEditing={d.id === loadedKeyDrillId}
+                    onLaunch={handleLaunchDrill}
+                    onEdit={handleEditDrill}
+                    onDuplicate={handleDuplicateDrill}
+                    onDelete={(id) => {
+                      drillsLib.deleteDrill(id);
+                      if (id === loadedKeyDrillId)
+                        setLoadedKeyDrillId(undefined);
+                    }}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {builtInsOpen && templateDrills.length === 0 && (
+            <p className="rounded-md border border-dashed border-border bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground leading-relaxed">
+              No built-in drills present. Click{" "}
+              <span className="font-medium text-foreground">Restore</span> to
+              bring them back.
+            </p>
+          )}
+        </section>
 
         {/* Editing badge — visible when the live config was loaded from
             a saved drill. Save changes / Discard / Done editing. */}

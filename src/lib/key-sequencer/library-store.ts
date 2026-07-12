@@ -43,6 +43,21 @@ type KeyDrillsLibraryStore = {
    * setup page mount effect.
    */
   seedStartersIfNeeded: () => void;
+  /**
+   * Phase 47 — Retro-flag any existing drills whose names match a
+   * starter template. Fixes users whose library was seeded before
+   * Phase 46 introduced the `isStarter` flag (their templates were
+   * saved without the flag and now show up under Your Custom Drills).
+   * Safe to call on every mount; only stamps drills that need it.
+   */
+  reflagLegacyStartersIfNeeded: () => void;
+  /**
+   * Phase 47 — Restore any starter templates that the user has
+   * deleted. Compares STARTER_TEMPLATES names against what's in the
+   * library; re-inserts any missing entries with isStarter=true.
+   * Safe / idempotent — won't create duplicates.
+   */
+  restoreMissingStarters: () => void;
 };
 
 /** Current seed pass; bump to re-seed for existing users. */
@@ -135,6 +150,38 @@ export const useKeyDrillsLibrary = create<KeyDrillsLibraryStore>()(
         set((state) => ({
           drills: state.drills.filter((d) => d.id !== id),
         })),
+      reflagLegacyStartersIfNeeded: () => {
+        const state = get();
+        const templateNames = new Set(STARTER_TEMPLATES.map((t) => t.name));
+        let changed = false;
+        const next = state.drills.map((d) => {
+          if (d.isStarter === undefined && templateNames.has(d.name)) {
+            changed = true;
+            return { ...d, isStarter: true };
+          }
+          return d;
+        });
+        if (changed) set({ drills: next });
+      },
+      restoreMissingStarters: () => {
+        const state = get();
+        const existingNames = new Set(state.drills.map((d) => d.name));
+        const missing = STARTER_TEMPLATES.filter(
+          (t) => !existingNames.has(t.name),
+        );
+        if (missing.length === 0) return;
+        const now = Date.now();
+        const restored: KeyDrill[] = missing.map((t, i) => ({
+          id: newKeyDrillId(),
+          name: t.name,
+          notes: t.notes,
+          config: t.config,
+          createdAt: now - (missing.length - i),
+          updatedAt: now - (missing.length - i),
+          isStarter: true,
+        }));
+        set({ drills: [...state.drills, ...restored] });
+      },
       seedStartersIfNeeded: () => {
         const state = get();
         // Already seeded this version? Nothing to do.
