@@ -357,8 +357,12 @@ export default function PracticeSessionPage() {
   // length only (transitions don't count as drill measures). The
   // metronome stop length comes from the active sequence (which already
   // includes transition beats) — see handleToggle.
+  // Phase 57 — Always compute a total so the PhaseBadge shows
+  // "Measure X of Y". Matches Key Sequencer. When looping, Y is a
+  // per-rep length (drillMeasures); the measure counter keeps
+  // advancing and is displayed modulo the rep length by PhaseBadge.
   const totalPlayMeasures = config.repeatIndefinitely
-    ? null
+    ? config.drillMeasures
     : config.drillMeasures * config.repetitions;
 
   // Quick Start auto-launch — if we arrived with ?autostart=1 (set by a
@@ -1244,10 +1248,16 @@ function PhaseBadge({
     // coming; the badge just needs to say "prep is happening."
     label = "Get Ready";
   } else if (isPlaying) {
-    label =
-      totalMeasures === null
-        ? `Measure ${measure}`
-        : `Measure ${measure} of ${totalMeasures}`;
+    // Phase 57 — always show "of N". When looping, measure counts
+    // past totalMeasures; wrap it modulo so users see "Measure 3 of 4"
+    // rather than "Measure 12 of 4" mid-loop.
+    if (totalMeasures === null || totalMeasures <= 0) {
+      label = `Measure ${measure}`;
+    } else {
+      const display =
+        measure > 0 ? ((measure - 1) % totalMeasures) + 1 : measure;
+      label = `Measure ${display} of ${totalMeasures}`;
+    }
   } else {
     label = "";
   }

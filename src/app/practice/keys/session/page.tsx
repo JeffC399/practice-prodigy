@@ -374,7 +374,13 @@ export default function KeySequencerSessionPage() {
               countInRemaining={state.countInBeatsRemaining}
               measure={state.measureInSession}
               totalMeasures={
-                config.repeatIndefinitely ? null : steps.length
+                // Phase 57 — always show "of N". When looping, N is
+                // the pool-scan length (one full cycle). Non-loop is
+                // the fully expanded steps.length.
+                config.repeatIndefinitely
+                  ? config.keyPool.length *
+                    Math.max(1, config.measuresPerKey)
+                  : steps.length
               }
             />
 
@@ -534,20 +540,26 @@ function NowCard({
 
   return (
     <div
-      className={`relative flex w-full flex-col items-center gap-4 rounded-xl border-2 border-primary/40 bg-primary/5 px-6 py-8 transition-opacity ${emphasis}`}
+      // Phase 57 — dimensions ported verbatim from Arpeggios'
+      // TwoPanePanel (emphasized variant): single border weight,
+      // primary/60 border, primary/10 bg, shadow-sm, py-10 padding,
+      // min-h-[14rem] so both panes share the same height regardless
+      // of content. See TwoPanePanel in practice/session/page.tsx.
+      className={`relative flex w-full flex-col items-center justify-center gap-4 rounded-xl border border-primary/60 bg-primary/10 px-6 py-10 shadow-sm transition-opacity min-h-[14rem] ${emphasis}`}
     >
       {/* Phase 53 — Beat-synced pulsing ring during prep. Matches
           Arpeggios exactly: ring-4 ring-primary + amber boxShadow
           glow, re-keyed on beatTick so the initial → animate fires
-          on each audio click. */}
+          on each audio click.
+          Phase 57 — ring inset trimmed to -0.5 to match Arpeggios. */}
       {isPreparing && (
         <motion.span
           key={beatTick}
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 0.25 }}
+          initial={{ opacity: 1, scale: 1 }}
+          animate={{ opacity: 0.25, scale: 1 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-1 rounded-xl ring-4 ring-primary"
+          className="pointer-events-none absolute -inset-0.5 rounded-xl ring-4 ring-primary"
           style={{ boxShadow: "0 0 18px 2px rgba(245, 158, 11, 0.7)" }}
         />
       )}
@@ -669,7 +681,7 @@ function TwoPaneNextCard({
 }) {
   if (!step) {
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/60 bg-background/20 px-6 py-8 text-muted-foreground/60">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 bg-background/20 px-6 py-10 min-h-[14rem] text-muted-foreground/60">
         <span className="font-mono text-xs uppercase tracking-wider">Next</span>
         <span className="text-sm">— end —</span>
       </div>
@@ -677,7 +689,13 @@ function TwoPaneNextCard({
   }
   const enharmonicPreference = config.enharmonicPreference ?? "auto";
   return (
-    <div className="flex h-full w-full flex-col items-center gap-4 rounded-xl border-2 border-border bg-card/40 px-6 py-8">
+    <div
+      // Phase 57 — dimensions ported from Arpeggios' TwoPanePanel
+      // (non-emphasized variant): border-border/60, bg-card/20,
+      // py-10, min-h-[14rem]. Matches the Now pane's outer footprint
+      // so the two-pane grid renders as truly symmetric cells.
+      className="flex h-full w-full flex-col items-center justify-center gap-4 rounded-xl border border-border/60 bg-card/20 px-6 py-10 min-h-[14rem]"
+    >
       <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
         Next
       </span>
@@ -751,10 +769,14 @@ function PhaseBadge({
   } else if (isTransition) {
     label = "Get Ready";
   } else if (isPlaying) {
-    label =
-      totalMeasures === null
-        ? `Measure ${measure}`
-        : `Measure ${measure} of ${totalMeasures}`;
+    // Phase 57 — modulo the measure for parity with Arpeggios.
+    if (totalMeasures === null || totalMeasures <= 0) {
+      label = `Measure ${measure}`;
+    } else {
+      const display =
+        measure > 0 ? ((measure - 1) % totalMeasures) + 1 : measure;
+      label = `Measure ${display} of ${totalMeasures}`;
+    }
   } else {
     label = "";
   }
