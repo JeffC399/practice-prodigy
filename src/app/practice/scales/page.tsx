@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
 import { OnboardingCard } from "@/components/shared/onboarding-card";
+import { PresetChip } from "@/components/shared/preset-chip";
 import { PITCH_CLASSES } from "@/lib/music/chord";
 import { useScaleDrillConfig } from "@/lib/scale-driller/config-store";
 import { rootDisplay } from "@/lib/scale-driller/display";
@@ -775,35 +776,6 @@ function ScalePoolSection({
       {/* Add specific combo — hand-pick workflow. */}
       <AddSpecificCombo onAdd={addCombo} />
     </section>
-  );
-}
-
-/**
- * Small chip button used above each column's checkbox grid to apply
- * a musically meaningful preset in one click. `muted` variant for
- * destructive-adjacent actions ("None").
- */
-function PresetChip({
-  label,
-  onClick,
-  muted,
-}: {
-  label: string;
-  onClick: () => void;
-  muted?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
-        muted
-          ? "border-border/60 bg-transparent text-muted-foreground/70 hover:border-border hover:text-foreground"
-          : "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 

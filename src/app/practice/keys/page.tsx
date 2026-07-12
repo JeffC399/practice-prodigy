@@ -17,6 +17,7 @@ import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
 import { OnboardingCard } from "@/components/shared/onboarding-card";
+import { PresetChip } from "@/components/shared/preset-chip";
 import {
   BPM_MAX,
   BPM_MIN,
@@ -92,6 +93,15 @@ const CYCLE_OF_5THS: KeyPitchClass[] = [
   "C", "F", "A#", "D#", "G#", "C#",
   "F#", "B", "E", "A", "D", "G",
 ];
+
+/**
+ * Phase 67 — Musically meaningful subset presets that mirror the
+ * Scale Driller Keys column presets. Kept in sync so both modules
+ * feel identical.
+ */
+const NATURAL_KEYS: KeyPitchClass[] = ["C", "D", "E", "F", "G", "A", "B"];
+const FLAT_SIDE_KEYS: KeyPitchClass[] = ["F", "A#", "D#", "G#", "C#", "F#"];
+const SHARP_SIDE_KEYS: KeyPitchClass[] = ["G", "D", "A", "E", "B", "F#"];
 
 function keyDisplay(k: KeyPitchClass, pref: "auto" | "sharps" | "flats") {
   if (pref === "sharps") return KEY_LABELS[k].sharp;
@@ -698,38 +708,46 @@ export default function KeySequencerSetupPage() {
 
         {/* Key pool */}
         <section className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
+          <div className="flex items-baseline justify-between">
             <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               Key pool
             </h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Pick which keys the drill will cycle through. Tap "All 12" for
-              a full-chromatic drill or "Cycle of 5ths" for jazz-standard
-              order.
-            </p>
+            {/* Phase 67 — Count feedback in the section header,
+                matching the Scale Driller pool section convention. */}
+            <span className="font-mono text-[10px] text-muted-foreground/70">
+              {keyPool.length} of 12 selected
+            </span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={selectAll}
-              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-            >
-              All 12
-            </button>
-            <button
-              type="button"
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Pick which keys the drill will cycle through. Preset chips
+            below apply a musically meaningful subset in one click.
+          </p>
+          {/* Phase 67 — Shared PresetChip row (matches Scale Driller).
+              All / Cycle of 5ths / Naturals / Flat side / Sharp side /
+              None. Cycle of 5ths also switches the ordering strategy
+              since selecting that specific order implies the intent. */}
+          <div className="flex flex-wrap gap-1.5">
+            <PresetChip label="All" onClick={selectAll} />
+            <PresetChip
+              label="Cycle of 5ths"
               onClick={selectCycleOf5ths}
-              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-            >
-              Cycle of 5ths (jazz order)
-            </button>
-            <button
-              type="button"
-              onClick={clearAll}
-              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-            >
-              Clear
-            </button>
+              title="Also sets the ordering to Cycle of 5ths"
+            />
+            <PresetChip
+              label="Naturals"
+              onClick={() => setKeyPool(NATURAL_KEYS)}
+            />
+            <PresetChip
+              label="Flat side"
+              onClick={() => setKeyPool(FLAT_SIDE_KEYS)}
+              title="F, B♭, E♭, A♭, D♭, G♭ — the flat side of the cycle"
+            />
+            <PresetChip
+              label="Sharp side"
+              onClick={() => setKeyPool(SHARP_SIDE_KEYS)}
+              title="G, D, A, E, B, F♯ — the sharp side of the cycle"
+            />
+            <PresetChip label="None" onClick={clearAll} muted />
           </div>
           <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
             {ALL_KEYS.map((k) => {
@@ -750,9 +768,6 @@ export default function KeySequencerSetupPage() {
                 </button>
               );
             })}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {keyPool.length} of 12 keys selected
           </div>
         </section>
 
