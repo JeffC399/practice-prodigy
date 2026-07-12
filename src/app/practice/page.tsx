@@ -469,7 +469,12 @@ export default function PracticeSetupPage() {
     if (!isShippedDrill(drill.id)) {
       drillsLib.markDrillLoaded(drill.id);
     }
-    router.push("/practice/session?autostart=1");
+    // Phase 55 — dropped the ?autostart=1 param. User feedback:
+    // landing on the drill screen already mid-drill is jarring;
+    // Key Sequencer's "press Start when ready" flow is cleaner.
+    // The drill screen still preloads with all the config, so the
+    // launch is one Space/click away.
+    router.push("/practice/session");
   };
 
   /** Open Chord pool + scroll the chosen row into view + focus its root select. */

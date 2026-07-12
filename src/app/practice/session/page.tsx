@@ -503,6 +503,11 @@ export default function PracticeSessionPage() {
   // never fire twice even if handleToggle's identity changes. Both the
   // Quick-Start autostart and the resume flow funnel through the same
   // ref so they can't race against each other.
+  //
+  // Phase 55 — autoStartFromUrl is now false in practice (dropped
+  // ?autostart=1 from /practice), but resume-from-crash still needs
+  // to auto-start so the flow feels seamless. Keeping the ref-guarded
+  // effect so resume still works.
   useEffect(() => {
     if (
       (autoStartFromUrl || resumeFromUrl) &&
@@ -517,6 +522,31 @@ export default function PracticeSessionPage() {
     // omitted here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStartFromUrl, resumeFromUrl, isIdle]);
+
+  // Phase 55 — Space to Start/Stop. Guarded so users can type Space
+  // in inputs without hijacking the shortcut. Matches Key Sequencer's
+  // implementation exactly so the two modules feel identical.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      handleToggle();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // handleToggle identity is unstable but the ref-based state inside
+    // makes each fresh call correct; no dep needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist a resume snapshot on each play-measure boundary. The
   // sequence + position are captured so a browser crash leaves a
