@@ -352,10 +352,13 @@ export default function KeySequencerSessionPage() {
               // it advances exactly once per audible beat.
               const isPrep = !!currentStep && currentStep.isRest;
               const isPreparing = isCountIn || isPrep;
-              const beatTick =
-                currentStepIdx * 100 +
-                state.measureInSession * 10 +
-                state.beatInMeasure;
+              // Phase 54 — beatTick advances on EVERY beat including
+              // count-in. Arpeggios uses the same pattern:
+              // countInBeatsRemaining changes during count-in and
+              // absoluteBeat changes during play. Together they make
+              // a per-beat unique key so the pulse animation re-mounts
+              // on every metronome click regardless of phase.
+              const beatTick = `${state.countInBeatsRemaining}-${state.absoluteBeat}`;
               return practiceLayout === "two-pane" ? (
                 <div className="grid w-full max-w-4xl grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
                   <NowCard
@@ -373,6 +376,9 @@ export default function KeySequencerSessionPage() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.25, ease: "easeOut" }}
+                        // Phase 54 — w-full so this fills the grid cell
+                        // and matches the Now pane's width exactly.
+                        className="w-full"
                       >
                         <TwoPaneNextCard step={nextStep} config={config} />
                       </motion.div>
@@ -461,8 +467,10 @@ function NowCard({
    * Phase 51 — Re-keyed each beat during prep so the pulsing ring
    * animation re-mounts and flashes ON every metronome click.
    * Matches Arpeggios' two-pane Now-panel pulse behavior exactly.
+   * Phase 54 — string so count-in beats (which don't advance
+   * beatInMeasure) still change the key on every click.
    */
-  beatTick: number;
+  beatTick: string;
 }) {
   const isPrep = !!step && step.isRest;
   const isPreparing = isCountIn || isPrep;
@@ -627,7 +635,7 @@ function TwoPaneNextCard({
 }) {
   if (!step) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/60 bg-background/20 px-6 py-8 text-muted-foreground/60">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/60 bg-background/20 px-6 py-8 text-muted-foreground/60">
         <span className="font-mono text-xs uppercase tracking-wider">Next</span>
         <span className="text-sm">— end —</span>
       </div>
@@ -635,7 +643,7 @@ function TwoPaneNextCard({
   }
   const enharmonicPreference = config.enharmonicPreference ?? "auto";
   return (
-    <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-border bg-card/40 px-6 py-8">
+    <div className="flex h-full w-full flex-col items-center gap-4 rounded-xl border-2 border-border bg-card/40 px-6 py-8">
       <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
         Next
       </span>
