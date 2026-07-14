@@ -621,15 +621,21 @@ function ScalePoolSection({
             · {scalePool.length} combo{scalePool.length === 1 ? "" : "s"}
           </span>
         </span>
-        {scalePool.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setScalePool([])}
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Clear pool
-          </button>
-        )}
+        {/* Phase 68 — Always render Clear pool so the header row
+            height stays fixed. `invisible` when the pool is empty
+            hides the button visually + suppresses pointer events
+            without collapsing its layout footprint. */}
+        <button
+          type="button"
+          onClick={() => setScalePool([])}
+          aria-hidden={scalePool.length === 0}
+          tabIndex={scalePool.length === 0 ? -1 : 0}
+          className={`text-[11px] text-muted-foreground hover:text-foreground transition-colors ${
+            scalePool.length === 0 ? "invisible pointer-events-none" : ""
+          }`}
+        >
+          Clear pool
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -732,17 +738,26 @@ function ScalePoolSection({
         </div>
       </div>
 
-      {/* Pool preview — one row per root, grouped chips, × per chip
-          to remove a single combo. "Add specific combo" popover at
-          the end lets users pick exactly one instance without
-          disturbing the checkbox cross-product. */}
-      {scalePool.length > 0 && (
-        <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-background/20 p-3">
-          <div className="flex items-baseline justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
-              Pool preview · grouped by root
-            </span>
-          </div>
+      {/* Phase 68 — Pool preview panel now ALWAYS renders. When the
+          pool is empty, it shows a compact empty-state line at the
+          same height as one populated root row, so the elements
+          below (AddSpecificCombo) stay put across empty → 1-combo →
+          full transitions. No layout jump when the user selects
+          their first scale.
+          The panel uses min-h-[3rem] so a truly empty pool still
+          reserves the row height. */}
+      <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-background/20 p-3 min-h-[3rem]">
+        <div className="flex items-baseline justify-between">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+            Pool preview · grouped by root
+          </span>
+        </div>
+        {scalePool.length === 0 ? (
+          <span className="text-[11px] text-muted-foreground/60">
+            No combos yet — pick scales and keys above to build your
+            pool.
+          </span>
+        ) : (
           <div className="flex flex-col gap-1">
             {poolByRoot.map(([root, combos]) => (
               <div
@@ -770,8 +785,8 @@ function ScalePoolSection({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Add specific combo — hand-pick workflow. */}
       <AddSpecificCombo onAdd={addCombo} />
