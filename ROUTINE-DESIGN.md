@@ -1,12 +1,12 @@
-# My Practice — Design (v0.4 Flagship)
+# My Practice — Design (v0.5 Flagship)
 
 > The flagship module. Turns Practice Prodigy from a collection of drilling tools into the app a serious musician uses every day. Composes every other module into structured practice sessions; tracks all practice time; provides AI coaching and pedagogical guidance.
 
-**Doc status:** v0.4 flagship design — 2026-07-22
+**Doc status:** v0.5 flagship design — 2026-07-22
 **Target ship:** v1 milestone (not v2 — promoted to flagship per 2026-07-14 interview)
-**Estimated build:** ~5–6 months across sequenced slices (see §16 build plan reference; extended by ~1–2 weeks in v0.3 for self-rated proficiency and ~1 week in v0.4 for methodology-per-item + Routine Overview)
+**Estimated build:** ~5–6 months across sequenced slices (see §16 build plan reference; extended by ~1–2 weeks in v0.3 for self-rated proficiency and ~1 week in v0.4 for methodology-per-item + Routine Overview; ~1 day extra in v0.5 for methodology scoping)
 
-**Supersedes:** v0.3 (also 2026-07-22) which added the self-rated proficiency system. v0.4 adds two changes from user feedback: (1) proficiency levels are now numeric (Level 1–5) with descriptors as sub-labels; (2) methodology becomes an optional per-item property (a single routine can weave multiple methods) with a new Routine Overview screen as the pre-save gate.
+**Supersedes:** v0.4 (also 2026-07-22) which added numeric levels + methodology-per-item + Routine Overview. v0.5 introduces **methodology scoping** — each methodology carries a `scope` field (per-item, per-routine, or either) so structural methodologies (Interleaved Practice, Pomodoro, Spaced Repetition rotation) live at the routine level while per-activity methodologies (Slow Practice, Chunking, Slow Loop, Mental Practice) live at the item level. Deliberate Practice can go either way. Prompted by user question about Interleaved Practice — a fundamentally routine-level structure that was being awkwardly applied per-item in v0.4.
 
 ---
 
@@ -344,14 +344,29 @@ This upgrades methodology from "which template did the user pick?" to "which met
 
 **Optional per item.** Methodology is a first-class optional field, not required. Rest breaks, warmup long-tones, freeform improvisation — many items don't map to any of the 8 built-in methods. Blank is legal and appears in the Overview simply as "—" (no method).
 
-**Smart defaults per category.** When a user or the AI adds an item, the methodology dropdown pre-fills based on the item's category:
+**Scope (v0.5): per-item vs per-routine.** Each methodology carries a `scope` field that determines where it can be applied. Some methodologies are about **how a single activity is executed** (Slow Practice, Chunking, Slow Loop, Mental Practice) — those live at the item level. Others are about **how items relate to each other over time** (Interleaved Practice, Pomodoro, Spaced Repetition rotation) — those live at the routine level. Deliberate Practice can go either way — a whole routine can be one Deliberate Practice session, or a single item within a mixed routine can use it.
+
+| Methodology | Scope | Rationale |
+|---|---|---|
+| Deliberate Practice | either | One-item block OR whole-session structure — both valid |
+| Interleaved Practice | per-routine | Meaningless as a single-item property; requires rotation between items |
+| Slow Practice | per-item | About tempo/attention on one activity |
+| Pomodoro | per-routine | Structures 25/5 timer boundaries across items |
+| Chunking | per-item | About decomposing one piece/passage |
+| Spaced Repetition | per-routine | About rotating items over multiple sessions |
+| Mental Practice | per-item | About executing one item without the instrument |
+| Slow Loop | per-item | Surgical drill on one lick |
+
+The routine builder's methodology dropdowns filter by scope automatically. Item composers only show per-item + either methodologies. The routine-level methodology picker (see §7.5) only shows per-routine + either.
+
+**Smart defaults per category (per-item scope).** When a user or the AI adds an item, the item's methodology dropdown pre-fills based on the item's category:
 
 | Category | Default methodology |
 |---|---|
 | Warmup | — (no method) |
 | Technique | Slow Practice |
 | Repertoire | Chunking |
-| Ear Training | Spaced Repetition |
+| Ear Training | — (default at routine level → Spaced Repetition) |
 | Sight Reading | — (deferred; Sight Reading module ships in v2) |
 | Theory | — (no method) |
 | Improvisation | — (no method — subjective) |
@@ -386,6 +401,39 @@ Explicit scope-check to avoid a common misconception. When a user picks a method
 **UI transparency**: in v2, the methodology dropdown will visually distinguish supported combinations (🔒 Enforced) from label-only ones (💡 Guidance) so users know what to expect. For v1, methodology is uniformly "guidance."
 
 **What this means practically for a v1 user**: picking Slow Practice for your Arpeggios drill will show you the Slow Practice principles at exactly the right moment. You still have to follow them yourself. Your Reports will honestly reflect "you tagged 60% of your practice as Slow Practice" — whether that time was actually slow is on you.
+
+### 7.5 Routine-level methodology (v0.5)
+
+Structural methodologies (Interleaved Practice, Pomodoro, Spaced Repetition rotation) apply at the **routine** level rather than the item level. The Routine data model gains an optional `methodologyId` field alongside per-item methodology.
+
+**Where the routine-level methodology is set:**
+- **Manual build**: routine builder has a "Method for the whole routine" dropdown alongside the Name field. Only `per-routine` and `either`-scoped methodologies appear.
+- **Template load**: the template's `methodologyId` at the top of the JSON file becomes the routine-level methodology automatically.
+- **AI Coach**: if the user asks for an interleaved / pomodoro / spaced-rep routine, the AI sets the routine-level methodology directly.
+
+**Where it shows up:**
+- **Routine Overview header**: `Method: Interleaved Practice` shown prominently near the Name field.
+- **Full-screen player**: a small chip in the top-right during execution shows the routine method ("This is Interleaved Practice") so the user remembers the structural context between items.
+- **Reports methodology mix**: aggregates BOTH routine-level and item-level methodologies (time is attributed to whichever scope applied).
+
+**Interaction between routine-level and item-level methodologies:**
+- **Both can coexist.** A routine can be Pomodoro (routine-level) with a Slow Practice item (item-level) and a Chunking item (item-level). The Pomodoro structure enforces 25/5 boundaries; individual items still carry their own method for guidance/reports.
+- **Structural methodologies cannot go per-item.** The item composer's dropdown filters them out.
+- **Per-activity methodologies cannot go per-routine.** The routine-level dropdown filters them out.
+- **Deliberate Practice** appears in both dropdowns since it's scoped `either`.
+
+**Practical example — the shipped Interleaved template:**
+```
+Routine name: "Interleaved Practice — 60 min, 5 skills, 4 rounds"
+Routine methodology: Interleaved Practice    ← routine level
+Items:
+  1. Pick your 5 skills · Theory · —          ← no item method (inherits structural)
+  2. Round 1 — Skill A · Technique · —        ← no item method
+  ...
+  18. Reflect · Cool-down · —                 ← no item method
+```
+
+The user's Reports would show this session as 100% Interleaved Practice time, sourced from the routine-level tag. No double-counting.
 
 ---
 
@@ -720,6 +768,11 @@ type Routine = {
   createdAt: number;
   updatedAt: number;
   lastRunAt?: number;
+  /**
+   * v0.5 — Routine-level (structural) methodology. Only methodologies
+   * scoped "per-routine" or "either" can go here. See §7.5.
+   */
+  methodologyId?: MethodologyId;
   // Provenance: how was this routine created?
   source: "manual" | "ai-coach" | "template";
   sourceRef?: string;  // if template: methodology entry id; if ai-coach: conversation id
@@ -804,6 +857,14 @@ type MethodologyEntry = {
   sources: Array<{ label: string; url?: string }>;
   templates: RoutineTemplate[];      // 1–2 per entry
   categories: CategoryId[];          // which categories the method most targets
+  /**
+   * v0.5 — Determines where this methodology can be attached:
+   *   "per-item"    → only on individual RoutineItems (Slow Practice, Chunking, etc.)
+   *   "per-routine" → only on the Routine's top-level methodologyId (Interleaved, Pomodoro, Spaced Rep)
+   *   "either"      → both are valid (Deliberate Practice)
+   * The routine builder's methodology dropdowns filter by scope automatically.
+   */
+  scope: "per-item" | "per-routine" | "either";
 };
 
 type RoutineTemplate = {
@@ -1097,4 +1158,5 @@ Full flagship is ~4–6 months of work sequenced into named slices. **The detail
 | 2026-06-29 | v0.1 — Initial design pass. Scoped as cross-module routine layer targeting v2 milestone. |
 | 2026-07-14 | **v0.2 flagship rewrite.** Promoted from v2 to v1. Scope expanded significantly: added AI Coach (BYOK Anthropic + OpenAI, Passive / Active modes, chat + shortcuts UI, Standard / Deep+Evolving profile), first-class Songs library, methodology library (6–8 entries), category taxonomy (10 built-ins + user extras), auto-tracked practice sessions, dedicated Reports tab with heatmap / streak / header chip, cloud sync via Supabase, 5-tab module structure, 3-step onboarding wizard. 23 design decisions locked via user interview. Existing v0.1 concepts (RoutineItem discriminated union, Launcher / Composer / Renderer pattern, resume mid-routine) retained. |
 | 2026-07-22 | **v0.3 self-rated proficiency levels.** Added a lightweight v1 proficiency system per user request: 5 stage-based levels per category (Exploring / Developing / Comfortable / Fluent / Teaching) + N/A + optional target level per category. Users self-rate; the app never grades automatically. AI Coach reads current-vs-target gap to weight routines. Reports gain a per-category level chip grid + timeline of significant level events + recent vibe-check trend. End-of-routine offers a single-tap per-category "How'd it go?" rating (1–5). Onboarding wizard gains an optional Step 2.5 for level self-assessment. Data model adds `ProficiencyLevel`, `CategoryLevel`, and `SessionCategoryFeedback` types. Estimated build extended by ~1–2 weeks (~4.5–6.5 months total). Full automated grading + adaptive progression + assessment routines + level curricula deferred to v2 (see [`MY-PRACTICE-V2-BACKLOG.md`](./MY-PRACTICE-V2-BACKLOG.md)). |
+| 2026-07-22 | **v0.5 methodology scoping.** Introduced when the user asked how Interleaved Practice would be implemented. Interleaved is a structural methodology (about how items relate over time), not a per-item property — the v0.4 model of "methodology on every item" was semantically awkward for it (and for Pomodoro and Spaced Repetition rotation). v0.5 gives each MethodologyEntry a `scope` field: `per-item`, `per-routine`, or `either`. Routine gains its own optional `methodologyId` field for structural methodologies. Item composer dropdowns show only `per-item` + `either`; routine-level dropdown shows only `per-routine` + `either`. Deliberate Practice = `either` (whole-session or per-item block). New §7.5 walks through the routine-level methodology surface (builder field, Overview header, player chip, Reports attribution). Existing methodology templates already implicitly use routine-level `methodologyId` at the JSON top — the v0.5 change formalizes this and prevents structural-per-item semantic errors. ~1 day extra build time. |
 | 2026-07-22 | **v0.4 numeric levels + methodology-per-item + Routine Overview + v1/v2 scope-check.** Three user-requested improvements shipped as one revision. (1) **Level identifiers are now numeric** (Level 1–5) with the stage descriptors kept as sub-labels ("Level 3 · Comfortable"). Numbers scale past v1 without a naming crisis and make deltas unambiguous. `ProficiencyLevel` type changes from a union of stage names to `1 \| 2 \| 3 \| 4 \| 5 \| "n/a"`. (2) **Methodology becomes an optional per-item property** — every `RoutineItem` carries an optional `methodologyId` field, so a single routine can weave multiple methods together (Slow Practice on the arp drill, Chunking on the repertoire section, etc.). Smart defaults per category (Technique → Slow Practice, Repertoire → Chunking, etc.). "?" AI-suggestion affordance per item. Bulk "AI: assign methodologies to all items" button in the builder. Methodology mix chip added to Reports for balance signals. (3) **Routine Overview** — new pre-save/pre-run gate screen that consolidates naming, methodology mix, category balance, and duration into one confirming view. Manual builds, AI drafts, and template loads all converge on the same Overview screen. Smart default names generated per source. Actions: Edit items / Save without running / Save & Run. Extends estimate by ~1 week for the Overview UI + methodology picker + AI bulk-assign. (4) **New §7.4** explicitly documents what v1 methodology DOES (label + guidance + AI signal + fully shapes `custom` / `rest` items) vs DOES NOT (does not auto-change drilling-module behavior at runtime — that's v2). Prompted by user question "when User selects a methodology, the element to which that methodology applies will then be trained IN ACCORDANCE WITH THE PRINCIPLES OF THAT METHODOLOGY, correct?" Honest answer: partially in v1, fully in v2. Full runtime enforcement per (module × methodology) combo deferred to v2 (see V2-BACKLOG §1.5) — ~2-3 months of work best done after v1 GA + real usage data. |
