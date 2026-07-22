@@ -4,7 +4,7 @@
 
 **Plan status:** v1 — 2026-07-22
 **Design source:** ROUTINE-DESIGN.md v0.2 flagship
-**Total estimated effort:** ~5–6 months across 8 slices (extended by ~1–2 weeks in ROUTINE-DESIGN.md v0.3 for self-rated proficiency levels; see per-slice notes for where the work lands)
+**Total estimated effort:** ~5–6 months across 8 slices (extended by ~1–2 weeks in ROUTINE-DESIGN.md v0.3 for self-rated proficiency levels and ~1 week in v0.4 for methodology-per-item + Routine Overview; see per-slice notes for where the work lands)
 **Delivery model:** feature-flagged behind `NEXT_PUBLIC_MY_PRACTICE_ENABLED`; the module ships to production incrementally as each slice completes; dogfooded internally before public flip
 
 ---
@@ -249,8 +249,10 @@ create policy "own sessions" on practice_sessions for all using (auth.uid() = us
 | **B.10** | Take-over integration in each drilling module (routine-mode flag + chip) | 3d |
 | **B.11** | Resume-mid-routine + end-of-routine summary + persistence | 2d |
 | **B.12** | **End-of-routine category vibe-check UI** — single-tap per-category "How'd it go?" (Rough/Struggled/OK/Solid/Great) inside the summary modal; skippable; feeds `SessionCategoryFeedback` (v0.3) | 1d |
-| **B.13** | Sound cues + auto-advance + keyboard shortcuts | 1d |
-| **B.14** | Slice B polish + shortcuts-overlay registrations + tests + deploy | 1d |
+| **B.13** | **Methodology field in item composer** — dropdown per-item with smart default per category (Technique → Slow Practice, Repertoire → Chunking, etc.); "?" AI-suggest icon (v0.4) | 1d |
+| **B.14** | **Routine Overview screen** — pre-save/pre-run gate; item table (order · label · category · method · duration); category mix chip; methodology mix chip; smart default routine name; [Edit items] / [Save without running] / [Save & Run] actions (v0.4) | 3d |
+| **B.15** | Sound cues + auto-advance + keyboard shortcuts | 1d |
+| **B.16** | Slice B polish + shortcuts-overlay registrations + tests + deploy | 1d |
 
 ### 3.3 New files
 
@@ -465,9 +467,10 @@ create policy "own songs" on songs for all using (auth.uid() = user_id);
 | **D.5** | Daily trend line chart + 7-day rolling average overlay | 1d |
 | **D.6** | Songs progress panel inside Reports (integrates with Slice C) | 1d |
 | **D.7** | **Levels & progression panel** — per-category chip grid (current + target + delta), timeline of level events, recent vibe-check trend per category, [Reassess my levels] CTA (v0.3) | 2d |
-| **D.8** | Header chip + streak logic + time-zone handling | 2d |
-| **D.9** | CSV + PDF export | 1d |
-| **D.10** | Slice D polish + deploy | 1d |
+| **D.8** | **Methodology mix chip** — small horizontal chip showing how the user's practice time distributed across methods over the selected range. Feeds AI insights ("You've been 90% Slow Practice this month; consider adding Interleaved for retention.") (v0.4) | 1d |
+| **D.9** | Header chip + streak logic + time-zone handling | 2d |
+| **D.10** | CSV + PDF export | 1d |
+| **D.11** | Slice D polish + deploy | 1d |
 
 ### 5.3 New files
 
@@ -606,14 +609,16 @@ Methodology + templates are **static content**, not user data. They ship in the 
 | **F.2** | Provider integration: Anthropic SDK + OpenAI SDK wrappers | 2d |
 | **F.3** | System prompt v1: Passive mode. Context assembly (profile + library + recent history + **per-category levels + targets + recent vibe-checks** for v0.3 level-aware drafting) | 3d |
 | **F.4** | Chat UI: message list + streaming + shortcut buttons | 2d |
-| **F.5** | Routine draft parser: extract structured Routine from AI response + show as editable draft | 2d |
+| **F.5** | Routine draft parser: extract structured Routine from AI response + show as editable draft (drafts include per-item methodology per v0.4) | 2d |
 | **F.6** | "Why this?" transparency panel — includes level-gap explanation + recent vibe-check trend inputs (v0.3) | 1d |
-| **F.7** | Conversation history persistence + resume | 1d |
-| **F.8** | Active mode: tool use (create-item / edit-routine / update-profile tools) | 3d |
-| **F.9** | Profile-update confirmation flow (AI proposes, user accepts/rejects) | 1d |
-| **F.10** | Cost + usage indicator (per-conversation token counts, running monthly estimate) | 1d |
-| **F.11** | Model picker + provider switcher UI | 1d |
-| **F.12** | Slice F polish + safety review + deploy | 2d |
+| **F.7** | **AI-suggest methodology** — per-item [?] icon → server call that returns a single method for THIS item's context. Cheap (small prompt). Fills the field with the AI's pick (v0.4) | 2d |
+| **F.8** | **Bulk "AI: assign methodologies to all items"** — builder button → one AI turn filling every blank methodology field on the current routine; user reviews on Overview screen (v0.4) | 1d |
+| **F.9** | Conversation history persistence + resume | 1d |
+| **F.10** | Active mode: tool use (create-item / edit-routine / update-profile tools) | 3d |
+| **F.11** | Profile-update confirmation flow (AI proposes, user accepts/rejects) | 1d |
+| **F.12** | Cost + usage indicator (per-conversation token counts, running monthly estimate) | 1d |
+| **F.13** | Model picker + provider switcher UI | 1d |
+| **F.14** | Slice F polish + safety review + deploy | 2d |
 
 ### 7.3 New files
 
@@ -824,3 +829,4 @@ Named releases are marketing beats. Each has a "What's new" modal entry + roadma
 |---|---|
 | 2026-07-22 | v1 — Initial build plan. 8 slices, ~4–6 months total. Companion to ROUTINE-DESIGN.md v0.2. |
 | 2026-07-22 | v1.1 — Absorbed the v0.3 self-rated proficiency system (per user request 2026-07-22). Added phase A.14 (data model), B.12 (end-of-routine vibe-check UI), D.7 (levels & progression panel in Reports), F.3 + F.6 (level-aware AI Coach context), G.1 (wizard step 2.5) + G.2 (quarterly reassessment nudge). Total estimate extended by ~1–2 weeks (~5–6 months). Automated grading + adaptive progression + assessment routines + curricula formally deferred to v2 — see MY-PRACTICE-V2-BACKLOG.md §1. |
+| 2026-07-22 | v1.2 — Absorbed the v0.4 methodology-per-item + Routine Overview additions. New phases: B.13 (methodology field in item composer w/ smart defaults + "?" AI-suggest), B.14 (Routine Overview screen — 3d, biggest single new phase), D.8 (methodology mix chip in Reports), F.7 (per-item AI-suggest methodology tool call), F.8 (bulk "AI: assign methodologies" builder button). F.n phases 8→14 renumbered by +2. Total estimate extended by ~1 week additional. Level identifiers changed from stage names to numeric (Level 1–5); descriptor is now a sub-label. RoutineItem gains optional `methodologyId` field. |

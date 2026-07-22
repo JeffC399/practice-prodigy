@@ -1,12 +1,12 @@
-# My Practice — Design (v0.3 Flagship)
+# My Practice — Design (v0.4 Flagship)
 
 > The flagship module. Turns Practice Prodigy from a collection of drilling tools into the app a serious musician uses every day. Composes every other module into structured practice sessions; tracks all practice time; provides AI coaching and pedagogical guidance.
 
-**Doc status:** v0.3 flagship design — 2026-07-22
+**Doc status:** v0.4 flagship design — 2026-07-22
 **Target ship:** v1 milestone (not v2 — promoted to flagship per 2026-07-14 interview)
-**Estimated build:** ~5–6 months across sequenced slices (see §16 build plan reference; extended by ~1–2 weeks in v0.3 for self-rated proficiency)
+**Estimated build:** ~5–6 months across sequenced slices (see §16 build plan reference; extended by ~1–2 weeks in v0.3 for self-rated proficiency and ~1 week in v0.4 for methodology-per-item + Routine Overview)
 
-**Supersedes:** v0.2 (2026-07-14) which locked the flagship scope + 23 design decisions from the initial interview. v0.3 adds a v1 lightweight proficiency-level system (self-rated levels per category feeding the AI Coach) and formally defers automated grading + adaptive progression to v2 (documented in [`MY-PRACTICE-V2-BACKLOG.md`](./MY-PRACTICE-V2-BACKLOG.md)).
+**Supersedes:** v0.3 (also 2026-07-22) which added the self-rated proficiency system. v0.4 adds two changes from user feedback: (1) proficiency levels are now numeric (Level 1–5) with descriptors as sub-labels; (2) methodology becomes an optional per-item property (a single routine can weave multiple methods) with a new Routine Overview screen as the pre-save gate.
 
 ---
 
@@ -133,22 +133,24 @@ Each category gets a **current level** and an **optional target level** per user
 
 #### The five levels + "Not applicable"
 
-Levels use a stage-based naming that describes relationship-to-material, not judgment-of-skill. This avoids the "Beginner sounds bad" defensiveness:
+Levels use a **numeric primary identifier** (Level 1–5) with a stage-based descriptor as a sub-label. The number is the anchor; the descriptor adds qualitative color. Numbers scale past v1 (v2's automated grading can add Level 6+ for Mastery / Concert-Ready without a naming crisis), are language-independent, and make deltas unambiguous ("Level 2 → Level 3" reads cleaner than "Developing → Comfortable").
 
-| Level | Meaning |
-|---|---|
-| **Exploring** | Just starting; still learning what this category even is |
-| **Developing** | Working on the basics; can do some things but with effort |
-| **Comfortable** | Basics are fluent; can handle standard-level challenges |
-| **Fluent** | Solid intermediate → advanced; can handle most challenges you meet |
-| **Teaching** | Advanced; could clearly explain / teach this to another musician |
-| **N/A** | Not applicable to me right now |
+UI treatment: numbers rendered prominently; descriptor shown as a secondary label (`Level 3 · Comfortable`). "N/A" has no number — it's a distinct opt-out.
 
-Users can bump levels up or down whenever they want in Profile → Levels. Changes are logged (with timestamp) so Reports can show progression narratives.
+| # | Descriptor | Meaning |
+|---|---|---|
+| **Level 1** | Exploring | Just starting; still learning what this category even is |
+| **Level 2** | Developing | Working on the basics; can do some things but with effort |
+| **Level 3** | Comfortable | Basics are fluent; can handle standard-level challenges |
+| **Level 4** | Fluent | Solid intermediate → advanced; can handle most challenges you meet |
+| **Level 5** | Teaching | Advanced; could clearly explain / teach this to another musician |
+| **N/A** | *(not applicable)* | Not applicable to me right now — hides from AI + prompts |
+
+Users can bump levels up or down whenever they want in Profile → Levels. Changes are logged (with timestamp) so Reports can show progression narratives ("Ear Training: Level 2 → Level 3 · Sep 12").
 
 #### Target levels
 
-Each category can also have a target — the user's own aspiration. "I'm Comfortable with Ear Training and want to be Fluent." Targets are pure aspiration; the app never enforces them. The AI Coach uses them to weight routines toward gaps ("you're at Developing on Ear Training but want to reach Fluent — I've weighted 30% of this routine there").
+Each category can also have a target — the user's own aspiration. "I'm at Level 3 with Ear Training and want to reach Level 4." Targets are pure aspiration; the app never enforces them. The AI Coach uses them to weight routines toward gaps ("you're at Level 2 on Ear Training but want to reach Level 4 — I've weighted 30% of this routine there").
 
 #### Optional per-routine feedback
 
@@ -266,7 +268,7 @@ User picks profile depth in the onboarding wizard (see §11). Can upgrade Standa
 - Repertoire priorities (link to Songs library)
 - Preferred practice methods (multi-select from methodology library)
 
-**Per-category proficiency levels** (see §4.3) — every profile carries a current + target level per category. Standard profile users can leave these unset (defaults to Comfortable current / no target) and set them later. Deep profile users are prompted for them during setup.
+**Per-category proficiency levels** (see §4.3) — every profile carries a current + target level per category. Standard profile users can leave these unset (defaults to Level 3 · Comfortable / no target) and set them later. Deep profile users are prompted for them during setup.
 
 **Progressive enrichment** — instead of dumping all Deep fields at once, the app drips one new field per week when relevant ("Quick question — what genres do you mostly play?"). Reduces onboarding friction; same total data collection.
 
@@ -295,7 +297,7 @@ Conversation history persists per-user (last 100 conversations synced via cloud)
 Every AI-drafted routine has a small **[Why this?]** link that expands to show which profile fields + recent history + levels influenced the AI's choices:
 
 > Focus areas: **Improvisation**, **Ear Training**
-> Levels: **Ear Training** — Developing → target Fluent (gap: 2 steps)
+> Levels: **Ear Training** — Level 2 · Developing → target Level 4 · Fluent (gap: 2 steps)
 > Recent 2 weeks: 40% Technique, 5% Ear Training
 > Recent Ear Training vibe-checks: Rough, Struggled, OK
 > Session length: 45 min
@@ -331,8 +333,39 @@ Each methodology gets a signature template. Templates carry:
 - Name (e.g. "Deliberate Practice — 45 min technique focus")
 - Description (short — what this method does + when to use it)
 - Duration estimate
-- Item list (with categories, tool references where relevant, rest items)
+- Item list (with categories, tool references where relevant, rest items, per-item methodology references — see §7.3)
 - Attribution: "Based on the [Deliberate Practice](/my-practice/methodology/deliberate-practice) method"
+
+### 7.3 Methodology as a per-item property (v0.4)
+
+Every RoutineItem carries an optional **methodology** field. Users (or the AI) can pick the method that applies to each item individually. A single routine can weave multiple methods — Slow Practice on the technique drill, Chunking on the repertoire section, Interleaved rotation between them.
+
+This upgrades methodology from "which template did the user pick?" to "which method is this specific activity using?" It matches how teachers actually assign practice and unlocks richer AI-Coach reasoning.
+
+**Optional per item.** Methodology is a first-class optional field, not required. Rest breaks, warmup long-tones, freeform improvisation — many items don't map to any of the 8 built-in methods. Blank is legal and appears in the Overview simply as "—" (no method).
+
+**Smart defaults per category.** When a user or the AI adds an item, the methodology dropdown pre-fills based on the item's category:
+
+| Category | Default methodology |
+|---|---|
+| Warmup | — (no method) |
+| Technique | Slow Practice |
+| Repertoire | Chunking |
+| Ear Training | Spaced Repetition |
+| Sight Reading | — (deferred; Sight Reading module ships in v2) |
+| Theory | — (no method) |
+| Improvisation | — (no method — subjective) |
+| Transcription | Chunking |
+| Recording / Listening | Mental Practice |
+| Cool-down | — (no method) |
+
+User can change any default freely. Defaults just save clicks for common pairings.
+
+**AI-suggested methodology (per-item).** Every methodology dropdown has a small **[?]** icon. Click → AI Coach suggests a method for THIS specific item given the user's profile, the item's context (category, tool ref, notes), and recent history. Cheaper than a full routine-drafting turn; a great "help me here" moment.
+
+**Bulk AI assignment.** In the routine builder, a **[AI: assign methodologies to all items]** button fills in every blank methodology field at once. User reviews and tweaks individual choices before the Overview screen.
+
+**Methodology in Reports.** Reports gain a "methodology mix" chip in the level panel showing how the user's practice time distributed across methods over the selected range. Balance signal — if a user is 90% Slow Practice month after month, the AI insights might nudge toward Interleaved for retention.
 
 ---
 
@@ -500,7 +533,7 @@ Landing shows a dashboard with:
 
 **Row 5: Levels & progression**
 - Per-category chip grid: category name · current level · target level (if set) · small delta indicator if level changed in the selected range.
-- Timeline strip below: significant level events across the app's lifetime ("Ear Training: Developing → Comfortable · Sep 12", "Repertoire: target set to Fluent · Oct 3"). Motivating without being gamified.
+- Timeline strip below: significant level events across the app's lifetime ("Ear Training: Level 2 → Level 3 · Sep 12", "Repertoire: target set to Level 4 · Oct 3"). Motivating without being gamified.
 - Recent vibe-check trend per category (last 5 ratings shown as tiny bars). Helps user see whether recent sessions felt rough or great — signal for what to work on next.
 - **[Reassess my levels]** button opens Profile → Levels.
 
@@ -509,7 +542,7 @@ Landing shows a dashboard with:
 - Sort by time this month; alerts for "haven't practiced in N days" songs.
 
 **Row 7: AI insights (BYOK users only)**
-- AI-generated weekly summary: "You practiced 6h 30m this week (+40% vs last week). Big shift toward Repertoire. You haven't touched Ear Training in 12 days — want a routine focused there? Also: your recent Ear Training vibe-checks are trending up — you might be ready to bump your level from Developing to Comfortable."
+- AI-generated weekly summary: "You practiced 6h 30m this week (+40% vs last week). Big shift toward Repertoire. You haven't touched Ear Training in 12 days — want a routine focused there? Also: your recent Ear Training vibe-checks are trending up — you might be ready to bump your level from 2 to 3."
 - Runs on-demand or weekly (user configurable).
 
 ### 10.3 Reports export
@@ -551,8 +584,8 @@ Shown only when the user picked Standard or Deep in Step 2. Fully skippable.
 >
 > Rate your current comfort with each category. This shapes what the AI Coach suggests. You can change any of these anytime.
 >
-> **Warmup** — Exploring · Developing · Comfortable · Fluent · Teaching · N/A
-> *(...one row per category — 10 in total. Each defaults to Comfortable; user can bump. Users can also skip and set later.)*
+> **Warmup** — [1 · Exploring] [2 · Developing] [**3 · Comfortable**] [4 · Fluent] [5 · Teaching] [N/A]
+> *(...one row per category — 10 in total. Each defaults to Level 3 · Comfortable; user can bump. Users can also skip and set later.)*
 >
 > **Set a target?** Optional per-category dropdown for aspirational level.
 
@@ -611,13 +644,22 @@ type CustomCategory = {
   color: string;                         // hex, from curated palette
 };
 
-type ProficiencyLevel =
-  | "exploring"        // just starting
-  | "developing"       // working on basics
-  | "comfortable"      // basics fluent
-  | "fluent"           // solid intermediate → advanced
-  | "teaching"         // could teach
-  | "n/a";             // not applicable to this user
+/**
+ * Numeric level, 1–5. Higher = more advanced. See §4.3 for
+ * descriptors. Storing as a number keeps the type open to v2's
+ * automated-grading extension (Level 6+ can be added without a
+ * schema change). "N/A" is a distinct opt-out.
+ */
+type ProficiencyLevel = 1 | 2 | 3 | 4 | 5 | "n/a";
+
+/** Human-readable descriptor per level (§4.3). */
+const LEVEL_DESCRIPTORS: Record<Exclude<ProficiencyLevel, "n/a">, string> = {
+  1: "Exploring",
+  2: "Developing",
+  3: "Comfortable",
+  4: "Fluent",
+  5: "Teaching",
+};
 
 type CategoryLevel = {
   categoryId: CategoryId;
@@ -672,6 +714,13 @@ type RoutineItemBase = {
   category: CategoryId;              // the activity category (required)
   estimatedSeconds: number;
   notes?: string;
+  /**
+   * v0.4 — Optional methodology reference. When set, this item is
+   * being practiced using that method (Slow Practice, Chunking, etc.).
+   * Undefined = no specific method. See §7.3 for smart defaults per
+   * category and AI-suggestion affordances.
+   */
+  methodologyId?: MethodologyId;
 };
 
 // Discriminated union of type variants (one per drilling module + rest + custom):
@@ -821,6 +870,73 @@ Sidebar sticky on desktop; select dropdown on mobile (same pattern as Settings).
 - Module switcher shows "My Practice" as a live entry.
 - When a routine is executing in full-screen practice mode, the header + footer are hidden (see §9.1).
 
+### 14.4 Routine Overview (pre-save / pre-run gate) — v0.4
+
+Every routine — whether hand-built, AI-drafted, or template-loaded — passes through a **Routine Overview** screen before it's saved or run. The Overview is the "review before commit" surface that consolidates naming, methodology mix, category balance, and duration into one confirming view.
+
+#### When it shows
+
+- **Manual build path**: User builds items in the routine builder → clicks **[Review →]** → lands on the Overview.
+- **AI Coach path**: AI drafts a routine in the chat → clicks **[Preview routine →]** → lands on the Overview.
+- **Template path**: User picks a template from Methodology tab → clicks **[Try this template →]** → lands on the Overview with the template loaded.
+
+All three paths converge on the same screen. One save flow to design + one place to build muscle memory.
+
+#### What it shows
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ Routine Overview                                              │
+├───────────────────────────────────────────────────────────────┤
+│ Name: [Slow Practice · Technique · 25 min          ] (edit)   │
+│ Estimated total: 25 min                                       │
+├───────────────────────────────────────────────────────────────┤
+│ ORDER  ITEM                     CATEGORY    METHOD       TIME │
+│  1     Warmup (long tones)      Warmup      —            5:00 │
+│  2     Major scales @ 60 BPM    Technique   Slow Practice 8:00│
+│  3     Rest                     Cool-down   —            2:00 │
+│  4     Arp drill: 7ths @ 80     Technique   Slow Loop    8:00 │
+│  5     Cool-down: play freely   Cool-down   —            2:00 │
+├───────────────────────────────────────────────────────────────┤
+│ Category mix:                                                 │
+│  ■ Warmup 20%  ■■■ Technique 64%  ■ Cool-down 16%             │
+│                                                               │
+│ Methodology mix:                                              │
+│  ■■ Slow Practice 32%  ■■ Slow Loop 32%  □ No method 36%      │
+├───────────────────────────────────────────────────────────────┤
+│ [← Edit items]  [Save without running]  [Save & Run →]        │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Fields at a glance**:
+- **Name** — pre-filled with a smart default (see below). Editable inline.
+- **Estimated total** — sum of item durations.
+- **Item table** — order + label + category + methodology + duration per row. Click any row to jump back to that item's composer.
+- **Category mix chip row** — visual balance of the 10 categories.
+- **Methodology mix chip row** — visual distribution across methods (including "No method").
+- **Warning banners** — subtle nudges when balance is unusual (e.g. 90%+ single-method, 0% rest breaks in a 60+ min routine).
+
+#### Smart default names
+
+Pre-filled based on content:
+- Methodology-template load → template's name ("Deliberate Practice — 45 min technique focus")
+- AI Coach draft → AI-suggested name from the conversation ("Ear Training focus, 45 min")
+- Manual build → algorithmic name: dominant category + methodology + duration, e.g. "Technique · Slow Practice · 25 min"
+- Fallback → "Untitled routine · YYYY-MM-DD HH:MM"
+
+User can overwrite freely. Empty name at save-time → auto-generated.
+
+#### Actions
+
+- **[← Edit items]** — back to the builder without losing state.
+- **[Save without running]** — persist to Your Routines; return to Routines tab.
+- **[Save & Run →]** — persist AND immediately launch full-screen practice mode.
+- **[Discard]** (secondary, in a small menu) — throws away the routine without saving.
+
+#### Overview is where the AI-methodology-assign flow completes
+
+If the user in the builder clicked **[AI: assign methodologies to all items]**, the Overview screen shows the AI's picks for every item. User can accept, or click a row to edit individually before saving. This preserves the "AI does the tedious part; user has final say" ethos.
+
 ---
 
 ## 15. Cross-Module Integration
@@ -961,3 +1077,4 @@ Full flagship is ~4–6 months of work sequenced into named slices. **The detail
 | 2026-06-29 | v0.1 — Initial design pass. Scoped as cross-module routine layer targeting v2 milestone. |
 | 2026-07-14 | **v0.2 flagship rewrite.** Promoted from v2 to v1. Scope expanded significantly: added AI Coach (BYOK Anthropic + OpenAI, Passive / Active modes, chat + shortcuts UI, Standard / Deep+Evolving profile), first-class Songs library, methodology library (6–8 entries), category taxonomy (10 built-ins + user extras), auto-tracked practice sessions, dedicated Reports tab with heatmap / streak / header chip, cloud sync via Supabase, 5-tab module structure, 3-step onboarding wizard. 23 design decisions locked via user interview. Existing v0.1 concepts (RoutineItem discriminated union, Launcher / Composer / Renderer pattern, resume mid-routine) retained. |
 | 2026-07-22 | **v0.3 self-rated proficiency levels.** Added a lightweight v1 proficiency system per user request: 5 stage-based levels per category (Exploring / Developing / Comfortable / Fluent / Teaching) + N/A + optional target level per category. Users self-rate; the app never grades automatically. AI Coach reads current-vs-target gap to weight routines. Reports gain a per-category level chip grid + timeline of significant level events + recent vibe-check trend. End-of-routine offers a single-tap per-category "How'd it go?" rating (1–5). Onboarding wizard gains an optional Step 2.5 for level self-assessment. Data model adds `ProficiencyLevel`, `CategoryLevel`, and `SessionCategoryFeedback` types. Estimated build extended by ~1–2 weeks (~4.5–6.5 months total). Full automated grading + adaptive progression + assessment routines + level curricula deferred to v2 (see [`MY-PRACTICE-V2-BACKLOG.md`](./MY-PRACTICE-V2-BACKLOG.md)). |
+| 2026-07-22 | **v0.4 numeric levels + methodology-per-item + Routine Overview.** Two user-requested improvements shipped as one revision. (1) **Level identifiers are now numeric** (Level 1–5) with the stage descriptors kept as sub-labels ("Level 3 · Comfortable"). Numbers scale past v1 without a naming crisis and make deltas unambiguous. `ProficiencyLevel` type changes from a union of stage names to `1 \| 2 \| 3 \| 4 \| 5 \| "n/a"`. (2) **Methodology becomes an optional per-item property** — every `RoutineItem` carries an optional `methodologyId` field, so a single routine can weave multiple methods together (Slow Practice on the arp drill, Chunking on the repertoire section, etc.). Smart defaults per category (Technique → Slow Practice, Repertoire → Chunking, etc.). "?" AI-suggestion affordance per item. Bulk "AI: assign methodologies to all items" button in the builder. Methodology mix chip added to Reports for balance signals. (3) **Routine Overview** — new pre-save/pre-run gate screen that consolidates naming, methodology mix, category balance, and duration into one confirming view. Manual builds, AI drafts, and template loads all converge on the same Overview screen. Smart default names generated per source. Actions: Edit items / Save without running / Save & Run. Extends estimate by ~1 week for the Overview UI + methodology picker + AI bulk-assign. |
