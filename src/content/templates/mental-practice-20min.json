@@ -1,0 +1,41 @@
+{
+  "id": "mental-practice-20min",
+  "name": "Mental Practice — 20 min session",
+  "description": "Score study + visualization + aural rehearsal of one passage. No instrument required. Practice on a plane, in bed, on a walk.",
+  "methodologyId": "mental-practice",
+  "estimatedTotalSeconds": 1200,
+  "items": [
+    {
+      "id": "pick-passage",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Pick the passage",
+      "instruction": "Choose one passage you're currently learning. Ideally 8-32 measures. Something you can already play but haven't fully memorized.",
+      "estimatedSeconds": 120
+    },
+    {
+      "id": "score-study",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Score study — 8 minutes",
+      "instruction": "Open the score (or your ear-transcribed sketch). Read it silently, hearing each note in your head. Track your fingers on your leg or in the air. When you hit a spot you can't hear internally, stop. Figure out what's happening theoretically (what chord, what mode, what interval) until you can hear it. This is the highest-payoff mental practice mode.",
+      "estimatedSeconds": 480
+    },
+    {
+      "id": "visualization",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Visualization — 6 minutes",
+      "instruction": "Close your eyes. Play the passage from start to finish in your head. See your hands moving. Hear every note. When your mind wanders or a section blurs, that's diagnostic — that section isn't as solid as you thought. Note it.",
+      "estimatedSeconds": 360
+    },
+    {
+      "id": "aural-rehearsal",
+      "type": "custom",
+      "category": "ear-training",
+      "label": "Aural rehearsal — 4 minutes",
+      "instruction": "Just listen internally. Play the passage in your head without any physical motion. If a phrase is unclear in your head, it will be unclear in performance. Complete audibility is the goal.",
+      "estimatedSeconds": 240
+    }
+  ]
+}

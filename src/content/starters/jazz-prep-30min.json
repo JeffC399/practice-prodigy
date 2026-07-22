@@ -1,0 +1,40 @@
+{
+  "id": "jazz-prep-30min",
+  "name": "Jazz Prep — 30 min",
+  "description": "ii-V-I vocabulary + all m7 arpeggios + improvisation over a standard. A compact jazz-focused session.",
+  "estimatedTotalSeconds": 1800,
+  "items": [
+    {
+      "id": "warmup",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Warmup — long tones + a mode of the day (5 min)",
+      "instruction": "Pick one mode (start with Dorian). Play it slowly across your range. Focus on tone and connection between notes.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "ii-v-i",
+      "type": "custom",
+      "category": "technique",
+      "label": "ii-V-I in 12 keys (12 min)",
+      "instruction": "Cycle through ii-V-I in every key — cycle of 4ths order (Cmaj7 → Fmaj7 → B♭maj7 → E♭maj7 → …). Play the arpeggios for each chord (root - 3rd - 5th - 7th). Metronome around 80-90 BPM. If you have an Arpeggios drill saved for this, launch it.",
+      "estimatedSeconds": 720
+    },
+    {
+      "id": "improv",
+      "type": "custom",
+      "category": "improvisation",
+      "label": "Improvise over a standard (10 min)",
+      "instruction": "Pick a jazz standard you know the form of. Play the head; improvise over 3-4 choruses. Focus on using the vocabulary you just drilled.",
+      "estimatedSeconds": 600
+    },
+    {
+      "id": "reflect",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Reflect (3 min)",
+      "instruction": "Which ii-V felt hardest during the drill? Which key gave you trouble in the improv? Note them — that's tomorrow's Slow Loop material.",
+      "estimatedSeconds": 180
+    }
+  ]
+}

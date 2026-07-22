@@ -1,0 +1,65 @@
+{
+  "id": "slow-practice-30min",
+  "name": "Slow Practice — 30 min technique focus",
+  "description": "Pick a passage. Find your clean tempo. Nudge up in small steps. Record where you plateau so tomorrow starts there.",
+  "methodologyId": "slow-practice",
+  "estimatedTotalSeconds": 1800,
+  "items": [
+    {
+      "id": "warmup",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Warm up (5 min)",
+      "instruction": "Loose hands, easy scales, no metronome. Slow practice depends on relaxed muscles — cold hands sabotage the method.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "pick-passage",
+      "type": "custom",
+      "category": "technique",
+      "label": "Pick a passage + target tempo",
+      "instruction": "Choose the passage you want to speed up. Write down the target BPM (the tempo you want to play it AT eventually). This is the finish line — you won't reach it today.",
+      "estimatedSeconds": 120
+    },
+    {
+      "id": "find-clean-tempo",
+      "type": "custom",
+      "category": "technique",
+      "label": "Find your clean tempo",
+      "instruction": "Start at target - 30%. Play once. Was every note right, every rhythm right, hands relaxed? If yes, you're at clean tempo. If no, drop another 10% and try again. Keep dropping until you can play through with zero errors and zero tension. That's the tempo you'll start from.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "clean-reps",
+      "type": "custom",
+      "category": "technique",
+      "label": "5 clean at clean tempo",
+      "instruction": "Play the passage 5 times at the clean tempo. Full concentration. If any attempt is not clean, drop the tempo further and restart the count.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "nudge-up",
+      "type": "custom",
+      "category": "technique",
+      "label": "Nudge up in 3-5 BPM steps",
+      "instruction": "Bump the tempo by 3-5 BPM. Play the passage 3 times. Still clean? Bump again. First flub — drop back to the last clean tempo and stay there for 3 more reps. Then try nudging again. Continue until you plateau.",
+      "estimatedSeconds": 600
+    },
+    {
+      "id": "alternate-slow-target",
+      "type": "custom",
+      "category": "technique",
+      "label": "Alternate slow + target (optional)",
+      "instruction": "Play the passage at your current plateau tempo, then immediately at target tempo, then back to plateau, then target. The contrast is diagnostic — what you can't do at target becomes obvious. Note what specifically is missing.",
+      "estimatedSeconds": 120
+    },
+    {
+      "id": "record-plateau",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Record your plateau",
+      "instruction": "Write down today's plateau BPM. Tomorrow's session starts 3 BPM below this. Over sessions, the plateau creeps up — that's the whole game.",
+      "estimatedSeconds": 60
+    }
+  ]
+}

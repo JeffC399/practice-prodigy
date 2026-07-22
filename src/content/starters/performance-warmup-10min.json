@@ -1,0 +1,32 @@
+{
+  "id": "performance-warmup-10min",
+  "name": "Performance Warmup — 10 min",
+  "description": "A tight warmup to run before a gig, recital, lesson, or recording session. Tuner check, metronome pulse, one clean run of a familiar piece.",
+  "estimatedTotalSeconds": 600,
+  "items": [
+    {
+      "id": "tuner-check",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Tune (1 min)",
+      "instruction": "Open the Tuner module. Verify every string / your voice / your reed is at pitch. Fix anything drifting.",
+      "estimatedSeconds": 60
+    },
+    {
+      "id": "metronome-pulse",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Metronome pulse — 2 min at performance tempo",
+      "instruction": "Open the Metronome. Set it to your performance tempo. Play a simple pattern (long tones, one scale, a warmup lick). Get your internal clock aligned with the performance tempo.",
+      "estimatedSeconds": 120
+    },
+    {
+      "id": "clean-run",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "One clean run of your opening piece (7 min)",
+      "instruction": "Play through the piece you're about to perform. Slow it slightly if needed to make sure it's clean. Do NOT drill problem spots now — trust that yesterday's work holds. This is a warmup, not a rescue.",
+      "estimatedSeconds": 420
+    }
+  ]
+}

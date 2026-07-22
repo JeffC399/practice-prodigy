@@ -1,0 +1,65 @@
+{
+  "id": "spaced-repetition-warmup-30min",
+  "name": "Spaced Repetition Warmup — 30 min rotating queue",
+  "description": "A warmup that touches different technique items each session. Runs off a rotating pool so nothing gets over-drilled and nothing gets forgotten.",
+  "methodologyId": "spaced-repetition",
+  "estimatedTotalSeconds": 1800,
+  "items": [
+    {
+      "id": "pick-queue",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Pick today's 5 items from your queue",
+      "instruction": "From your technique library (major scales, arpeggio patterns, licks, chord voicings, ear-training sets — whatever you have), pick 5 items to touch today. Rotate: prefer items you haven't touched in a while over items you drilled yesterday. If you don't have a queue yet, start with 5 major-scale keys.",
+      "estimatedSeconds": 120
+    },
+    {
+      "id": "item-1",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Item 1 — 5 minutes",
+      "instruction": "Play through the first item. Focus on cleanliness. Rate it at the end: solid / shaky. Solid items go to a longer interval next time; shaky items stay in daily rotation.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "item-2",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Item 2 — 5 minutes",
+      "instruction": "Second item. Same rating at the end.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "item-3",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Item 3 — 5 minutes",
+      "instruction": "Third item.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "item-4",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Item 4 — 5 minutes",
+      "instruction": "Fourth item.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "item-5",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Item 5 — 5 minutes",
+      "instruction": "Fifth item.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "log-ratings",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Log the ratings",
+      "instruction": "Note which items were solid and which were shaky. Solid → longer interval (skip a few days). Shaky → stay in near-term rotation. Over weeks, mature items get touched less; new material gets touched daily.",
+      "estimatedSeconds": 180
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "id": "daily-warmup-20min",
+  "name": "Daily Warmup — 20 min",
+  "description": "A gentle daily warmup that touches metronome time, technique drilling, and a cool-down. Good default first routine for anyone new to the app.",
+  "estimatedTotalSeconds": 1200,
+  "items": [
+    {
+      "id": "metronome-warmup",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Metronome + long tones (3 min)",
+      "instruction": "Open the Metronome module (or hum along in your head). 60 BPM in 4/4. Play long, relaxed tones — one note per beat, or one note per measure. Focus on tone quality and physical looseness.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "technique-drill",
+      "type": "custom",
+      "category": "technique",
+      "label": "Technique drill of your choice (12 min)",
+      "instruction": "Pick any drill from your Arpeggios, Key Sequencer, or Scale Driller library. Play at a comfortable tempo. This is a warmup, not a stretch session — cleanliness over speed.",
+      "estimatedSeconds": 720
+    },
+    {
+      "id": "faster-metronome",
+      "type": "custom",
+      "category": "technique",
+      "label": "Metronome up to 100 BPM (3 min)",
+      "instruction": "Same warm scale or pattern, now at 100 BPM. Just to wake up the fast side of your hands.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "cool-down",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Cool-down (2 min)",
+      "instruction": "Slow down. Play something you love — anything. Let the practice session end on a musical note, not a technical one.",
+      "estimatedSeconds": 120
+    }
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "id": "interleaved-practice-60min",
+  "name": "Interleaved Practice — 60 min, 5 skills, 4 rounds",
+  "description": "Rotate through 5 skills at 3 minutes each; 4 complete rounds. Each skill gets 12 total minutes chopped into 4 encounters. Feels worse than blocked practice. Retains substantially better.",
+  "methodologyId": "interleaved-practice",
+  "estimatedTotalSeconds": 3600,
+  "items": [
+    {
+      "id": "pick-skills",
+      "type": "custom",
+      "category": "theory",
+      "label": "Pick your 5 skills",
+      "instruction": "Choose 5 skills to interleave. Related is best (three arpeggio patterns + two scales, or three key sequencer drills + a repertoire tune + ear training). Write them down as Skill A / B / C / D / E — this order defines the rotation.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-1-a",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 1 — Skill A (3 min)",
+      "instruction": "3 minutes on Skill A. Full concentration. When the chime sounds, stop mid-attempt if you have to.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-1-b",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 1 — Skill B (3 min)",
+      "instruction": "3 minutes on Skill B. Cold-start each skill; that's the point.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-1-c",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 1 — Skill C (3 min)",
+      "instruction": "3 minutes on Skill C.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-1-d",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 1 — Skill D (3 min)",
+      "instruction": "3 minutes on Skill D.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-1-e",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 1 — Skill E (3 min)",
+      "instruction": "3 minutes on Skill E.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-2-a",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 2 — Skill A (3 min)",
+      "instruction": "Second pass on Skill A. Note the cold start; this is the interleave working.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-2-b",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 2 — Skill B (3 min)",
+      "instruction": "Second pass on Skill B.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-2-c",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 2 — Skill C (3 min)",
+      "instruction": "Second pass on Skill C.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-2-d",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 2 — Skill D (3 min)",
+      "instruction": "Second pass on Skill D.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-2-e",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 2 — Skill E (3 min)",
+      "instruction": "Second pass on Skill E.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "midpoint-rest",
+      "type": "rest",
+      "category": "cool-down",
+      "label": "Midpoint rest",
+      "guidanceText": "Halfway. Water. Walk. Don't check phone.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-3-a",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 3 — Skill A (3 min)",
+      "instruction": "Third pass on Skill A.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-3-b",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 3 — Skill B (3 min)",
+      "instruction": "Third pass on Skill B.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-3-c",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 3 — Skill C (3 min)",
+      "instruction": "Third pass on Skill C.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-3-d",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 3 — Skill D (3 min)",
+      "instruction": "Third pass on Skill D.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "round-3-e",
+      "type": "custom",
+      "category": "technique",
+      "label": "Round 3 — Skill E (3 min)",
+      "instruction": "Third pass on Skill E.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "reflect",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Reflect (3 min)",
+      "instruction": "How did each skill feel by round 3? Which cold-started worst? That's your next-session priority. Don't judge in-session progress; the retention gain shows up tomorrow.",
+      "estimatedSeconds": 180
+    }
+  ]
+}

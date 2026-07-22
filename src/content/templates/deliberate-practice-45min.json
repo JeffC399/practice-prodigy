@@ -1,0 +1,65 @@
+{
+  "id": "deliberate-practice-45min",
+  "name": "Deliberate Practice — 45 min technique focus",
+  "description": "Pick one specific weakness. Warm up separately. Baseline it. Drill it deliberately. Rest. Contextualize. Reflect. The full Ericsson protocol in a session-friendly shape.",
+  "methodologyId": "deliberate-practice",
+  "estimatedTotalSeconds": 2700,
+  "items": [
+    {
+      "id": "warmup",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Warm up (any warmup you like)",
+      "instruction": "Get loose. Long tones, gentle scales, whatever wakes your hands up. Not counted as deliberate work — just prep. Keep it easy; deliberate practice is metabolically expensive and needs a warm system.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "identify",
+      "type": "custom",
+      "category": "technique",
+      "label": "Identify today's specific weakness",
+      "instruction": "One thing. In one sentence. Something you can measure. Examples: 'clean 16ths across the neck at 100 BPM,' 'the interval jump from bar 12 to 13,' 'the m7♭5 arpeggio in every key at 80 BPM.' Write it down before you continue.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "baseline",
+      "type": "custom",
+      "category": "technique",
+      "label": "Baseline it — 10 attempts, count the clean ones",
+      "instruction": "Play the target 10 times at your intended tempo. Count how many were clean (every note right, no tension, no hesitation). If 8+, you're not in the challenge zone — pick something harder. If 0-2, back off — pick something easier. Sweet spot: 3-7 out of 10.",
+      "estimatedSeconds": 240
+    },
+    {
+      "id": "deliberate-work",
+      "type": "custom",
+      "category": "technique",
+      "label": "Deliberate work — 20 minutes",
+      "instruction": "Loop the target. Slow it down if needed. Isolate the smallest chunk that's still failing. Vary rhythm and articulation. Every attempt: was that clean? If no — what specifically went wrong? Fix that one thing on the next attempt. Full concentration; no phone.",
+      "estimatedSeconds": 1200
+    },
+    {
+      "id": "rest",
+      "type": "rest",
+      "category": "cool-down",
+      "label": "Rest — full stop",
+      "guidanceText": "Walk away. Get water. Stretch. Do not touch the instrument. Your brain consolidates during this window; treat it as part of the work.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "contextualize",
+      "type": "custom",
+      "category": "technique",
+      "label": "Contextualize — 8 minutes",
+      "instruction": "Play the target in its full context. If it was a passage from a piece, play the whole section. If it was a technical pattern, weave it into some improvisation. Does it hold up when the surrounding music asks things of you?",
+      "estimatedSeconds": 480
+    },
+    {
+      "id": "reflect",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Reflect — 2 minutes",
+      "instruction": "What worked? What didn't? Rate today's clean-count vs the baseline. What's tomorrow's target — same thing again, or a different weakness? Write it down.",
+      "estimatedSeconds": 120
+    }
+  ]
+}

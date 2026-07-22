@@ -1,0 +1,49 @@
+{
+  "id": "pomodoro-25-5-cycles",
+  "name": "Pomodoro — 25/5, 2 cycles (55 min)",
+  "description": "Two 25-minute focused blocks with a 5-minute rest between. Pick what each pomodoro contains at the start; the structure is agnostic to content.",
+  "methodologyId": "pomodoro",
+  "estimatedTotalSeconds": 3300,
+  "items": [
+    {
+      "id": "plan",
+      "type": "custom",
+      "category": "theory",
+      "label": "Plan the two pomodoros (2 min)",
+      "instruction": "Write down what pomodoro 1 and pomodoro 2 will each contain. Can be the same content across both, or different focus per block. Commit to a plan before starting so you don't spend the pomodoro deciding.",
+      "estimatedSeconds": 120
+    },
+    {
+      "id": "pomodoro-1",
+      "type": "custom",
+      "category": "technique",
+      "label": "Pomodoro 1 — 25 minutes focused work",
+      "instruction": "Full attention. Phone away. If your mind wanders, note where it went and bring it back. If someone interrupts, ask them to give you 20 minutes. Stop when the chime sounds — even mid-attempt.",
+      "estimatedSeconds": 1500
+    },
+    {
+      "id": "rest-1",
+      "type": "rest",
+      "category": "cool-down",
+      "label": "Rest — 5 minutes",
+      "guidanceText": "Stand up. Walk. Water. Look at something far away. Do NOT check your phone — that's not rest, that's a different form of attention. The 5 minutes is when your brain consolidates the previous block.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "pomodoro-2",
+      "type": "custom",
+      "category": "technique",
+      "label": "Pomodoro 2 — 25 minutes focused work",
+      "instruction": "Second block. Same rules. Full attention. Stop on the chime.",
+      "estimatedSeconds": 1500
+    },
+    {
+      "id": "reflect",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Reflect (3 min)",
+      "instruction": "What got done in each block? What didn't fit that's tomorrow's work? Note whether the structure helped or if you were fighting the timer. If you want another set, take a proper 20-min break first.",
+      "estimatedSeconds": 180
+    }
+  ]
+}

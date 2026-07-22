@@ -1,0 +1,73 @@
+{
+  "id": "chunking-repertoire-45min",
+  "name": "Chunking Repertoire — 45 min",
+  "description": "Structured session for learning or polishing one piece. Map chunks, work priority ones, iterate transitions, assemble.",
+  "methodologyId": "chunking",
+  "estimatedTotalSeconds": 2700,
+  "items": [
+    {
+      "id": "warmup",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Warmup (5 min)",
+      "instruction": "Loose hands. Something you can already play. Doesn't need to relate to the piece.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "pick-piece",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Pick the piece + map chunks",
+      "instruction": "Open the score (or your ear-transcribed sketch). Bracket the natural chunks — 4-8 measures each, ending at phrase boundaries. Number them: Chunk 1, 2, 3... A 32-bar tune is typically 4 chunks of 8 bars.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "baseline",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Baseline each chunk",
+      "instruction": "Play each chunk in isolation, straight through. Mark which are already clean (green) and which need work (red). Prioritize the reds.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "work-chunk-1",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Work priority chunk #1 (Slow Practice on it)",
+      "instruction": "Apply Slow Practice to the highest-priority chunk. Slow it down. Get it clean. Nudge tempo. 5 clean in a row at target = done. See the Slow Practice article for the full protocol.",
+      "estimatedSeconds": 600
+    },
+    {
+      "id": "work-chunk-2",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Work priority chunk #2 (Slow Practice on it)",
+      "instruction": "Same protocol on the second-priority chunk.",
+      "estimatedSeconds": 480
+    },
+    {
+      "id": "transitions",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Work the transitions",
+      "instruction": "Play the last measure of chunk N + the first measure of chunk N+1. Only that. Loop it. Get it clean. Move to the next transition. For 8 chunks there are 7 transitions — prioritize the ones between the chunks you just worked.",
+      "estimatedSeconds": 480
+    },
+    {
+      "id": "assemble",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "Assemble incrementally",
+      "instruction": "Chunks 1 + 2 with the transition. Then 1 + 2 + 3. Then 1 + 2 + 3 + 4. Each time you add a chunk, if it breaks, drop back and work that transition. Do NOT play from the top if you break in bar 22.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "reflect",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Reflect",
+      "instruction": "Which chunks are now green? Which transitions are still red? That's tomorrow's list.",
+      "estimatedSeconds": 240
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "id": "slow-loop-15min",
+  "name": "Slow Loop — 15 min lick focus",
+  "description": "Isolate one hard lick or bar. Baseline a starting tempo. Run counts of 5-clean-in-a-row up the tempo ladder. Save your plateau for tomorrow.",
+  "methodologyId": "slow-loop",
+  "estimatedTotalSeconds": 900,
+  "items": [
+    {
+      "id": "isolate",
+      "type": "custom",
+      "category": "technique",
+      "label": "Isolate the exact loop",
+      "instruction": "Not the whole bar — the exact notes that fail. Often 4-8 notes; sometimes just 2 pitches with a hard interval. Write down what you're looping. This is the surgical target.",
+      "estimatedSeconds": 120
+    },
+    {
+      "id": "baseline",
+      "type": "custom",
+      "category": "technique",
+      "label": "Baseline the starting tempo",
+      "instruction": "Find the fastest tempo at which you can play the loop 9-10 clean out of 10 attempts. If you get 9-10 at your first tempo choice, you started too fast — go faster to find the ceiling. If you get 6-8, drop 20%. If <6, drop 30%. Play 10 attempts to confirm.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "count-1",
+      "type": "custom",
+      "category": "technique",
+      "label": "Count 1: 5 clean in a row at starting tempo",
+      "instruction": "Loop at your starting tempo until you hit 5 CONSECUTIVE clean attempts. Flub on attempt 3? Restart the count at zero. Strictness is the whole method.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "nudge-1",
+      "type": "custom",
+      "category": "technique",
+      "label": "Nudge +5 BPM — count 2",
+      "instruction": "Bump 5 BPM. Do another count of 5 clean in a row. If you can't hit 5 straight, drop back to the last tempo and stay there for another count.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "nudge-2",
+      "type": "custom",
+      "category": "technique",
+      "label": "Nudge +5 BPM — count 3",
+      "instruction": "Another 5 BPM up. Another count of 5 clean.",
+      "estimatedSeconds": 180
+    },
+    {
+      "id": "plateau",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Record your plateau",
+      "instruction": "Whatever tempo you plateaued at (the last one where you hit 5 clean), write it down. Tomorrow's session starts 5 BPM below that. Do NOT play the loop at full tempo now to 'test' yourself — trust the slow work.",
+      "estimatedSeconds": 60
+    }
+  ]
+}

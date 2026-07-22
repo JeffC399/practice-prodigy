@@ -1,0 +1,40 @@
+{
+  "id": "slow-and-steady-20min",
+  "name": "Slow and Steady — 20 min",
+  "description": "Everything at 50-60 BPM. A low-effort session focused on relaxation and connection, good for tired days or evenings.",
+  "estimatedTotalSeconds": 1200,
+  "items": [
+    {
+      "id": "long-tones",
+      "type": "custom",
+      "category": "warmup",
+      "label": "Long tones at 50 BPM (5 min)",
+      "instruction": "One note per two beats. Full length. Focus on tone, breath, and physical release. Every note should feel effortless.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "slow-scale",
+      "type": "custom",
+      "category": "technique",
+      "label": "One scale, ascending + descending, at 60 BPM (5 min)",
+      "instruction": "Pick any scale. One note per beat. Full range. Repeat until 5 minutes are up. Every note gets its full duration and attention.",
+      "estimatedSeconds": 300
+    },
+    {
+      "id": "slow-tune",
+      "type": "custom",
+      "category": "repertoire",
+      "label": "A piece at 60% of its target tempo (7 min)",
+      "instruction": "Pick a piece you're learning. Play it substantially slower than performance tempo. Notice everything you notice — tension, hesitation, wrong-note habits. Don't try to fix; just observe.",
+      "estimatedSeconds": 420
+    },
+    {
+      "id": "cool-down",
+      "type": "custom",
+      "category": "cool-down",
+      "label": "Cool-down (3 min)",
+      "instruction": "Play something you love. Slowly. End the session feeling relaxed, not stretched.",
+      "estimatedSeconds": 180
+    }
+  ]
+}
