@@ -11,6 +11,7 @@ import {
   type ModuleEntry,
 } from "@/lib/modules/registry";
 import { AccountChip } from "./account-chip";
+import { SyncStatusChip } from "./sync-status-chip";
 
 /**
  * Persistent shell header — sticky bar at the very top of every screen.
@@ -50,6 +51,10 @@ export function SiteHeader() {
           avatar + dropdown with Sign out. Loads its state via
           useUser() which subscribes to Supabase auth changes. */}
       <div className="flex items-center gap-2">
+        {/* Phase 81 (Slice A.3) — SyncStatusChip shows aggregate sync
+            state across all registered stores. Hidden entirely for
+            signed-out users so anonymous browsing has zero visual noise. */}
+        <SyncStatusChip />
         <AccountChip />
         <ModuleSwitcher current={current} />
       </div>
