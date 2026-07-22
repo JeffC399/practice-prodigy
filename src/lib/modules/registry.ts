@@ -12,6 +12,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { isMyPracticeEnabled } from "@/lib/feature-flags";
 
 /**
  * Single source of truth for Practice Prodigy's 9-item platform vision.
@@ -76,10 +77,25 @@ export const MODULES: ModuleEntry[] = [
     id: "my-practice",
     name: "My Practice",
     shortName: "My Practice",
-    status: "designed",
-    bucket: "next",
+    // Phase 72 — Feature-flag gated. When
+    // NEXT_PUBLIC_MY_PRACTICE_ENABLED=true the entry lights up as a
+    // clickable live module; otherwise it stays "designed" (visible
+    // in the module switcher as a preview but not clickable). This
+    // lets us dogfood the flagship on preview deploys + the maker's
+    // own environment without exposing a half-built surface in prod.
+    ...(isMyPracticeEnabled()
+      ? ({
+          status: "live" as const,
+          bucket: "now" as const,
+          route: "/my-practice",
+          routeMatch: (p: string) => p.startsWith("/my-practice"),
+        })
+      : ({
+          status: "designed" as const,
+          bucket: "next" as const,
+        })),
     description:
-      "Compose practice routines across every module: chain a metronome warmup → arpeggio drills → scale focus → sight-reading into one playable session. The cross-module composition layer. Design locked in ROUTINE-DESIGN.md; ships paired with the Metronome module.",
+      "The flagship module. Compose practice routines from every module. AI Coach drafts personalized sessions. Track every minute by category; build methodology-based templates. See ROUTINE-DESIGN.md v0.2 for the full flagship design + MY-PRACTICE-BUILD-PLAN.md for the 8-slice build.",
     icon: CalendarCheck,
   },
   {
