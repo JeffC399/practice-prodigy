@@ -2,8 +2,8 @@
 
 > Features and capabilities scoped BEYOND v1. Captured here so nothing is lost when we go past v1 GA. Each item has enough detail to pick up cold months later.
 
-**Doc status:** v1 — 2026-07-22
-**Depends on:** `ROUTINE-DESIGN.md` v0.3 (v1 design) + `MY-PRACTICE-BUILD-PLAN.md` (v1 build)
+**Doc status:** v1.1 — 2026-07-22
+**Depends on:** `ROUTINE-DESIGN.md` v0.4 (v1 design) + `MY-PRACTICE-BUILD-PLAN.md` v1.2 (v1 build)
 **When to consult:** planning v2 build, when a user requests a deferred feature, or when weighing whether a v1 change enables a v2 win
 
 ---
@@ -110,6 +110,96 @@ type CurriculumEntry = {
 3. **Grading transparency** — does the user see the grading formula, or is it a black box? Recommend transparent.
 4. **Override mechanism** — user disagrees with a suggested level. How does the app respond?
 5. **What if signals conflict?** Automated grade says "you're ready to level up" but user vibe-checks say "I'm still struggling." Which wins?
+
+---
+
+## 1.5 Methodology Runtime Enforcement (Per Module)
+
+Elevate methodology from a **label + guidance signal** (what v1 ships per ROUTINE-DESIGN.md §7.3–7.4) to **runtime-enforced behavior in the drilling modules**. When a user picks Slow Practice for their arpeggio drill, the Arpeggios drill screen actually behaves like Slow Practice — caps tempo, requires 5-clean confirmations, blocks tempo bumps past a plateau.
+
+### 1.5.1 The gap this closes
+
+Per v1 scope, if the user picks Slow Practice for an item that launches a drilling module, the module doesn't know or care. The methodology text is displayed as guidance; the user follows it by choice. That's a real gap between "user picked Slow Practice" and "drill behaved like Slow Practice."
+
+v2 closes this by giving each drilling module a "methodology mode" runtime layer.
+
+### 1.5.2 Scope
+
+For each (module × methodology) pair where the combination makes musical sense, design + implement runtime behavior:
+
+**Slow Practice mode** (applies to: Arpeggios, Key Sequencer, Scale Driller, Metronome)
+- Tempo capped to user's "clean tempo" (asked at drill start).
+- Tempo up-nudge only unlocks after user affirms 5 clean reps in a row.
+- Plateau tempo persists across sessions; next session starts 3 BPM below.
+
+**Slow Loop mode** (applies to: Arpeggios, Key Sequencer, Scale Driller)
+- Drill forces loop-on-smallest-chunk (single measure or single lick).
+- Strict 5-clean-restart-on-flub counter visible during drill.
+- No jump-ahead controls; loop until count met.
+
+**Deliberate Practice mode** (applies to: Arpeggios, Key Sequencer, Scale Driller, Lead Sheet playback)
+- Mid-drill "Was that clean?" prompt after every N reps.
+- Rest reminder at 20 minutes.
+- End-of-item reflection prompt (1-2 sentences the user types).
+
+**Interleaved Practice mode** (applies to: routine-level, not per-drill)
+- Forces rotation timer overriding per-item durations.
+- Item-list becomes cyclic; each rotation is timed.
+
+**Pomodoro mode** (applies to: routine-level)
+- Enforces 25/5 structure across the routine's items regardless of individual estimated durations.
+- Rest items auto-inserted at 25-min boundaries.
+
+**Chunking mode** (applies to: Lead Sheet playback, Song items)
+- Displays chunk boundaries in the sheet view.
+- Auto-scrolls sheet by chunk.
+- Progress bar shows chunks completed, not measures.
+
+**Spaced Repetition mode** (applies to: Arpeggios, Key Sequencer, Scale Driller as warmup routines)
+- Draws items from a rotating queue (skipping items recently drilled).
+- Prompts user to rate each item at end (solid/shaky), promotes/demotes items in the queue.
+
+**Mental Practice mode** (applies to: Custom items only)
+- Prompts "Are you away from the instrument?" at start.
+- Timer runs; item's guidance text is score-study / visualization / aural-rehearsal instructions.
+
+### 1.5.3 Data model additions
+
+```ts
+// Each drilling module registers its supported methodology modes:
+type ModuleMethodologyMode = {
+  moduleId: ModuleId;
+  methodologyId: MethodologyId;
+  /** Runtime handler — hooks into the module's play surface. */
+  handler: (item: RoutineItem, context: ModuleContext) => MethodologyModeRuntime;
+};
+
+// The runtime object the drill screen consults:
+type MethodologyModeRuntime = {
+  /** Override the module's default behavior mid-drill. */
+  onBeatTick?: (state: DrillState) => DrillState | null;
+  onTempoNudge?: (delta: number) => number | null;
+  onItemStart?: () => void;
+  onItemEnd?: () => void;
+  renderOverlay?: () => ReactNode;
+  // etc.
+};
+```
+
+### 1.5.4 Estimated build
+
+**~2-3 months across all module × methodology combinations.** Should be built after v1 GA + at least 2 months of usage data (so we know which combinations users actually pick before we design their behaviors).
+
+### 1.5.5 Open questions
+
+1. **Do users see WHICH modes are enforced vs guidance-only?** Recommend yes — a small "🔒 Enforced" chip on methodology dropdowns for supported combos vs "💡 Guidance" for unsupported ones. Sets accurate expectations.
+2. **What if a user picks a methodology whose runtime isn't implemented for the target module?** Fall back to guidance-only mode. Never block.
+3. **Should users be able to DISABLE runtime enforcement per drill?** E.g. "I want Slow Practice tagged for reports but I don't want the tempo cap today." Probably yes; opt-out setting per item.
+4. **Migration**: users' existing routines with methodology tags shouldn't break when runtime enforcement lands. Runtime is additive.
+
+### 1.5.6 Why deferred to v2
+
+Building this in v1 would add ~2-3 months to an already-ambitious flagship plan. Also: we don't know yet which module × methodology combinations users actually want. Better to ship v1's label + guidance layer, watch what users pick, then build runtime for the top combinations first.
 
 ---
 
@@ -357,3 +447,4 @@ Deferred from `ROUTINE-DESIGN.md` §17 open items. Once cloud sync + AI + storag
 | Date | Change |
 |---|---|
 | 2026-07-22 | v1 — Initial backlog. Captures the 17 major v2+ items deferred from the v1 flagship scope. Anchored on user's 2026-07-22 request that "nothing be lost when we go beyond v1." |
+| 2026-07-22 | v1.1 — Added §1.5 "Methodology Runtime Enforcement (Per Module)" after user asked whether picking a methodology means the item is *trained in accordance with that methodology's principles*. Honest scope-check: v1 ships methodology as label + guidance + AI signal only; the drilling modules don't yet change behavior based on the methodology tag. v2 slice adds runtime enforcement per (module × methodology) combination. ~2-3 months of work. Deferred to after v1 GA + real usage data so we know which combinations users pick. |
