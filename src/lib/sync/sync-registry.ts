@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/client";
 import { createSyncEngine, type SyncEngine } from "./sync-engine";
 import type { SyncAdapter, SyncStatus } from "./types";
 
+const adapters = new Map<string, SyncAdapter<unknown>>();
+
 /**
  * Sync registry — Slice A.3 (Phase 81).
  *
@@ -47,6 +49,7 @@ export function registerSyncAdapter<TData>(adapter: SyncAdapter<TData>): void {
 
   const engine = createSyncEngine(adapter);
   engines.set(adapter.storeKey, engine);
+  adapters.set(adapter.storeKey, adapter as SyncAdapter<unknown>);
 
   // Emit aggregate status when this engine changes.
   engine.subscribe(() => emitAggregate());
@@ -96,6 +99,27 @@ export function subscribeAggregateStatus(
  */
 export async function pullAll(): Promise<void> {
   await Promise.all(Array.from(engines.values()).map((e) => e.pull()));
+}
+
+/**
+ * Local entity counts across all registered adapters that opted in
+ * via `getLocalCount()`. Used by the migration prompt (A.4) to
+ * summarize "we found N drills, M sheets, K settings on this
+ * device."
+ *
+ * Adapters without `getLocalCount()` are omitted from the result.
+ * Adapters returning 0 are omitted too — no point saying "0 sheets."
+ */
+export function getLocalCounts(): Array<{ label: string; count: number }> {
+  const out: Array<{ label: string; count: number }> = [];
+  for (const adapter of adapters.values()) {
+    if (!adapter.getLocalCount || !adapter.displayLabel) continue;
+    const count = adapter.getLocalCount();
+    if (count > 0) {
+      out.push({ label: adapter.displayLabel, count });
+    }
+  }
+  return out;
 }
 
 /**

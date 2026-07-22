@@ -112,4 +112,26 @@ export interface SyncAdapter<TData = unknown> {
    *     data payload.
    */
   applyRemote: (rows: LocalRow<TData>[]) => void;
+
+  /**
+   * Human-readable label for the migration prompt UI. Shown when
+   * we ask "we found N X on this device — sync them?". Optional;
+   * omit for stores that shouldn't surface in the prompt (e.g.
+   * ephemeral state, resume snapshots).
+   */
+  displayLabel?: string;
+
+  /**
+   * How many entities does this store currently have locally?
+   *
+   * Used by the first-sign-in migration prompt (A.4) to summarize
+   * what's about to sync. Return 0 when the store is empty. Return
+   * undefined (or omit the method) for stores that shouldn't surface
+   * in the migration UI (ephemeral state, resume snapshots, etc.).
+   *
+   * Collection stores return their entity count. Singleton stores
+   * return 1 if any meaningful state is set, 0 otherwise (default:
+   * always 1 because touching the store implies user has state).
+   */
+  getLocalCount?: () => number;
 }

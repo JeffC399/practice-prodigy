@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Patrick_Hand } from "next/font/google";
+import { MigrationPrompt } from "@/components/shell/migration-prompt";
 import { ServiceWorkerRegister } from "@/components/shell/service-worker-register";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
@@ -91,6 +92,7 @@ export default function RootLayout({
         <SiteHeader />
         {children}
         <SiteFooter />
+        <MigrationPrompt />
         <ServiceWorkerRegister />
       </body>
     </html>
