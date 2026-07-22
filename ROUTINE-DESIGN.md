@@ -1,12 +1,12 @@
-# My Practice — Design (v0.2 Flagship)
+# My Practice — Design (v0.3 Flagship)
 
 > The flagship module. Turns Practice Prodigy from a collection of drilling tools into the app a serious musician uses every day. Composes every other module into structured practice sessions; tracks all practice time; provides AI coaching and pedagogical guidance.
 
-**Doc status:** v0.2 flagship design — 2026-07-14
+**Doc status:** v0.3 flagship design — 2026-07-22
 **Target ship:** v1 milestone (not v2 — promoted to flagship per 2026-07-14 interview)
-**Estimated build:** 4–6 months across sequenced slices (see §16 build plan reference)
+**Estimated build:** ~5–6 months across sequenced slices (see §16 build plan reference; extended by ~1–2 weeks in v0.3 for self-rated proficiency)
 
-**Supersedes:** v0.1 (2026-06-29) which scoped a minimal cross-module routine layer targeting v2. v0.2 is significantly bigger: adds AI coaching, methodology library, time tracking, category reports, songs library, and cloud sync — all in v1.
+**Supersedes:** v0.2 (2026-07-14) which locked the flagship scope + 23 design decisions from the initial interview. v0.3 adds a v1 lightweight proficiency-level system (self-rated levels per category feeding the AI Coach) and formally defers automated grading + adaptive progression to v2 (documented in [`MY-PRACTICE-V2-BACKLOG.md`](./MY-PRACTICE-V2-BACKLOG.md)).
 
 ---
 
@@ -125,6 +125,54 @@ Users can add their own categories via **Profile → Categories → + Add catego
 - Show up in reports as regular categories.
 - Can be renamed or deleted (deleting a category demotes tagged items to a "Custom" bucket, doesn't lose data).
 
+### 4.3 Proficiency Levels (v1: Self-Rated)
+
+Each category gets a **current level** and an **optional target level** per user. Users self-rate; the app never grades automatically in v1. The AI Coach uses the current-vs-target gap to shape routines, and Reports show level history over time.
+
+**Full automated grading + adaptive progression is deferred to v2** — see [`MY-PRACTICE-V2-BACKLOG.md`](./MY-PRACTICE-V2-BACKLOG.md) for the deferred scope. This v1 slice ships the *interface* for level tracking without the grading engine, so the data model + UI are ready for v2 to plug into.
+
+#### The five levels + "Not applicable"
+
+Levels use a stage-based naming that describes relationship-to-material, not judgment-of-skill. This avoids the "Beginner sounds bad" defensiveness:
+
+| Level | Meaning |
+|---|---|
+| **Exploring** | Just starting; still learning what this category even is |
+| **Developing** | Working on the basics; can do some things but with effort |
+| **Comfortable** | Basics are fluent; can handle standard-level challenges |
+| **Fluent** | Solid intermediate → advanced; can handle most challenges you meet |
+| **Teaching** | Advanced; could clearly explain / teach this to another musician |
+| **N/A** | Not applicable to me right now |
+
+Users can bump levels up or down whenever they want in Profile → Levels. Changes are logged (with timestamp) so Reports can show progression narratives.
+
+#### Target levels
+
+Each category can also have a target — the user's own aspiration. "I'm Comfortable with Ear Training and want to be Fluent." Targets are pure aspiration; the app never enforces them. The AI Coach uses them to weight routines toward gaps ("you're at Developing on Ear Training but want to reach Fluent — I've weighted 30% of this routine there").
+
+#### Optional per-routine feedback
+
+At the end of every routine, the player offers a **single-tap category vibe-check** for each category the routine touched:
+
+> **How did Ear Training go today?**
+> Rough · Struggled · OK · Solid · Great
+
+Fully skippable (Skip All button). Ratings are stored per session-item and become a "recent feel" signal the AI Coach can read ("your last three Ear Training sessions were rated Rough — want a gentler routine today?"). Ratings never auto-change the user's level; only the user changes their level.
+
+#### N/A is first-class
+
+If a user marks a category as N/A, the app:
+- Hides it from AI Coach considerations
+- Hides it from the vibe-check prompts after routines
+- Still shows time spent (if they happen to practice it) in Reports
+- Never nags them to set a level for it
+
+This respects the reality that not every musician cares about every category. A jazz bassist marking Sight Reading N/A is a legitimate choice.
+
+#### Reassessment nudge
+
+Every 3 months, a subtle Profile prompt: "It's been a while since you rated your levels — want to update?" No pressure; just a check-in. Some users will bump themselves up (progress); some will bump themselves down (humility from real growth); most will leave levels alone. All fine.
+
 ---
 
 ## 5. Session Tracking
@@ -206,7 +254,7 @@ User picks profile depth in the onboarding wizard (see §11). Can upgrade Standa
 
 **Standard profile (~5 fields):**
 - Instrument (dropdown: Bass, Guitar, Piano, Voice, Drums, Saxophone, other free-text)
-- Skill level (Beginner / Intermediate / Advanced / Pro)
+- Overall skill level (Beginner / Intermediate / Advanced / Pro) — a coarse global signal; per-category proficiency is finer-grained (see §4.3 and next bullet)
 - Primary goals (free-text list, 1–5 items, examples: "build my ii-V vocabulary", "learn 20 jazz standards", "improve time feel")
 - Focus areas (multi-select from the 10 categories: which matter most to me right now)
 - Typical session length (dropdown: 15 / 30 / 45 / 60 / 90 / 120 min)
@@ -217,6 +265,8 @@ User picks profile depth in the onboarding wizard (see §11). Can upgrade Standa
 - Specific weaknesses (free-text list, e.g. "left-hand independence", "fast tempos", "reading in flat keys")
 - Repertoire priorities (link to Songs library)
 - Preferred practice methods (multi-select from methodology library)
+
+**Per-category proficiency levels** (see §4.3) — every profile carries a current + target level per category. Standard profile users can leave these unset (defaults to Comfortable current / no target) and set them later. Deep profile users are prompted for them during setup.
 
 **Progressive enrichment** — instead of dumping all Deep fields at once, the app drips one new field per week when relevant ("Quick question — what genres do you mostly play?"). Reduces onboarding friction; same total data collection.
 
@@ -242,12 +292,14 @@ Conversation history persists per-user (last 100 conversations synced via cloud)
 
 ### 6.6 "Why this recommendation?" transparency
 
-Every AI-drafted routine has a small **[Why this?]** link that expands to show which profile fields + recent history influenced the AI's choices:
+Every AI-drafted routine has a small **[Why this?]** link that expands to show which profile fields + recent history + levels influenced the AI's choices:
 
 > Focus areas: **Improvisation**, **Ear Training**
+> Levels: **Ear Training** — Developing → target Fluent (gap: 2 steps)
 > Recent 2 weeks: 40% Technique, 5% Ear Training
+> Recent Ear Training vibe-checks: Rough, Struggled, OK
 > Session length: 45 min
-> → This routine emphasizes Ear Training (18 min) to rebalance recent bias toward Technique.
+> → This routine emphasizes Ear Training (18 min) to close a target gap AND rebalance recent bias. Started gentle because recent vibe-checks were Rough.
 
 Builds trust in the AI; teaches the user how to shape their profile.
 
@@ -446,12 +498,18 @@ Landing shows a dashboard with:
 - Overlay: rolling 7-day average.
 - Toggle range: 30 days / 90 days / this year / all-time.
 
-**Row 5: Songs progress**
+**Row 5: Levels & progression**
+- Per-category chip grid: category name · current level · target level (if set) · small delta indicator if level changed in the selected range.
+- Timeline strip below: significant level events across the app's lifetime ("Ear Training: Developing → Comfortable · Sep 12", "Repertoire: target set to Fluent · Oct 3"). Motivating without being gamified.
+- Recent vibe-check trend per category (last 5 ratings shown as tiny bars). Helps user see whether recent sessions felt rough or great — signal for what to work on next.
+- **[Reassess my levels]** button opens Profile → Levels.
+
+**Row 6: Songs progress**
 - List of songs currently marked "learning" or "polishing" with practice time this month per song.
 - Sort by time this month; alerts for "haven't practiced in N days" songs.
 
-**Row 6: AI insights (BYOK users only)**
-- AI-generated weekly summary: "You practiced 6h 30m this week (+40% vs last week). Big shift toward Repertoire. You haven't touched Ear Training in 12 days — want a routine focused there?"
+**Row 7: AI insights (BYOK users only)**
+- AI-generated weekly summary: "You practiced 6h 30m this week (+40% vs last week). Big shift toward Repertoire. You haven't touched Ear Training in 12 days — want a routine focused there? Also: your recent Ear Training vibe-checks are trending up — you might be ready to bump your level from Developing to Comfortable."
 - Runs on-demand or weekly (user configurable).
 
 ### 10.3 Reports export
@@ -484,6 +542,19 @@ Full-screen card:
 > **Deep + Evolving** — 10+ fields, ~10 min. Maximum personalization. Fields drip in over time; no need to fill all at once.
 >
 > **Skip for now** — Use defaults. You can always come back.
+
+### Step 2.5 — Rate your current levels (optional)
+
+Shown only when the user picked Standard or Deep in Step 2. Fully skippable.
+
+> **Where are you right now?**
+>
+> Rate your current comfort with each category. This shapes what the AI Coach suggests. You can change any of these anytime.
+>
+> **Warmup** — Exploring · Developing · Comfortable · Fluent · Teaching · N/A
+> *(...one row per category — 10 in total. Each defaults to Comfortable; user can bump. Users can also skip and set later.)*
+>
+> **Set a target?** Optional per-category dropdown for aspirational level.
 
 ### Step 3 — Try a starter routine
 
@@ -528,6 +599,8 @@ type PracticeProfile = {
   aiConversationHistory: AIMessage[];    // last 100 conversations
   // Categories
   customCategories: CustomCategory[];    // user-defined extras
+  // Per-category proficiency (§4.3)
+  levels: CategoryLevel[];               // one entry per category (built-in + custom)
   createdAt: number;
   updatedAt: number;
 };
@@ -536,6 +609,22 @@ type CustomCategory = {
   id: string;
   name: string;
   color: string;                         // hex, from curated palette
+};
+
+type ProficiencyLevel =
+  | "exploring"        // just starting
+  | "developing"       // working on basics
+  | "comfortable"      // basics fluent
+  | "fluent"           // solid intermediate → advanced
+  | "teaching"         // could teach
+  | "n/a";             // not applicable to this user
+
+type CategoryLevel = {
+  categoryId: CategoryId;
+  current: ProficiencyLevel;             // defaults to "comfortable"
+  target?: ProficiencyLevel;             // optional aspiration
+  updatedAt: number;
+  history: Array<{ level: ProficiencyLevel; changedAt: number }>;
 };
 ```
 
@@ -612,6 +701,8 @@ type PracticeSession = {
   endedAt?: number;                  // set when session ends (5-min inactivity)
   routineExecutionId?: string;       // if this session was a routine execution
   items: SessionItem[];
+  /** Per-category vibe-checks captured at end of routine (§4.3). Optional. */
+  categoryFeedback?: SessionCategoryFeedback[];
 };
 
 type SessionItem = {
@@ -623,6 +714,12 @@ type SessionItem = {
   startedAt: number;
   endedAt: number;
   actualSeconds: number;             // seconds actively practicing (not paused)
+};
+
+type SessionCategoryFeedback = {
+  categoryId: CategoryId;
+  /** 1 = Rough, 2 = Struggled, 3 = OK, 4 = Solid, 5 = Great */
+  rating: 1 | 2 | 3 | 4 | 5;
 };
 ```
 
@@ -863,3 +960,4 @@ Full flagship is ~4–6 months of work sequenced into named slices. **The detail
 |---|---|
 | 2026-06-29 | v0.1 — Initial design pass. Scoped as cross-module routine layer targeting v2 milestone. |
 | 2026-07-14 | **v0.2 flagship rewrite.** Promoted from v2 to v1. Scope expanded significantly: added AI Coach (BYOK Anthropic + OpenAI, Passive / Active modes, chat + shortcuts UI, Standard / Deep+Evolving profile), first-class Songs library, methodology library (6–8 entries), category taxonomy (10 built-ins + user extras), auto-tracked practice sessions, dedicated Reports tab with heatmap / streak / header chip, cloud sync via Supabase, 5-tab module structure, 3-step onboarding wizard. 23 design decisions locked via user interview. Existing v0.1 concepts (RoutineItem discriminated union, Launcher / Composer / Renderer pattern, resume mid-routine) retained. |
+| 2026-07-22 | **v0.3 self-rated proficiency levels.** Added a lightweight v1 proficiency system per user request: 5 stage-based levels per category (Exploring / Developing / Comfortable / Fluent / Teaching) + N/A + optional target level per category. Users self-rate; the app never grades automatically. AI Coach reads current-vs-target gap to weight routines. Reports gain a per-category level chip grid + timeline of significant level events + recent vibe-check trend. End-of-routine offers a single-tap per-category "How'd it go?" rating (1–5). Onboarding wizard gains an optional Step 2.5 for level self-assessment. Data model adds `ProficiencyLevel`, `CategoryLevel`, and `SessionCategoryFeedback` types. Estimated build extended by ~1–2 weeks (~4.5–6.5 months total). Full automated grading + adaptive progression + assessment routines + level curricula deferred to v2 (see [`MY-PRACTICE-V2-BACKLOG.md`](./MY-PRACTICE-V2-BACKLOG.md)). |
