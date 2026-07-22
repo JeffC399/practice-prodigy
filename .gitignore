@@ -62,3 +62,4 @@ Desktop.ini
 
 # Claude / agent scratch (if any)
 .claude/local-cache/
+.secrets/
