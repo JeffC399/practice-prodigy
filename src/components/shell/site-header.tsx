@@ -10,6 +10,7 @@ import {
   STATUS_LABELS,
   type ModuleEntry,
 } from "@/lib/modules/registry";
+import { AccountChip } from "./account-chip";
 
 /**
  * Persistent shell header — sticky bar at the very top of every screen.
@@ -42,7 +43,16 @@ export function SiteHeader() {
           Practice Prodigy
         </span>
       </Link>
-      <ModuleSwitcher current={current} />
+      {/* Phase 80 (Slice A.2) — AccountChip sits LEFT of the module
+          switcher on the right side of the header. Same visual language
+          (small border, hover tint). Signed-out users see a tiny
+          "Sign in" pill; signed-in users see an initial-in-circle
+          avatar + dropdown with Sign out. Loads its state via
+          useUser() which subscribes to Supabase auth changes. */}
+      <div className="flex items-center gap-2">
+        <AccountChip />
+        <ModuleSwitcher current={current} />
+      </div>
     </header>
   );
 }
