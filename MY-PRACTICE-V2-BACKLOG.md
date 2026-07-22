@@ -358,6 +358,16 @@ Mic input during practice → real-time evaluation.
 
 ~8+ weeks per module (bass first, then voice, then guitar).
 
+### Chords module integration (day-1 when this ships)
+
+The Chords module (`CHORDS-DESIGN.md` v0.1) ships v1 as silent + metronome only. When the audio-analysis slice lands here, Chords is a first-class integration target:
+
+- **Rhythm-only feedback** — detect strum onsets, validate timing vs metronome. Useful even without pitch detection.
+- **Monophonic listening** — user arpeggiates the chord one note at a time; app validates each pitch using the Tuner's autocorrelation. Ships as a "Test Arp" toggle inside Chords drill.
+- **Polyphonic listening** — validate that the strummed chord contains the expected pitches. Hardest sub-slice; ships last.
+
+Chords data model already carries the info needed (`Voicing.chord` for expected pitches + `Voicing.frets` for validation) — no schema changes required in Chords when this slice lands.
+
 ---
 
 ## 10. Instrument Selector (Multi-Instrument Support)

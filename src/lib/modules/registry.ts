@@ -4,6 +4,7 @@ import {
   Ear,
   Eye,
   FileMusic,
+  Guitar,
   KeyRound,
   ListMusic,
   Mic,
@@ -145,6 +146,16 @@ export const MODULES: ModuleEntry[] = [
       "Drill scales (major, modes, pentatonic, blues, harmonic/melodic minor, whole tone, diminished, chromatic) across a user-built pool of scale × key combos. Instrument-neutral: silent + metronome only. See PROJECT-DESIGN.md §11 Phase 62.",
     icon: ListMusic,
     routeMatch: (p) => p.startsWith("/practice/scales"),
+  },
+  {
+    id: "chords",
+    name: "Chords",
+    shortName: "Chords",
+    status: "designed",
+    bucket: "next",
+    description:
+      "Drill chord voicings on guitar. Six built-in pattern systems (open chords, CAGED major/minor triads, barre shapes, diatonic 7ths, drop-2 voicings) + custom pattern authoring (interactive fretboard editor + tab-text). Practice/Test modes; silent + metronome only in v1. See CHORDS-DESIGN.md v0.1. Ships after My Practice Slice B.",
+    icon: Guitar,
   },
   {
     id: "theory",

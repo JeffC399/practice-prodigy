@@ -225,7 +225,7 @@ create policy "own sessions" on practice_sessions for all using (auth.uid() = us
 - User can navigate `/my-practice` and see the Routines tab (default landing).
 - User can click **+ Build routine**, name it, add items via a type picker, drag-reorder, save.
 - Item types supported: drill, key-drill, scale-drill, metronome, leadsheet, rest, custom.
-- Item types NOT supported yet: song (Slice C), ear-training (future module).
+- Item types NOT supported yet: song (Slice C), chord-drill (Chords module, ships after Slice B; see CHORDS-DESIGN.md), ear-training (future module).
 - User can launch a routine → enters full-screen practice mode → walks through items → sees end-of-routine summary.
 - Drill items take over the drill's own screen with a "Routine: item 3 of 7" chip in the top-right.
 - Space bar starts/stops the current item's play surface (same shortcut convention).
