@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { CustomCategory } from "@/lib/practice/categories";
+import type { CategoryId, CustomCategory } from "@/lib/practice/categories";
+import type {
+  CategoryProficiency,
+  LevelChangeLogEntry,
+  ProficiencyLevel,
+} from "@/lib/practice/proficiency";
 import type { ChordNotationStyle } from "@/lib/music/render-chord";
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -341,6 +346,24 @@ export type UserPrefs = {
    * ids use the `custom:` prefix so they never collide with built-ins.
    */
   customCategories: CustomCategory[];
+  /**
+   * Slice A.14 (Phase 95) — Self-rated proficiency per category.
+   * See ROUTINE-DESIGN.md §4.3. Only categories the user has
+   * explicitly rated appear here; categories without an entry are
+   * treated as "unrated" (no level shown, no AI weighting).
+   * Keyed by CategoryId so lookups are O(1).
+   *
+   * Managed via a Profile → Levels UI in Slice E (v1 self-rated
+   * only; automated grading is v2 backlog).
+   */
+  proficiency: Record<CategoryId, CategoryProficiency>;
+  /**
+   * Slice A.14 (Phase 95) — Append-only log of level changes for
+   * Reports' progression narratives ("Ear Training: Level 2 → 3 ·
+   * Sep 12"). Bounded locally to the most recent N entries; full
+   * history lives in the cloud (or is derivable at query time).
+   */
+  levelHistory: LevelChangeLogEntry[];
 };
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
@@ -369,7 +392,12 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   cornerRadius: "normal",
   highContrast: false,
   customCategories: [],
+  proficiency: {},
+  levelHistory: [],
 };
+
+/** Local cap on retained level-history entries. Cloud is the source of truth. */
+const MAX_LOCAL_LEVEL_HISTORY = 500;
 
 /**
  * Phase 34.2 — every appearance-only field. Used by:
@@ -485,6 +513,31 @@ type UserPrefsStore = UserPrefs & {
   applyAppearanceSlice: (slice: Partial<AppearanceSlice>) => void;
   /** Phase 34.2 — apply a preset mood by name. */
   applyMood: (mood: AppearanceMood) => void;
+  /**
+   * Slice A.14 (Phase 95) — Set (or update) a category's current
+   * proficiency level. Appends a LevelChangeLogEntry when the level
+   * actually changes (skips log write on no-op).
+   */
+  setCategoryLevel: (
+    categoryId: CategoryId,
+    level: ProficiencyLevel,
+  ) => void;
+  /**
+   * Slice A.14 (Phase 95) — Set (or clear with `undefined`) a
+   * category's target aspiration level. Independent of current
+   * level; can be set even for categories with no current rating.
+   */
+  setCategoryTarget: (
+    categoryId: CategoryId,
+    target: 1 | 2 | 3 | 4 | 5 | undefined,
+  ) => void;
+  /**
+   * Slice A.14 (Phase 95) — Remove a category's proficiency entry
+   * entirely (as opposed to setting current=n/a, which is a
+   * different signal — "I've considered this and it doesn't apply
+   * to me"). Used by category-delete flows and Settings reset.
+   */
+  clearCategoryProficiency: (categoryId: CategoryId) => void;
 };
 
 export const useUserPrefs = create<UserPrefsStore>()(
@@ -553,6 +606,56 @@ export const useUserPrefs = create<UserPrefsStore>()(
         }),
       applyAppearanceSlice: (slice) => set(slice),
       applyMood: (mood) => set(APPEARANCE_MOOD_PRESETS[mood]),
+      setCategoryLevel: (categoryId, level) =>
+        set((state) => {
+          const now = Date.now();
+          const existing = state.proficiency[categoryId];
+          const from: ProficiencyLevel = existing?.current ?? "n/a";
+          const noChange = existing?.current === level;
+          const nextProficiency: Record<CategoryId, CategoryProficiency> = {
+            ...state.proficiency,
+            [categoryId]: {
+              categoryId,
+              current: level,
+              target: existing?.target,
+              updatedAt: now,
+            },
+          };
+          if (noChange) {
+            return { proficiency: nextProficiency };
+          }
+          const nextHistory = [
+            ...state.levelHistory,
+            { categoryId, from, to: level, at: now },
+          ];
+          const capped =
+            nextHistory.length > MAX_LOCAL_LEVEL_HISTORY
+              ? nextHistory.slice(nextHistory.length - MAX_LOCAL_LEVEL_HISTORY)
+              : nextHistory;
+          return { proficiency: nextProficiency, levelHistory: capped };
+        }),
+      setCategoryTarget: (categoryId, target) =>
+        set((state) => {
+          const existing = state.proficiency[categoryId];
+          return {
+            proficiency: {
+              ...state.proficiency,
+              [categoryId]: {
+                categoryId,
+                current: existing?.current ?? "n/a",
+                target,
+                updatedAt: Date.now(),
+              },
+            },
+          };
+        }),
+      clearCategoryProficiency: (categoryId) =>
+        set((state) => {
+          if (!state.proficiency[categoryId]) return state;
+          const next = { ...state.proficiency };
+          delete next[categoryId];
+          return { proficiency: next };
+        }),
     }),
     {
       name: "practice-prodigy:user-prefs:v1",
