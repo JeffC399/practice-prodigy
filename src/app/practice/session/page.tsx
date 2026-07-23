@@ -32,6 +32,7 @@ import { useDrillsLibrary } from "@/lib/state/drills-library";
 import { SHIPPED_DRILLS } from "@/lib/data/shipped-drills";
 import { useResumeSession } from "@/lib/state/resume-session";
 import { useUserPrefs } from "@/lib/state/user-prefs";
+import { useSessionTracker } from "@/lib/tracking/session-tracker";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Minus,
@@ -613,6 +614,22 @@ export default function PracticeSessionPage() {
     state.measureInSession,
     activeSequence,
   ]);
+
+  // Slice A.7 (Phase 87) — Heartbeat into the central session tracker
+  // whenever the drill is actively playing. Fires on entry to `isPlaying`
+  // and on every play-measure downbeat thereafter. The tracker
+  // rate-limits internal writes to one per 5s per (module, itemId), so
+  // firing on every downbeat (1–4 Hz depending on tempo) is cheap. The
+  // tracker handles session-start detection, item accumulation, and
+  // 5-min inactivity auto-end centrally — this file just reports
+  // "arpeggios drill still playing" every measure.
+  useEffect(() => {
+    if (!isPlaying) return;
+    useSessionTracker.getState().reportActivity({
+      module: "arpeggios",
+      itemId: config.loadedDrillId ?? undefined,
+    });
+  }, [isPlaying, state.measureInSession, config.loadedDrillId]);
 
   // Reset the per-session saved-measure tracker whenever the engine
   // returns to idle (either user-pressed Stop or natural end) so the
