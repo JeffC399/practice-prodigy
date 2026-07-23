@@ -244,6 +244,11 @@ export type ScaleDrill = {
   lastLoadedAt?: number;
   /** True when the drill came from STARTER_TEMPLATES (built-in library). */
   isStarter?: boolean;
+  /**
+   * Slice A.10 (Phase 90) — Per-drill category override for the
+   * session tracker. See KeyDrill.category for details.
+   */
+  category?: string;
 };
 
 /** Fresh drill id generator. */

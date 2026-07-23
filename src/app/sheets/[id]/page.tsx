@@ -64,20 +64,21 @@ export default function SheetViewPage() {
   }, []);
 
   // Slice A.8 (Phase 88) — Central session tracker heartbeat while
-  // this sheet plays back. Unlike drilling modules with per-beat
-  // ticks, LSB playback is a fire-and-forget promise; we heartbeat
-  // once on play-start then every 30s until playback ends. Attributes
-  // time to the "repertoire" category via MODULE_DEFAULT_CATEGORY.
+  // this sheet plays back. Slice A.10 (Phase 90) — Pass sheet's
+  // per-item category override when set; falls back to
+  // MODULE_DEFAULT_CATEGORY["lsb-playback"] ("repertoire").
   useEffect(() => {
     if (!isPlaying || !id) return;
     const report = () =>
-      useSessionTracker
-        .getState()
-        .reportActivity({ module: "lsb-playback", itemId: id });
+      useSessionTracker.getState().reportActivity({
+        module: "lsb-playback",
+        itemId: id,
+        category: sheet?.category,
+      });
     report();
     const handle = setInterval(report, 30 * 1000);
     return () => clearInterval(handle);
-  }, [isPlaying, id]);
+  }, [isPlaying, id, sheet?.category]);
 
   if (!mounted) {
     return (

@@ -31,6 +31,11 @@ type KeyDrillsLibraryStore = {
     meta: { name?: string; notes?: string },
   ) => void;
   renameDrill: (id: string, name: string) => void;
+  /**
+   * Slice A.10 (Phase 90) — Set (or clear with `undefined`) the
+   * per-drill category override.
+   */
+  setDrillCategory: (id: string, category: string | undefined) => void;
   /** Stamp lastLoadedAt — call when the user launches a drill. */
   markDrillLoaded: (id: string) => void;
   /** Duplicate an existing drill; returns the new id or null on miss. */
@@ -112,6 +117,12 @@ export const useKeyDrillsLibrary = create<KeyDrillsLibraryStore>()(
             d.id === id
               ? { ...d, name: name.trim() || d.name, updatedAt: Date.now() }
               : d,
+          ),
+        })),
+      setDrillCategory: (id, category) =>
+        set((state) => ({
+          drills: state.drills.map((d) =>
+            d.id === id ? { ...d, category, updatedAt: Date.now() } : d,
           ),
         })),
       markDrillLoaded: (id) =>

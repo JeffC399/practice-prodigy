@@ -9,6 +9,7 @@ import { useMetronome } from "@/lib/audio/use-metronome";
 import { keyDisplay, keySpokenForm } from "@/lib/key-sequencer/display";
 import { buildKeySequence } from "@/lib/key-sequencer/sequencer";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
+import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
 import {
   cancelVoiceAnnounce,
   speakUpcoming,
@@ -224,17 +225,28 @@ export default function KeySequencerSessionPage() {
   ]);
 
   // Slice A.8 (Phase 88) — Heartbeat into the central session tracker
-  // while playing. Same pattern as the Arpeggios drill session; fires on
-  // isPlaying entry and per-measure downbeat. Tracker rate-limits to one
-  // write per 5s per (module, itemId) so this is cheap. Attributes time
-  // to the "technique" category via MODULE_DEFAULT_CATEGORY.
+  // while playing. Fires on isPlaying entry and per-measure downbeat.
+  // Slice A.10 (Phase 90) — Look up the current drill from the library
+  // so we can pass its per-item category override; falls back to
+  // MODULE_DEFAULT_CATEGORY["key-sequencer"] ("technique").
+  const currentKeyDrill = useKeyDrillsLibrary((s) =>
+    config.loadedKeyDrillId
+      ? s.drills.find((d) => d.id === config.loadedKeyDrillId) ?? null
+      : null,
+  );
   useEffect(() => {
     if (!isPlaying) return;
     useSessionTracker.getState().reportActivity({
       module: "key-sequencer",
       itemId: config.loadedKeyDrillId ?? undefined,
+      category: currentKeyDrill?.category,
     });
-  }, [isPlaying, state.measureInSession, config.loadedKeyDrillId]);
+  }, [
+    isPlaying,
+    state.measureInSession,
+    config.loadedKeyDrillId,
+    currentKeyDrill?.category,
+  ]);
 
   // Cancel any pending utterance whenever the drill stops OR the
   // component unmounts.

@@ -108,6 +108,13 @@ export type CustomPattern = {
   lengthInMeasures: number;
   createdAt: number;
   updatedAt: number;
+  /**
+   * Slice A.10 (Phase 90) — Per-pattern category override for the
+   * session tracker. When a drill uses this pattern, its practice
+   * time can attribute to this category instead of the drill's own
+   * category. Rarely set; most users tag at the drill level.
+   */
+  category?: string;
 };
 
 /** Allowed values for the editor's length picker. v1 sticks to powers of 2. */

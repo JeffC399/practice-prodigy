@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { useScaleDrillConfig } from "@/lib/scale-driller/config-store";
+import { useScaleDrillsLibrary } from "@/lib/scale-driller/library-store";
 import {
   scaleInstanceDisplay,
   scaleSecondaryTokens,
@@ -109,14 +110,26 @@ export default function ScaleDrillerSessionPage() {
   }, [isPlaying, isCountIn, handleStop, handleStart]);
 
   // Slice A.8 (Phase 88) — Central session tracker heartbeat while
-  // playing. Same pattern as Arpeggios + Key Sequencer.
+  // playing. Slice A.10 (Phase 90) — Pass per-drill category override
+  // when set; falls back to MODULE_DEFAULT_CATEGORY["scale-driller"].
+  const currentScaleDrill = useScaleDrillsLibrary((s) =>
+    config.loadedScaleDrillId
+      ? s.drills.find((d) => d.id === config.loadedScaleDrillId) ?? null
+      : null,
+  );
   useEffect(() => {
     if (!isPlaying) return;
     useSessionTracker.getState().reportActivity({
       module: "scale-driller",
       itemId: config.loadedScaleDrillId ?? undefined,
+      category: currentScaleDrill?.category,
     });
-  }, [isPlaying, state.measureInSession, config.loadedScaleDrillId]);
+  }, [
+    isPlaying,
+    state.measureInSession,
+    config.loadedScaleDrillId,
+    currentScaleDrill?.category,
+  ]);
 
   // Live tempo updates during drill (matches Arpeggios / Key Sequencer).
   const bumpBpm = (delta: number) => {

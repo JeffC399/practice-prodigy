@@ -230,17 +230,20 @@ export default function SheetEditorPage() {
   }, []);
 
   // Slice A.8 (Phase 88) — Central session tracker heartbeat during
-  // in-editor playback. Same pattern as the read-only sheet view page.
+  // in-editor playback. Slice A.10 (Phase 90) — Pass sheet's per-item
+  // category override when set.
   useEffect(() => {
     if (!isPlaying || !id) return;
     const report = () =>
-      useSessionTracker
-        .getState()
-        .reportActivity({ module: "lsb-playback", itemId: id });
+      useSessionTracker.getState().reportActivity({
+        module: "lsb-playback",
+        itemId: id,
+        category: sheet?.category,
+      });
     report();
     const handle = setInterval(report, 30 * 1000);
     return () => clearInterval(handle);
-  }, [isPlaying, id]);
+  }, [isPlaying, id, sheet?.category]);
   const [lyricCursor, setLyricCursor] = useState<LyricCursor | null>(null);
   const [lyricDraft, setLyricDraft] = useState("");
   const [surfaceLayout, setSurfaceLayout] =

@@ -26,6 +26,11 @@ type ScaleDrillsLibraryStore = {
     meta: { name?: string; notes?: string },
   ) => void;
   renameDrill: (id: string, name: string) => void;
+  /**
+   * Slice A.10 (Phase 90) — Set (or clear with `undefined`) the
+   * per-drill category override.
+   */
+  setDrillCategory: (id: string, category: string | undefined) => void;
   markDrillLoaded: (id: string) => void;
   duplicateDrill: (id: string) => string | null;
   deleteDrill: (id: string) => void;
@@ -84,6 +89,12 @@ export const useScaleDrillsLibrary = create<ScaleDrillsLibraryStore>()(
             d.id === id
               ? { ...d, name: name.trim() || d.name, updatedAt: Date.now() }
               : d,
+          ),
+        })),
+      setDrillCategory: (id, category) =>
+        set((state) => ({
+          drills: state.drills.map((d) =>
+            d.id === id ? { ...d, category, updatedAt: Date.now() } : d,
           ),
         })),
       markDrillLoaded: (id) =>

@@ -619,17 +619,23 @@ export default function PracticeSessionPage() {
   // whenever the drill is actively playing. Fires on entry to `isPlaying`
   // and on every play-measure downbeat thereafter. The tracker
   // rate-limits internal writes to one per 5s per (module, itemId), so
-  // firing on every downbeat (1–4 Hz depending on tempo) is cheap. The
-  // tracker handles session-start detection, item accumulation, and
-  // 5-min inactivity auto-end centrally — this file just reports
-  // "arpeggios drill still playing" every measure.
+  // firing on every downbeat (1–4 Hz depending on tempo) is cheap.
+  // Slice A.10 (Phase 90) — Pass the drill's per-item category
+  // override when set; the tracker falls back to
+  // MODULE_DEFAULT_CATEGORY.arpeggios ("technique") otherwise.
   useEffect(() => {
     if (!isPlaying) return;
     useSessionTracker.getState().reportActivity({
       module: "arpeggios",
       itemId: config.loadedDrillId ?? undefined,
+      category: currentDrill?.category,
     });
-  }, [isPlaying, state.measureInSession, config.loadedDrillId]);
+  }, [
+    isPlaying,
+    state.measureInSession,
+    config.loadedDrillId,
+    currentDrill?.category,
+  ]);
 
   // Reset the per-session saved-measure tracker whenever the engine
   // returns to idle (either user-pressed Stop or natural end) so the

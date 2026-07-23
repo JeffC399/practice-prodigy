@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { CategoryId } from "@/lib/practice/categories";
 import type { PracticeConfig } from "./practice-config";
 
 /**
@@ -28,6 +29,13 @@ export type Drill = {
    * "never launched yet" — those drills sort to the bottom.
    */
   lastLoadedAt?: number;
+  /**
+   * Slice A.10 (Phase 90) — Per-drill category override for the
+   * session tracker. When set, this drill's practice time attributes
+   * to the chosen category. When absent, falls back to
+   * MODULE_DEFAULT_CATEGORY.arpeggios ("technique").
+   */
+  category?: CategoryId;
 };
 
 type DrillsLibraryStore = {
@@ -40,6 +48,12 @@ type DrillsLibraryStore = {
     meta: { name?: string; notes?: string },
   ) => void;
   renameDrill: (id: string, name: string) => void;
+  /**
+   * Slice A.10 (Phase 90) — Set (or clear with `undefined`) the
+   * per-drill category override. Bumps updatedAt so cloud sync
+   * (Slice A.5) picks up the change.
+   */
+  setDrillCategory: (id: string, category: CategoryId | undefined) => void;
   /** Stamp lastLoadedAt — call when the user launches a drill. */
   markDrillLoaded: (id: string) => void;
   /**
@@ -109,6 +123,14 @@ export const useDrillsLibrary = create<DrillsLibraryStore>()(
           drills: state.drills.map((d) =>
             d.id === id
               ? { ...d, name: name.trim() || d.name, updatedAt: Date.now() }
+              : d,
+          ),
+        })),
+      setDrillCategory: (id, category) =>
+        set((state) => ({
+          drills: state.drills.map((d) =>
+            d.id === id
+              ? { ...d, category, updatedAt: Date.now() }
               : d,
           ),
         })),

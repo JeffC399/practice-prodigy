@@ -434,6 +434,13 @@ export type Sheet = {
   updatedAt: number;
   /** Last time the sheet was opened. */
   lastOpenedAt?: number;
+  /**
+   * Slice A.10 (Phase 90) — Per-sheet category override for the
+   * session tracker. When set, playback time attributes to the chosen
+   * category. Absent falls back to MODULE_DEFAULT_CATEGORY["lsb-playback"]
+   * ("repertoire"). Typed as `string` to match CategoryId.
+   */
+  category?: string;
 };
 
 /**

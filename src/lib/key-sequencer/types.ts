@@ -162,6 +162,15 @@ export type KeyDrill = {
    * strips this flag so the copy becomes a user drill.
    */
   isStarter?: boolean;
+  /**
+   * Slice A.10 (Phase 90) — Per-drill category override for the
+   * session tracker. When set, this drill's practice time attributes
+   * to the chosen category. When absent, falls back to
+   * MODULE_DEFAULT_CATEGORY["key-sequencer"] ("technique"). Typed as
+   * `string` to match the CategoryId shape (avoids a cross-module
+   * type import in this leaf file).
+   */
+  category?: string;
 };
 
 /** Fresh drill id generator. */
