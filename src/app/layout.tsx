@@ -7,6 +7,7 @@ import { ServiceWorkerRegister } from "@/components/shell/service-worker-registe
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
 import { SkipLink } from "@/components/shell/skip-link";
+import { SyncBoot } from "@/components/shell/sync-boot";
 import { ThemeApplicator } from "@/components/shell/theme-applicator";
 import "./globals.css";
 
@@ -92,6 +93,7 @@ export default function RootLayout({
         <SiteHeader />
         {children}
         <SiteFooter />
+        <SyncBoot />
         <MigrationPrompt />
         <ServiceWorkerRegister />
       </body>
