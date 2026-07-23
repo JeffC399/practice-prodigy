@@ -66,20 +66,22 @@ While you're on the dev project dashboard:
 
 **Step 2B.1**. In the left sidebar, click the **gear/settings icon** (near the bottom).
 
-**Step 2B.2**. Click **"API"** in the settings sub-menu.
+**Step 2B.2**. Click **"API Keys"** in the settings sub-menu.
 
 **Step 2B.3**. You'll see a page with several key pieces. Copy these into a notes file — you'll need them in Part 4:
 
-- **Project URL** — looks like `https://abcdefghij.supabase.co`. Copy the whole URL.
-- **`anon public` API key** — a long string starting with `eyJ...`. This is safe to expose in the browser. Copy the whole thing.
-- **`service_role secret` API key** — another long `eyJ...` string. **This one is SECRET and gives full admin access to your database.** Copy it, but treat it like a password — never paste it anywhere public.
+- **Project URL** — looks like `https://abcdefghij.supabase.co`. Copy the whole URL. Found under the "General" settings tab.
+- **`publishable` API key** — a string starting with `sb_publishable_…`. This is safe to expose in the browser (it's the browser-facing key that Row-Level Security policies protect against). Copy the whole thing.
+- **`secret` API key** — a string starting with `sb_secret_…`. **This one is SECRET and gives full admin access to your database, bypassing Row-Level Security.** Copy it, but treat it like a password — never paste it anywhere public.
+
+> **Note on key format (updated 2026-07 / Phase 83):** Supabase migrated from JWT-format keys (`anon` / `service_role`, both starting with `eyJ…`) to a new format (`sb_publishable_…` / `sb_secret_…`) that's easier to rotate individually. Legacy JWT keys auto-disable after ~90 days of project inactivity. The app uses the new format everywhere. If you see legacy keys in your project's API Keys page, they still work (dashboard toggle re-enables them) — but new projects should use `sb_…` from day one.
 
 Label these in your notes:
 
 ```
 SUPABASE_DEV_URL: https://abcdefghij.supabase.co
-SUPABASE_DEV_ANON: eyJ...
-SUPABASE_DEV_SERVICE_ROLE: eyJ...   <-- SECRET
+SUPABASE_DEV_PUBLISHABLE: sb_publishable_…
+SUPABASE_DEV_SECRET: sb_secret_…   <-- SECRET
 ```
 
 ### Part 2C — Create the PROD project
@@ -106,8 +108,8 @@ Same drill as Part 2B, on the prod project:
 
 ```
 SUPABASE_PROD_URL: https://klmnopqrst.supabase.co
-SUPABASE_PROD_ANON: eyJ...
-SUPABASE_PROD_SERVICE_ROLE: eyJ...   <-- SECRET
+SUPABASE_PROD_PUBLISHABLE: sb_publishable_…
+SUPABASE_PROD_SECRET: sb_secret_…   <-- SECRET
 ```
 
 You now have 6 pieces of information total (3 per project × 2 projects). Save these in a password manager if you have one.
@@ -170,10 +172,10 @@ Add these six:
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | your DEV project URL from Part 2B | Development, Preview |
 | `NEXT_PUBLIC_SUPABASE_URL` | your PROD project URL from Part 2D | Production |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your DEV `anon` key | Development, Preview |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your PROD `anon` key | Production |
-| `SUPABASE_SERVICE_ROLE_KEY` | your DEV `service_role` key | Development, Preview |
-| `SUPABASE_SERVICE_ROLE_KEY` | your PROD `service_role` key | Production |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | your DEV `publishable` key (`sb_publishable_…`) | Development, Preview |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | your PROD `publishable` key | Production |
+| `SUPABASE_SECRET_KEY` | your DEV `secret` key (`sb_secret_…`) | Development, Preview |
+| `SUPABASE_SECRET_KEY` | your PROD `secret` key | Production |
 
 Notice: same variable name, different value per environment. Vercel supports this — when Vercel builds a Production deploy, it'll use the Production value; when it builds a Preview deploy (like a preview URL from a git push), it'll use the Preview value.
 
@@ -225,9 +227,13 @@ The Production value is `true` when it should be `false`. Go to Vercel → Setti
 
 Go to Supabase → project → Settings → Database → "Reset database password". Generate a new one, save to your password manager.
 
-### I lost my `service_role` key
+### I lost my `secret` key
 
-Go to Supabase → project → Settings → API → click "Reset service_role key". Generate a new one. Update the Vercel env var. **Important**: this invalidates the old key immediately, so any live functions using the old key will break until you redeploy Vercel.
+Go to Supabase → project → Settings → API Keys → click "Rotate secret key". Generate a new one. Update the `SUPABASE_SECRET_KEY` env var on Vercel (all three environments) and in your local `.env.local`. **Important**: this invalidates the old key immediately, so any live functions using the old key will 401 until you redeploy Vercel.
+
+### The app 401s in production but works locally
+
+Prod's legacy API keys may be disabled. Fix: Supabase → project → Settings → API Keys → check that legacy keys are disabled (that's fine). Confirm both env vars in Vercel Production use the `sb_publishable_…` / `sb_secret_…` format, not the old JWT (`eyJ…`) format.
 
 ---
 

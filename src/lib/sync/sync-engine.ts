@@ -1,7 +1,16 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import type { Database, Json } from "@/lib/supabase/database.types";
 import type { LocalRow, SyncAdapter, SyncStatus, SyncableRow } from "./types";
+
+/**
+ * Union of all syncable table names in the Supabase schema. Adapters
+ * declare `tableName` as a plain `string` for API ergonomics, so we
+ * narrow to this union at the `.from()` boundary. Extending the
+ * schema (Slice B/C) automatically extends this union.
+ */
+type SyncableTableName = keyof Database["public"]["Tables"];
 
 /**
  * Sync engine — Slice A.3 (Phase 81).
@@ -96,17 +105,28 @@ export function createSyncEngine<TData = unknown>(
       // Upsert each row. Postgres handles ON CONFLICT via primary key
       // (id). Batched as one call for efficiency.
       //
-      // The `as any` cast bridges the placeholder Database type
-      // (src/lib/supabase/database.types.ts) — which doesn't know
-      // about our tables yet — to Supabase's generic table builder.
-      // Slice A.5 regenerates database.types.ts from the real
-      // migrations and this cast can come out.
+      // The `as never` bridge here tells TS "trust the runtime string
+      // matches one of the real tables" — adapter.tableName is typed
+      // `string` (adapter-driven), so Supabase's generic .from() can't
+      // narrow to a single table. Every syncable table in
+      // database.types.ts has the same 4-column shape, so the payload
+      // is always structurally valid.
       if (wireRows.length > 0) {
-        const payload = wireRows.map((r) => ({ ...r, user_id: userId }));
+        // userId is proven non-null by the guard at doPush's top; the
+        // closure loses that narrowing so we re-assert with `!` here.
+        // data casts to Json because adapter state is TData=unknown at
+        // the engine level; the DB column is jsonb and the store
+        // owner is responsible for keeping shapes JSON-serializable.
+        const uid = userId!;
+        const payload = wireRows.map((r) => ({
+          id: r.id,
+          data: r.data as Json,
+          updated_at: r.updated_at,
+          user_id: uid,
+        }));
         const { error } = await supabase
-          .from(adapter.tableName)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .upsert(payload as any, { onConflict: "id" });
+          .from(adapter.tableName as SyncableTableName)
+          .upsert(payload, { onConflict: "id" });
         if (error) throw error;
       }
       setStatus("idle");
@@ -125,11 +145,11 @@ export function createSyncEngine<TData = unknown>(
     setStatus("syncing");
     try {
       const { data, error } = await supabase
-        .from(adapter.tableName)
+        .from(adapter.tableName as SyncableTableName)
         .select("id, data, updated_at")
         .eq("user_id", userId);
       if (error) throw error;
-      const rows: LocalRow<TData>[] = (data ?? []).map((r: SyncableRow) => ({
+      const rows: LocalRow<TData>[] = (data ?? []).map((r) => ({
         id: r.id,
         data: r.data as TData,
         updatedAt: new Date(r.updated_at).getTime(),

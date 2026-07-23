@@ -24,7 +24,7 @@ export async function createClient() {
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -47,22 +47,21 @@ export async function createClient() {
 }
 
 /**
- * Admin client — server-only. Uses SUPABASE_SERVICE_ROLE_KEY, which
- * bypasses Row-Level Security. USE WITH CARE. Only call from server
- * code that has already authenticated + authorized the request; never
- * expose this client's methods through user-controlled API surfaces
- * without careful gating.
+ * Admin client — server-only. Uses SUPABASE_SECRET_KEY (formerly named
+ * SUPABASE_SERVICE_ROLE_KEY), which bypasses Row-Level Security. USE
+ * WITH CARE. Only call from server code that has already authenticated
+ * + authorized the request; never expose this client's methods through
+ * user-controlled API surfaces without careful gating.
  *
- * For A.1, we don't need admin operations yet, but the export is in
- * place so Slice A follow-ups (migrations, seed data, admin ops) can
- * import it without re-plumbing.
+ * Slice A follow-ups (migrations, seed data, admin ops) can import
+ * this without re-plumbing.
  */
 export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) {
     throw new Error(
-      "createAdminClient requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
+      "createAdminClient requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY.",
     );
   }
   return createServerClient<Database>(url, key, {

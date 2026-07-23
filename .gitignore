@@ -63,3 +63,7 @@ Desktop.ini
 # Claude / agent scratch (if any)
 .claude/local-cache/
 .secrets/
+
+# Supabase CLI local cache (project ref, versions, migration state)
+supabase/.temp/
+supabase/.branches/
