@@ -119,6 +119,7 @@ import { SelectionOverlay } from "@/components/sheets/selection-overlay";
 import { ShareModal } from "@/components/sheets/share-modal";
 import { ShortcutsOverlay } from "@/components/sheets/shortcuts-overlay";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
+import { useSessionTracker } from "@/lib/tracking/session-tracker";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
 
@@ -227,6 +228,19 @@ export default function SheetEditorPage() {
       sheetPlayback.cancel();
     };
   }, []);
+
+  // Slice A.8 (Phase 88) — Central session tracker heartbeat during
+  // in-editor playback. Same pattern as the read-only sheet view page.
+  useEffect(() => {
+    if (!isPlaying || !id) return;
+    const report = () =>
+      useSessionTracker
+        .getState()
+        .reportActivity({ module: "lsb-playback", itemId: id });
+    report();
+    const handle = setInterval(report, 30 * 1000);
+    return () => clearInterval(handle);
+  }, [isPlaying, id]);
   const [lyricCursor, setLyricCursor] = useState<LyricCursor | null>(null);
   const [lyricDraft, setLyricDraft] = useState("");
   const [surfaceLayout, setSurfaceLayout] =

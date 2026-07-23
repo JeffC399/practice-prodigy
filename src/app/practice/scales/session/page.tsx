@@ -18,6 +18,7 @@ import {
   RANDOM_ORDERING_STRATEGIES,
 } from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
+import { useSessionTracker } from "@/lib/tracking/session-tracker";
 
 /**
  * Scale Driller drill screen — Phase 62.
@@ -106,6 +107,16 @@ export default function ScaleDrillerSessionPage() {
     if (isPlaying || isCountIn) handleStop();
     else handleStart();
   }, [isPlaying, isCountIn, handleStop, handleStart]);
+
+  // Slice A.8 (Phase 88) — Central session tracker heartbeat while
+  // playing. Same pattern as Arpeggios + Key Sequencer.
+  useEffect(() => {
+    if (!isPlaying) return;
+    useSessionTracker.getState().reportActivity({
+      module: "scale-driller",
+      itemId: config.loadedScaleDrillId ?? undefined,
+    });
+  }, [isPlaying, state.measureInSession, config.loadedScaleDrillId]);
 
   // Live tempo updates during drill (matches Arpeggios / Key Sequencer).
   const bumpBpm = (delta: number) => {

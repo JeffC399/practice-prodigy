@@ -27,6 +27,7 @@ import {
   type MetronomeVisualStyle,
 } from "@/lib/state/metronome-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
+import { useSessionTracker } from "@/lib/tracking/session-tracker";
 
 /**
  * Standalone Metronome page (Phase 21).
@@ -144,6 +145,17 @@ export default function MetronomePage() {
   useEffect(() => {
     if (engineState.isPlaying) standaloneMetronome.setBpm(bpm);
   }, [bpm, engineState.isPlaying]);
+
+  // Slice A.8 (Phase 88) — Central session tracker heartbeat. The
+  // metronome has no "saved drill" concept — every use is ad-hoc, so
+  // itemId is left undefined and the tracker keys as "metronome:adhoc".
+  // Fires on isPlaying entry and every currentBeat tick; tracker's
+  // 5s rate-limit collapses tick-frequency writes. Attributes to the
+  // "warmup" category via MODULE_DEFAULT_CATEGORY.
+  useEffect(() => {
+    if (!engineState.isPlaying) return;
+    useSessionTracker.getState().reportActivity({ module: "metronome" });
+  }, [engineState.isPlaying, engineState.currentBeat]);
 
   // Live volume updates always (so muting during play works).
   useEffect(() => {

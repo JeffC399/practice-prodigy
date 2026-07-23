@@ -17,6 +17,7 @@ import { PrintPolish } from "@/components/sheets/print-polish";
 import { ShareModal } from "@/components/sheets/share-modal";
 import { SheetSurface } from "@/components/sheets/sheet-surface";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
+import { useSessionTracker } from "@/lib/tracking/session-tracker";
 
 /**
  * /sheets/[id] — read-only display + print view.
@@ -61,6 +62,22 @@ export default function SheetViewPage() {
       sheetPlayback.cancel();
     };
   }, []);
+
+  // Slice A.8 (Phase 88) — Central session tracker heartbeat while
+  // this sheet plays back. Unlike drilling modules with per-beat
+  // ticks, LSB playback is a fire-and-forget promise; we heartbeat
+  // once on play-start then every 30s until playback ends. Attributes
+  // time to the "repertoire" category via MODULE_DEFAULT_CATEGORY.
+  useEffect(() => {
+    if (!isPlaying || !id) return;
+    const report = () =>
+      useSessionTracker
+        .getState()
+        .reportActivity({ module: "lsb-playback", itemId: id });
+    report();
+    const handle = setInterval(report, 30 * 1000);
+    return () => clearInterval(handle);
+  }, [isPlaying, id]);
 
   if (!mounted) {
     return (

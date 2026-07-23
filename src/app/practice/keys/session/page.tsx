@@ -19,6 +19,7 @@ import {
   RANDOM_ORDERING_STRATEGIES,
 } from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
+import { useSessionTracker } from "@/lib/tracking/session-tracker";
 
 /**
  * Key Sequencer drill screen — Phase 45.2.
@@ -221,6 +222,19 @@ export default function KeySequencerSessionPage() {
     config.keyOrdering,
     lastAnnouncedStep,
   ]);
+
+  // Slice A.8 (Phase 88) — Heartbeat into the central session tracker
+  // while playing. Same pattern as the Arpeggios drill session; fires on
+  // isPlaying entry and per-measure downbeat. Tracker rate-limits to one
+  // write per 5s per (module, itemId) so this is cheap. Attributes time
+  // to the "technique" category via MODULE_DEFAULT_CATEGORY.
+  useEffect(() => {
+    if (!isPlaying) return;
+    useSessionTracker.getState().reportActivity({
+      module: "key-sequencer",
+      itemId: config.loadedKeyDrillId ?? undefined,
+    });
+  }, [isPlaying, state.measureInSession, config.loadedKeyDrillId]);
 
   // Cancel any pending utterance whenever the drill stops OR the
   // component unmounts.
