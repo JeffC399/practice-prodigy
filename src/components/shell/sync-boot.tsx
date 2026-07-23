@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { customPatternsSyncAdapter } from "@/lib/sync/adapters/custom-patterns";
 import { drillsSyncAdapter } from "@/lib/sync/adapters/drills";
 import { keyDrillsSyncAdapter } from "@/lib/sync/adapters/key-drills";
+import { practiceSessionsSyncAdapter } from "@/lib/sync/adapters/practice-sessions";
 import { scaleDrillsSyncAdapter } from "@/lib/sync/adapters/scale-drills";
 import { sheetsSyncAdapter } from "@/lib/sync/adapters/sheets";
 import { userPrefsSyncAdapter } from "@/lib/sync/adapters/user-prefs";
@@ -34,6 +35,7 @@ export function SyncBoot(): null {
     registerSyncAdapter(scaleDrillsSyncAdapter);
     registerSyncAdapter(sheetsSyncAdapter);
     registerSyncAdapter(customPatternsSyncAdapter);
+    registerSyncAdapter(practiceSessionsSyncAdapter);
   }, []);
   return null;
 }
