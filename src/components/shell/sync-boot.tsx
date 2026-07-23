@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { customPatternsSyncAdapter } from "@/lib/sync/adapters/custom-patterns";
+import { drillsSyncAdapter } from "@/lib/sync/adapters/drills";
+import { keyDrillsSyncAdapter } from "@/lib/sync/adapters/key-drills";
+import { scaleDrillsSyncAdapter } from "@/lib/sync/adapters/scale-drills";
+import { sheetsSyncAdapter } from "@/lib/sync/adapters/sheets";
 import { userPrefsSyncAdapter } from "@/lib/sync/adapters/user-prefs";
 import { registerSyncAdapter } from "@/lib/sync/sync-registry";
 
@@ -24,6 +29,11 @@ import { registerSyncAdapter } from "@/lib/sync/sync-registry";
 export function SyncBoot(): null {
   useEffect(() => {
     registerSyncAdapter(userPrefsSyncAdapter);
+    registerSyncAdapter(drillsSyncAdapter);
+    registerSyncAdapter(keyDrillsSyncAdapter);
+    registerSyncAdapter(scaleDrillsSyncAdapter);
+    registerSyncAdapter(sheetsSyncAdapter);
+    registerSyncAdapter(customPatternsSyncAdapter);
   }, []);
   return null;
 }

@@ -31,7 +31,9 @@ create policy "own rows" on <table_name>
 
 Why this shape:
 
-- **`id uuid`** — every row is uniquely addressable. Collection stores generate a random UUID per entity; singleton stores use `id = user_id`.
+- **`id`** — every row is uniquely addressable. Two variants:
+  - **Singleton tables** (profiles, user_prefs): `id uuid` where `id = user_id`. The primary key IS the user_id, ensuring one row per user.
+  - **Collection tables** (drills, sheets, key_drills, scale_drills, custom_patterns, routines, songs, practice_sessions): `id text` accepting client-generated prefix-based ids (e.g. `drill_l7f2ab_x9k2m`). Text was chosen over uuid in migration 0008 (Phase 85) because all five existing collection stores generate ids in `${prefix}_${Date.now(base36)}_${randomSuffix}` format. Text ids compare and index nearly as efficiently as uuid in Postgres; per-user scoping via RLS eliminates any cross-user collision risk.
 - **`user_id uuid`** — the RLS anchor. Every row is owned by exactly one user; `on delete cascade` means account deletion wipes everything.
 - **`data jsonb`** — opaque payload the app schema-validates on read. Avoids the schema-per-store treadmill; app-level types stay in TypeScript. Downsides (no server-side type checking, no computed indexes on nested fields) are acceptable for our workload.
 - **`updated_at timestamptz`** — the sync engine's last-write-wins comparison anchor. Default `now()` handles inserts; app sets it explicitly on updates.
@@ -49,7 +51,7 @@ Two shapes of syncable state, both using the same table structure:
 Examples: **drills, sheets, songs, routines, custom patterns, key-sequencer drills, scale-driller drills**.
 
 - One row per entity.
-- `id` = a random UUID generated at insert time.
+- `id` = a client-generated text id (e.g. `drill_l7f2ab_x9k2m`). Every store has its own `newXxxId()` helper following the `${prefix}_${Date.now(base36)}_${random6}` pattern.
 - `data` = the full entity payload (a drill config, a sheet, etc.).
 - Adapter's `extractLocal()` returns many rows.
 - Adapter's `applyRemote(rows)` replaces or merges the store's entity list.

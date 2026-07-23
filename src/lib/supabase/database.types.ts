@@ -229,6 +229,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_syncable_collection_table: {
+        Args: { table_name: string }
+        Returns: undefined
+      }
       create_syncable_table: {
         Args: { table_name: string }
         Returns: undefined
