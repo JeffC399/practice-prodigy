@@ -30,6 +30,8 @@ import {
   type ChordNotationStyle,
 } from "@/lib/music/render-chord";
 import { useDrillsLibrary } from "@/lib/state/drills-library";
+import { deleteAllInStore } from "@/lib/sync/sync-registry";
+import { useSessionTracker } from "@/lib/tracking/session-tracker";
 import {
   ACCENT_PALETTE_DISPLAY_NAMES,
   ACCENT_PALETTE_SWATCHES,
@@ -172,6 +174,9 @@ export default function SettingsPage() {
   const applyMood = useUserPrefs((s) => s.applyMood);
 
   const drillsLib = useDrillsLibrary();
+  const practiceHistoryCount = useSessionTracker(
+    (s) => s.history.filter((h) => h.endedAt !== null).length,
+  );
 
   // Gate render until after mount so persisted-store hydration doesn't
   // diff against SSR's default values (same pattern as /practice).
@@ -832,6 +837,23 @@ export default function SettingsPage() {
           defaultOpen
         >
           <DataExport drillsCount={drillsLib.drills.length} />
+        </SettingsSection>
+
+        {/* Slice A.12 pt 2 (Phase 94) — Practice history retention
+            control. Lets the user wipe every accumulated session
+            (local + cloud) with a two-click confirm. Placed under
+            Data → because it's a data-hygiene action. */}
+        <SettingsSection
+          tab="data-account"
+          title="Practice history"
+          description="Every session across all modules gets recorded. Wipe them anytime; deletion applies to your account across all devices."
+          summary={
+            practiceHistoryCount === 0
+              ? "No sessions recorded"
+              : `${practiceHistoryCount} session${practiceHistoryCount === 1 ? "" : "s"} on this device`
+          }
+        >
+          <PracticeHistoryRetention count={practiceHistoryCount} />
         </SettingsSection>
 
         <SettingsSection
@@ -1799,6 +1821,109 @@ function DataExport({ drillsCount }: { drillsCount: number }) {
         in a follow-up.
       </p>
       <a ref={linkRef} className="hidden" aria-hidden="true" />
+    </div>
+  );
+}
+
+/**
+ * PracticeHistoryRetention — Slice A.12 pt 2 (Phase 94).
+ *
+ * "Delete all practice history" control. Two-click confirm to prevent
+ * accidental wipe (mirrors the drill-delete pattern). Wipes both the
+ * local session tracker AND the cloud `practice_sessions` table for
+ * the current user.
+ *
+ * States:
+ *   - idle:      shows the primary delete button
+ *   - confirming: shows Cancel + Confirm delete
+ *   - deleting: spinner during the network round trip
+ *   - done:     brief "Cleared" flash before returning to idle
+ */
+function PracticeHistoryRetention({ count }: { count: number }) {
+  const [phase, setPhase] = useState<
+    "idle" | "confirming" | "deleting" | "done" | "error"
+  >("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    setPhase("deleting");
+    setErrorMsg(null);
+    try {
+      useSessionTracker.getState().clearHistory();
+      // Deletes cloud rows; no-op if signed out (local-only wipe suffices).
+      await deleteAllInStore("practice-sessions");
+      setPhase("done");
+      window.setTimeout(() => setPhase("idle"), 1800);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Delete failed.";
+      setErrorMsg(msg);
+      setPhase("error");
+    }
+  };
+
+  if (count === 0 && phase === "idle") {
+    return (
+      <p className="text-xs text-muted-foreground italic leading-relaxed">
+        Nothing to clear yet. Start practicing in any module and
+        sessions will start accumulating here.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {phase === "confirming" ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-rose-500/30 bg-rose-500/5 px-3 py-2">
+          <span className="flex-1 text-sm text-foreground">
+            This wipes {count} session{count === 1 ? "" : "s"} on this
+            device{" "}
+            <span className="text-muted-foreground">
+              and your cloud copy. It can&rsquo;t be undone.
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setPhase("idle")}
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="rounded-md border border-rose-500/50 bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-500/25 transition-colors"
+          >
+            Yes, delete all
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPhase("confirming")}
+          disabled={phase === "deleting"}
+          className="flex items-center justify-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-rose-500/50 hover:bg-rose-500/5 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {phase === "deleting"
+            ? "Deleting…"
+            : phase === "done"
+              ? "Cleared."
+              : `Delete all practice history (${count} session${count === 1 ? "" : "s"})`}
+        </button>
+      )}
+      {errorMsg && (
+        <p
+          role="alert"
+          className="rounded-md border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs text-rose-500"
+        >
+          {errorMsg}
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Deletion applies to your account across all devices you&rsquo;re
+        signed in on. Custom drills, sheets, and preferences stay
+        intact.
+      </p>
     </div>
   );
 }

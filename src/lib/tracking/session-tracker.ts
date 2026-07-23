@@ -124,6 +124,15 @@ type SessionTrackerStore = {
   checkInactivity: (now?: number) => void;
 
   /**
+   * Slice A.12 (Phase 94) — Wipe every ended session from local
+   * history AND end + discard any live current session. Used by the
+   * Settings "Delete all practice history" control. Local-only —
+   * callers should also call deleteAllInStore("practice-sessions")
+   * from the sync registry to wipe cloud rows.
+   */
+  clearHistory: () => void;
+
+  /**
    * Test-only escape hatch — clear all state without persisting a
    * fake session end. Do not use from UI code.
    */
@@ -276,6 +285,8 @@ export const useSessionTracker = create<SessionTrackerStore>()(
           });
         }
       },
+
+      clearHistory: () => set({ current: null, history: [] }),
 
       _reset: () => set({ current: null, history: [] }),
     }),

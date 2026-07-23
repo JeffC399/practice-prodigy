@@ -58,6 +58,19 @@ export type SyncEngine = {
   /** Force push local state to cloud now (returns when done). */
   push: () => Promise<void>;
 
+  /**
+   * Slice A.12 (Phase 94) — DELETE every row in this table owned by
+   * the current user. Used by retention/delete UIs ("Delete all
+   * practice history", "Delete account", per-entity delete). RLS
+   * scopes the delete to the caller's own rows. No-op when signed out.
+   *
+   * Callers are responsible for clearing local state separately;
+   * this method only touches cloud. Rationale: the local store's
+   * "how to clear" varies (setState / _reset / etc.) so keeping the
+   * engine cloud-only avoids coupling to each adapter's internals.
+   */
+  deleteAll: () => Promise<void>;
+
   /** Subscribe to status changes. Returns unsubscribe. */
   subscribe: (listener: (status: SyncStatus) => void) => () => void;
 
@@ -210,6 +223,24 @@ export function createSyncEngine<TData = unknown>(
     async push() {
       if (!userId) userId = await getUserId();
       await doPush();
+    },
+
+    async deleteAll() {
+      if (!userId) userId = await getUserId();
+      if (!userId) return; // Signed out — nothing to delete.
+      setStatus("syncing");
+      try {
+        const { error } = await supabase
+          .from(adapter.tableName as SyncableTableName)
+          .delete()
+          .eq("user_id", userId);
+        if (error) throw error;
+        setStatus("idle");
+      } catch (err) {
+        console.warn(`[sync ${adapter.storeKey}] deleteAll failed:`, err);
+        setStatus("error");
+        throw err;
+      }
     },
 
     subscribe(listener) {

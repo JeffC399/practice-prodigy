@@ -132,6 +132,20 @@ export async function pushAll(): Promise<void> {
 }
 
 /**
+ * Slice A.12 (Phase 94) — DELETE all cloud rows for one store,
+ * scoped to the current user. Used by retention/delete UIs. No-op
+ * if the storeKey isn't registered.
+ *
+ * Callers are responsible for clearing local state; this only
+ * touches cloud. See SyncEngine.deleteAll() for rationale.
+ */
+export async function deleteAllInStore(storeKey: string): Promise<void> {
+  const engine = engines.get(storeKey);
+  if (!engine) return;
+  await engine.deleteAll();
+}
+
+/**
  * Attach the Supabase auth-state watcher once. Starts/stops all
  * registered engines whenever the user signs in / out.
  *
