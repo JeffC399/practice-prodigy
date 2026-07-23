@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
 import { OnboardingCard } from "@/components/shared/onboarding-card";
 import { PresetChip } from "@/components/shared/preset-chip";
+import type { CategoryId } from "@/lib/practice/categories";
 import { PITCH_CLASSES } from "@/lib/music/chord";
 import { useScaleDrillConfig } from "@/lib/scale-driller/config-store";
 import { rootDisplay } from "@/lib/scale-driller/display";
@@ -239,6 +241,9 @@ export default function ScaleDrillerSetupPage() {
                     onLaunch={() => handleLaunchDrill(d)}
                     onEdit={() => handleEditDrill(d)}
                     onDelete={() => drillsLib.deleteDrill(d.id)}
+                    onSetCategory={(cat) =>
+                      drillsLib.setDrillCategory(d.id, cat)
+                    }
                   />
                 ))
               )}
@@ -278,6 +283,9 @@ export default function ScaleDrillerSetupPage() {
                   onLaunch={() => handleLaunchDrill(d)}
                   onEdit={() => handleEditDrill(d)}
                   onDelete={() => drillsLib.deleteDrill(d.id)}
+                  onSetCategory={(cat) =>
+                    drillsLib.setDrillCategory(d.id, cat)
+                  }
                 />
               ))}
             </div>
@@ -882,12 +890,15 @@ function ScaleDrillCard({
   onLaunch,
   onEdit,
   onDelete,
+  onSetCategory,
 }: {
   drill: ScaleDrill;
   justLoaded: boolean;
   onLaunch: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Slice A.10 (Phase 92) — Editable per-drill category. */
+  onSetCategory?: (category: CategoryId | undefined) => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const summary = useMemo(() => {
@@ -957,6 +968,19 @@ function ScaleDrillCard({
           </button>
         )}
       </div>
+      {/* Slice A.10 (Phase 92) — Category chip pinned to the card's
+          trailing edge next to the actions. Positioned to the LEFT of
+          the launch button title so it doesn't get lost in the
+          hover-revealed actions column. */}
+      {onSetCategory && (
+        <div className="ml-2 shrink-0">
+          <CategoryChipWithPopover
+            value={drill.category}
+            onChange={onSetCategory}
+            align="right"
+          />
+        </div>
+      )}
     </div>
   );
 }

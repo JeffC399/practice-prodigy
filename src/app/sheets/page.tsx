@@ -4,6 +4,7 @@ import { FileMusic, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
 import { SheetThumbnail } from "@/components/sheets/sheet-thumbnail";
 import { decodeSheet } from "@/lib/sheets/share";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
@@ -30,6 +31,7 @@ export default function SheetsLibraryPage() {
   // own font-style picker can still override.
   const chordFontDefault = useUserPrefs((s) => s.chordFontDefault);
   const deleteSheet = useSheetsLibrary((s) => s.deleteSheet);
+  const updateSheet = useSheetsLibrary((s) => s.updateSheet);
   const importSheet = useSheetsLibrary((s) => s.importSheet);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -317,6 +319,17 @@ export default function SheetsLibraryPage() {
                     </span>
                   </div>
                 </Link>
+                {/* Slice A.10 (Phase 92) — Category chip pinned to the
+                    card footer. Always visible so users can see + change
+                    the category without hovering into the actions bar. */}
+                <div className="flex items-center justify-start border-t border-border/60 bg-background/30 px-3 py-2">
+                  <CategoryChipWithPopover
+                    value={sheet.category}
+                    onChange={(cat) =>
+                      updateSheet(sheet.id, { category: cat })
+                    }
+                  />
+                </div>
                 {/* Phase 41.1 — Icons hidden by default on non-touch
                     devices; revealed on card hover OR when any child
                     receives keyboard focus. Mobile keeps them visible

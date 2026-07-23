@@ -59,6 +59,8 @@ import {
   usePracticeConfig,
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
+import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import type { CategoryId } from "@/lib/practice/categories";
 import {
   isShippedDrill,
   SHIPPED_DRILLS,
@@ -923,6 +925,9 @@ export default function PracticeSetupPage() {
                       if (newId) handleEditDrill({ ...d, id: newId });
                     }}
                     onDelete={drillsLib.deleteDrill}
+                    onSetCategory={(cat) =>
+                      drillsLib.setDrillCategory(drill.id, cat)
+                    }
                   />
                 ))}
               </div>
@@ -2451,6 +2456,7 @@ function DrillCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onSetCategory,
 }: {
   drill: Drill;
   isEditing: boolean;
@@ -2461,6 +2467,9 @@ function DrillCard({
   /** Phase 42 — one-click clone. Undefined on shipped drills. */
   onDuplicate?: (drill: Drill) => void;
   onDelete: (id: string) => void;
+  /** Slice A.10 (Phase 92) — Editable per-drill category. Omit on
+   * shipped drills to render the chip read-only (or not at all). */
+  onSetCategory?: (category: CategoryId | undefined) => void;
 }) {
   const c = drill.config;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -2577,6 +2586,19 @@ function DrillCard({
           </>
         )}
       </div>
+      {/* Slice A.10 (Phase 92) — Category chip footer. User drills get
+          an interactive chip that opens a picker popover. Shipped
+          drills would show a read-only chip only if they have a
+          category set (they don't currently), so we skip the row
+          entirely for them to keep the tile tight. */}
+      {onSetCategory && (
+        <div className="flex items-center justify-start px-3 pb-2">
+          <CategoryChipWithPopover
+            value={drill.category}
+            onChange={onSetCategory}
+          />
+        </div>
+      )}
     </div>
   );
 }

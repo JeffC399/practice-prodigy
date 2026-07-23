@@ -2,7 +2,9 @@
 
 import { Copy, Pencil, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
 import type { KeyDrill } from "@/lib/key-sequencer/types";
+import type { CategoryId } from "@/lib/practice/categories";
 import { ORDERING_STRATEGY_DISPLAY_NAMES } from "@/lib/state/practice-config";
 
 /**
@@ -23,6 +25,7 @@ export function KeyDrillCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onSetCategory,
 }: {
   drill: KeyDrill;
   isEditing: boolean;
@@ -30,6 +33,8 @@ export function KeyDrillCard({
   onEdit: (drill: KeyDrill) => void;
   onDuplicate: (drill: KeyDrill) => void;
   onDelete: (id: string) => void;
+  /** Slice A.10 (Phase 92) — Editable per-drill category. */
+  onSetCategory?: (category: CategoryId | undefined) => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const c = drill.config;
@@ -81,6 +86,16 @@ export function KeyDrillCard({
         )}
       </button>
 
+      {/* Slice A.10 (Phase 92) — Category chip footer. Always visible
+          so users can see + change the category at a glance. */}
+      {onSetCategory && (
+        <div className="flex items-center justify-start border-t border-border/60 bg-background/30 px-3 py-2">
+          <CategoryChipWithPopover
+            value={drill.category}
+            onChange={onSetCategory}
+          />
+        </div>
+      )}
       {/* Footer — action icons in a dedicated row. Hidden on desktop
           by default, revealed on group-hover OR when any child gets
           keyboard focus. Mobile keeps them visible since there's no

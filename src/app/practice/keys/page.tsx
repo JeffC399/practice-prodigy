@@ -552,6 +552,9 @@ export default function KeySequencerSetupPage() {
                         if (id === loadedKeyDrillId)
                           setLoadedKeyDrillId(undefined);
                       }}
+                      onSetCategory={(cat) =>
+                        drillsLib.setDrillCategory(d.id, cat)
+                      }
                     />
                   ))}
                 </div>
@@ -628,6 +631,9 @@ export default function KeySequencerSetupPage() {
                       if (id === loadedKeyDrillId)
                         setLoadedKeyDrillId(undefined);
                     }}
+                    onSetCategory={(cat) =>
+                      drillsLib.setDrillCategory(d.id, cat)
+                    }
                   />
                 ))}
               </div>
