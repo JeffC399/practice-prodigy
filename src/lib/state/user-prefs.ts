@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { CustomCategory } from "@/lib/practice/categories";
 import type { ChordNotationStyle } from "@/lib/music/render-chord";
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -333,6 +334,13 @@ export type UserPrefs = {
   cornerRadius: CornerRadius;
   /** High-contrast override — boosts fg/bg separation for readability. */
   highContrast: boolean;
+  /**
+   * Slice A.9 (Phase 89) — User-defined practice categories layered
+   * on top of the 10 built-ins. See ROUTINE-DESIGN.md §4.2. Managed
+   * via a Settings UI in Slice E; empty by default. Custom category
+   * ids use the `custom:` prefix so they never collide with built-ins.
+   */
+  customCategories: CustomCategory[];
 };
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
@@ -360,6 +368,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   uiSaturation: UI_SATURATION_DEFAULT,
   cornerRadius: "normal",
   highContrast: false,
+  customCategories: [],
 };
 
 /**

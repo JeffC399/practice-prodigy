@@ -124,3 +124,63 @@ export const BUILTIN_CATEGORIES: Record<BuiltinCategoryId, CategoryMeta> = {
 /** Ordered list of built-in category meta, for iteration in UI. */
 export const BUILTIN_CATEGORY_LIST: CategoryMeta[] =
   BUILTIN_CATEGORY_IDS.map((id) => BUILTIN_CATEGORIES[id]);
+
+/**
+ * User-defined custom category — Slice A.9 (Phase 89).
+ *
+ * Stored in useUserPrefs.customCategories. The id is user-generated
+ * (kebab-case slug, prefixed with `custom:` to avoid collision with
+ * built-in ids). Color is picked from a curated 12-color palette in
+ * the Settings UI (Slice E ships that picker).
+ *
+ * Kept as a plain object rather than extending CategoryMeta so future
+ * custom-only fields (e.g. hidden state, per-user icons) can land
+ * without touching the built-in shape.
+ */
+export type CustomCategory = {
+  /** Namespaced id, e.g. `custom:my-warmup`. */
+  id: string;
+  label: string;
+  color: string;
+  /** Optional one-liner. Falls back to `label` in tooltips when absent. */
+  description?: string;
+};
+
+/** Prefix that distinguishes custom category ids from built-ins. */
+export const CUSTOM_CATEGORY_ID_PREFIX = "custom:";
+
+/**
+ * Resolve any CategoryId (built-in or custom) to its display meta.
+ *
+ * Returns `null` if the id is unknown — e.g. a custom category was
+ * deleted while some SessionItems still reference it, or the app is
+ * viewing a session written by a newer version. UI code should treat
+ * a null result as "Uncategorized" rather than crash.
+ *
+ * Pass `customCategories` from useUserPrefs.customCategories to
+ * resolve custom ids; omit to resolve only built-ins.
+ */
+export function resolveCategoryMeta(
+  id: CategoryId,
+  customCategories: readonly CustomCategory[] = [],
+): CategoryMeta | CustomCategory | null {
+  if (isBuiltinCategoryId(id)) return BUILTIN_CATEGORIES[id];
+  return customCategories.find((c) => c.id === id) ?? null;
+}
+
+/**
+ * Generate a fresh custom category id from a user-typed label. Slugs
+ * lowercase-hyphenate the label, strip non-alphanumerics, and prepend
+ * the `custom:` prefix. If the label is empty, falls back to a
+ * timestamp-based id so we always have a stable handle.
+ */
+export function newCustomCategoryId(label: string): string {
+  const slug = label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const suffix =
+    slug.length > 0 ? slug : `cat-${Date.now().toString(36)}`;
+  return `${CUSTOM_CATEGORY_ID_PREFIX}${suffix}`;
+}
