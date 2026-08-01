@@ -67,12 +67,18 @@ export const userPrefsSyncAdapter: SyncAdapter<UserPrefs> = {
   displayLabel: "Preferences",
 
   extractLocal(): LocalRow<UserPrefs>[] {
+    const data = extractPrefsOnly();
+    // Slice A.15 (Phase 96) — Use the store's per-mutation timestamp
+    // instead of Date.now(). This makes cross-device LWW correct:
+    // a device that hasn't been touched in a week now correctly
+    // loses to a fresh device's newer prefs (previously local
+    // always won because we stamped "now" at push time).
     return [
       {
         // id ignored by engine for singletons (overwritten with user_id).
         id: "",
-        data: extractPrefsOnly(),
-        updatedAt: Date.now(),
+        data,
+        updatedAt: data._lastMutatedAt,
       },
     ];
   },

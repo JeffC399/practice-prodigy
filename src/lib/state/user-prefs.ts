@@ -364,6 +364,19 @@ export type UserPrefs = {
    * history lives in the cloud (or is derivable at query time).
    */
   levelHistory: LevelChangeLogEntry[];
+  /**
+   * Slice A.15 (Phase 96) — Wall-clock timestamp of the most recent
+   * mutation to any pref field, ms epoch. Used by the user_prefs
+   * sync adapter as the LWW comparison anchor — earlier we always
+   * used Date.now() at extract time, which meant local always won
+   * cross-device conflict. Now local pushes carry the actual
+   * mutation time, so a stale device that hasn't been touched in
+   * a week correctly loses to a fresh device's newer prefs.
+   *
+   * Auto-bumped by every setter via a wrapping `set` in the create
+   * body — individual setters don't have to remember to touch it.
+   */
+  _lastMutatedAt: number;
 };
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
@@ -394,6 +407,10 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   customCategories: [],
   proficiency: {},
   levelHistory: [],
+  // Sentinel value; the first real mutation replaces this with a live
+  // timestamp. Kept at 0 so a never-touched local store loses cleanly
+  // to any cloud row on first sync.
+  _lastMutatedAt: 0,
 };
 
 /** Local cap on retained level-history entries. Cloud is the source of truth. */
@@ -542,7 +559,29 @@ type UserPrefsStore = UserPrefs & {
 
 export const useUserPrefs = create<UserPrefsStore>()(
   persist(
-    (set) => ({
+    (rawSet) => {
+      // Slice A.15 (Phase 96) — Every setState call auto-bumps
+      // _lastMutatedAt so the sync adapter reports a truthful LWW
+      // timestamp on push. Individual setters below use this `set`
+      // instead of `rawSet`; the behavior is identical except for
+      // the timestamp overlay. `applyRemote` bypasses this by
+      // calling useUserPrefs.setState() directly — it doesn't want
+      // to re-stamp cloud data as freshly-mutated.
+      const set: typeof rawSet = ((partial, replace) => {
+        const now = Date.now();
+        const withStamp =
+          typeof partial === "function"
+            ? (state: UserPrefsStore) => ({
+                ...(partial as (s: UserPrefsStore) => Partial<UserPrefsStore>)(
+                  state,
+                ),
+                _lastMutatedAt: now,
+              })
+            : { ...partial, _lastMutatedAt: now };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (rawSet as any)(withStamp, replace);
+      }) as typeof rawSet;
+      return {
       ...DEFAULT_USER_PREFS,
       setPracticeLayout: (practiceLayout) => set({ practiceLayout }),
       setTheme: (theme) => set({ theme }),
@@ -656,7 +695,8 @@ export const useUserPrefs = create<UserPrefsStore>()(
           delete next[categoryId];
           return { proficiency: next };
         }),
-    }),
+      };
+    },
     {
       name: "practice-prodigy:user-prefs:v1",
       storage: createJSONStorage(() => localStorage),
