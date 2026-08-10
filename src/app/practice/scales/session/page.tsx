@@ -71,7 +71,13 @@ export default function ScaleDrillerSessionPage() {
 
   const displayStepIdx = currentStepIdx >= 0 ? currentStepIdx : 0;
   const currentStep = steps[displayStepIdx] ?? null;
-  const nextStep = steps[displayStepIdx + 1] ?? null;
+  // Phase 97 — Skip past PREP measures to find the next actual PLAY
+  // step (matches the fix in Key Sequencer session). Scale Driller
+  // was cosmetically fine because prep already carries upcomingScale,
+  // but this makes the invariant consistent across both modules:
+  // NEXT card always shows the next actually-played step.
+  const nextStep =
+    steps.slice(displayStepIdx + 1).find((s) => !s.isRest) ?? null;
 
   const isIdle = state.phase === "idle";
   const isCountIn = state.phase === "count-in";

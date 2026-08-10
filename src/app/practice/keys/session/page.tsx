@@ -93,7 +93,14 @@ export default function KeySequencerSessionPage() {
   // when actually playing.
   const displayStepIdx = currentStepIdx >= 0 ? currentStepIdx : 0;
   const currentStep = steps[displayStepIdx] ?? null;
-  const nextStep = steps[displayStepIdx + 1] ?? null;
+  // Phase 97 — Skip past PREP measures to find the next actual PLAY
+  // step so the NEXT card shows a musical event the user can
+  // anticipate (key + prompt-row words), not just the prep window's
+  // "upcoming key" placeholder. Previously the immediate next step
+  // was a prep row with no rowWords, so the NEXT card rendered
+  // "D" with no quality — user had no way to prep the chord tones.
+  const nextStep =
+    steps.slice(displayStepIdx + 1).find((s) => !s.isRest) ?? null;
 
   const isIdle = state.phase === "idle";
   const isCountIn = state.phase === "count-in";

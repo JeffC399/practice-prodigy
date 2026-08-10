@@ -373,18 +373,14 @@ export default function KeySequencerSetupPage() {
     drillsLib.reflagLegacyStartersIfNeeded();
   }, [mounted, drillsLib]);
 
-  // Phase 49 — Fresh-slate on page open. Whatever config was persisted
-  // from a previous visit is discarded so the user lands on a blank
-  // setup. If they want to continue a saved drill, they click its
-  // card in Your Custom Drills / Built-in Drills. Runs exactly once
-  // after mount using a ref so hot-reloads don't retrigger.
-  const didInitialResetRef = useRef(false);
-  useEffect(() => {
-    if (!mounted) return;
-    if (didInitialResetRef.current) return;
-    didInitialResetRef.current = true;
-    reset();
-  }, [mounted, reset]);
+  // Phase 97 — Removed the Phase 49 "fresh-slate on page open" reset.
+  // Every visit to the setup page previously called reset() on mount,
+  // wiping the config the user had built up. That fought against the
+  // natural tweak → play → tweak → save iteration loop: launching a
+  // drill and returning to setup looked like "everything disappeared."
+  // Now the persisted config survives across visits (matching Bass
+  // Arpeggios + Scale Driller behavior). Explicit fresh-slate is
+  // still one click away via handleCreateNewExercise / "New drill".
 
   const toggleKey = (k: KeyPitchClass) => {
     if (keyPool.includes(k)) {
