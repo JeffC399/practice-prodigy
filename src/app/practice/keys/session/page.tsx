@@ -443,6 +443,22 @@ export default function KeySequencerSessionPage() {
               // a per-beat unique key so the pulse animation re-mounts
               // on every metronome click regardless of phase.
               const beatTick = `${state.countInBeatsRemaining}-${state.absoluteBeat}`;
+              // Phase 98 — "now-only" layout: render just the Now
+              // card, no Next preview at all. For practitioners who
+              // want zero anticipation (reactive / surprise practice).
+              if (practiceLayout === "now-only") {
+                return (
+                  <div className="flex w-full max-w-3xl flex-col items-center gap-6">
+                    <NowCard
+                      step={currentStep}
+                      isIdle={isIdle}
+                      isCountIn={isCountIn}
+                      config={config}
+                      beatTick={beatTick}
+                    />
+                  </div>
+                );
+              }
               return practiceLayout === "two-pane" ? (
                 <div className="grid w-full max-w-4xl grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
                   <NowCard

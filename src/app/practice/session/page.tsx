@@ -943,8 +943,12 @@ export default function PracticeSessionPage() {
                   the pattern to play over it — this is the only place the
                   user reads what's coming. The metronome's stick-click
                   sound during prep beats does the "don't play yet"
-                  signaling, not the visual. */}
-              {nextLabel && !isIdle ? (
+                  signaling, not the visual.
+                  Phase 98 — Hidden entirely when layout is "now-only"
+                  so users who want deep focus / reactive practice see
+                  zero anticipation. The chord + measure count-in still
+                  appear on the audio side (stick-click on prep beats). */}
+              {nextLabel && !isIdle && practiceLayout !== "now-only" ? (
                 <div className="flex items-center gap-3 font-mono text-sm text-muted-foreground">
                   <span className="uppercase tracking-wider text-xs">Next</span>
                   <span

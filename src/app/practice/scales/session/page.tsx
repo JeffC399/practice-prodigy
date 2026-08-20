@@ -306,6 +306,20 @@ export default function ScaleDrillerSessionPage() {
               const isPrep = !!currentStep && currentStep.isRest;
               const isPreparing = isCountIn || isPrep;
               const beatTick = `${state.countInBeatsRemaining}-${state.absoluteBeat}`;
+              // Phase 98 — "now-only" layout: NOW card only, no NEXT.
+              if (practiceLayout === "now-only") {
+                return (
+                  <div className="flex w-full max-w-3xl flex-col items-center gap-6">
+                    <NowCard
+                      step={currentStep}
+                      isIdle={isIdle}
+                      isCountIn={isCountIn}
+                      config={config}
+                      beatTick={beatTick}
+                    />
+                  </div>
+                );
+              }
               return practiceLayout === "two-pane" ? (
                 <div className="grid w-full max-w-4xl grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
                   <NowCard

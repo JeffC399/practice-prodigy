@@ -30,13 +30,26 @@ export type PracticeLayout =
   /** Single big chord centered with a small NEXT preview above. v1 default. */
   | "single-pane"
   /** Two equally-weighted side-by-side panels: Now and Next. */
-  | "two-pane";
+  | "two-pane"
+  /**
+   * Phase 98 — Deep focus. Only the NOW card, no NEXT preview at all.
+   * For practitioners who intentionally want zero anticipation —
+   * pure reactive practice where every measure is a surprise. Common
+   * request from ear-training / improvisation contexts where reading
+   * ahead defeats the purpose.
+   */
+  | "now-only";
 
-export const PRACTICE_LAYOUTS = ["single-pane", "two-pane"] as const;
+export const PRACTICE_LAYOUTS = [
+  "single-pane",
+  "two-pane",
+  "now-only",
+] as const;
 
 export const PRACTICE_LAYOUT_DISPLAY_NAMES: Record<PracticeLayout, string> = {
   "single-pane": "Single pane",
   "two-pane": "Two pane",
+  "now-only": "Now only",
 };
 
 export const PRACTICE_LAYOUT_DESCRIPTIONS: Record<PracticeLayout, string> = {
@@ -44,6 +57,8 @@ export const PRACTICE_LAYOUT_DESCRIPTIONS: Record<PracticeLayout, string> = {
     "One big chord centered, with a small NEXT preview above. Focus mode.",
   "two-pane":
     "Equal-weight Now / Next chord panels side by side. Read-ahead mode for sight-reading-style practice.",
+  "now-only":
+    "Just the current chord — no NEXT preview. Deep focus / reactive practice; every measure is a surprise.",
 };
 
 /** Theme choice — `system` follows the OS prefers-color-scheme. */

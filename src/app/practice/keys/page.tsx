@@ -397,6 +397,25 @@ export default function KeySequencerSetupPage() {
   };
   const clearAll = () => setKeyPool([]);
 
+  // Phase 98 — Which preset (if any) currently matches the keyPool?
+  // Lets each PresetChip render an "active" state so the user can see
+  // "you're on Naturals" at a glance without remembering which preset
+  // they last clicked. Set-equality (ignores order + duplicates).
+  const activePreset: "all" | "cycleOf5ths" | "naturals" | "flatSide" | "sharpSide" | "none" | null = useMemo(() => {
+    const sameSet = (a: readonly KeyPitchClass[], b: readonly KeyPitchClass[]) => {
+      if (a.length !== b.length) return false;
+      const setB = new Set(b);
+      return a.every((k) => setB.has(k));
+    };
+    if (keyPool.length === 0) return "none";
+    if (sameSet(keyPool, ALL_KEYS)) return "all";
+    if (sameSet(keyPool, CYCLE_OF_5THS)) return "cycleOf5ths";
+    if (sameSet(keyPool, NATURAL_KEYS)) return "naturals";
+    if (sameSet(keyPool, FLAT_SIDE_KEYS)) return "flatSide";
+    if (sameSet(keyPool, SHARP_SIDE_KEYS)) return "sharpSide";
+    return null;
+  }, [keyPool]);
+
   if (!mounted) {
     return (
       <main
@@ -729,27 +748,40 @@ export default function KeySequencerSetupPage() {
               None. Cycle of 5ths also switches the ordering strategy
               since selecting that specific order implies the intent. */}
           <div className="flex flex-wrap gap-1.5">
-            <PresetChip label="All" onClick={selectAll} />
+            <PresetChip
+              label="All"
+              onClick={selectAll}
+              active={activePreset === "all"}
+            />
             <PresetChip
               label="Cycle of 5ths"
               onClick={selectCycleOf5ths}
+              active={activePreset === "cycleOf5ths"}
               title="Also sets the ordering to Cycle of 5ths"
             />
             <PresetChip
               label="Naturals"
               onClick={() => setKeyPool(NATURAL_KEYS)}
+              active={activePreset === "naturals"}
             />
             <PresetChip
               label="Flat side"
               onClick={() => setKeyPool(FLAT_SIDE_KEYS)}
+              active={activePreset === "flatSide"}
               title="F, B♭, E♭, A♭, D♭, G♭ — the flat side of the cycle"
             />
             <PresetChip
               label="Sharp side"
               onClick={() => setKeyPool(SHARP_SIDE_KEYS)}
+              active={activePreset === "sharpSide"}
               title="G, D, A, E, B, F♯ — the sharp side of the cycle"
             />
-            <PresetChip label="None" onClick={clearAll} muted />
+            <PresetChip
+              label="None"
+              onClick={clearAll}
+              muted
+              active={activePreset === "none"}
+            />
           </div>
           <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
             {ALL_KEYS.map((k) => {
@@ -760,10 +792,17 @@ export default function KeySequencerSetupPage() {
                   type="button"
                   onClick={() => toggleKey(k)}
                   aria-pressed={selected}
-                  className={`flex h-12 items-center justify-center rounded-md border text-sm font-medium transition-colors ${
+                  // Phase 98 — Selection state was too subtle at
+                  // border-primary/60 + bg-primary/15 — reads as
+                  // "slightly more colorful" rather than "obviously
+                  // selected." Both states now use border-2 (identical
+                  // widths → no layout shift) with dramatically
+                  // different color weights + a font-weight bump on
+                  // selected so at-a-glance parsing is instant.
+                  className={`flex h-12 items-center justify-center rounded-md border-2 text-base transition-all ${
                     selected
-                      ? "border-primary/60 bg-primary/15 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      ? "border-primary bg-primary/25 text-foreground font-semibold shadow-sm"
+                      : "border-border/30 bg-background/40 text-muted-foreground/60 font-medium hover:border-primary/50 hover:text-foreground"
                   }`}
                 >
                   {keyDisplay(k, enharmonicPreference)}
