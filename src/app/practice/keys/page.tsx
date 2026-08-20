@@ -678,13 +678,39 @@ export default function KeySequencerSetupPage() {
             }`}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
                   Now editing
                 </span>
-                <span className="text-lg font-semibold text-foreground">
-                  {editingDrill.name}
-                </span>
+                {/* Phase 99 — Name is now editable in-place. Blur or
+                    Enter commits via updateDrillMeta. Matches the Bass
+                    Arpeggios editing dialog's pattern; earlier KS
+                    parity was missed. `key` prop resets the input's
+                    defaultValue when the loaded drill changes. */}
+                <input
+                  key={`${editingDrill.id}-name`}
+                  type="text"
+                  defaultValue={editingDrill.name}
+                  onBlur={(e) => {
+                    const next = e.target.value.trim();
+                    if (next && next !== editingDrill.name) {
+                      drillsLib.updateDrillMeta(editingDrill.id, {
+                        name: next,
+                      });
+                    } else if (!next) {
+                      // Snap back if the user cleared the field.
+                      e.target.value = editingDrill.name;
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                  placeholder="Drill name"
+                  className="w-full min-w-0 rounded-md border border-border/50 bg-background/60 px-2 py-1 text-lg font-semibold text-foreground focus:border-primary focus:outline-none"
+                />
               </div>
               <div className="flex flex-wrap gap-2">
                 {isDirty && (
@@ -715,6 +741,23 @@ export default function KeySequencerSetupPage() {
                 </button>
               </div>
             </div>
+            {/* Phase 99 — Notes textarea in the badge, mirroring the
+                name field. 300-char cap matches the save-new form. */}
+            <textarea
+              key={`${editingDrill.id}-notes`}
+              defaultValue={editingDrill.notes ?? ""}
+              onBlur={(e) => {
+                const next = e.target.value.trim().slice(0, 300);
+                if (next !== (editingDrill.notes ?? "")) {
+                  drillsLib.updateDrillMeta(editingDrill.id, {
+                    notes: next,
+                  });
+                }
+              }}
+              placeholder="Add notes (optional) — e.g. Focus on the flat side keys. Slow at 60 to lock rhythm."
+              rows={2}
+              className="w-full resize-none rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none focus:text-foreground"
+            />
             <p className="text-xs text-muted-foreground leading-relaxed">
               The sections below have been populated with this drill&rsquo;s
               settings. Edit anything — the pool, prompt rows, tempo,
@@ -722,7 +765,8 @@ export default function KeySequencerSetupPage() {
               <span className="font-medium text-foreground">Save changes</span>{" "}
               to commit them, or{" "}
               <span className="font-medium text-foreground">Done editing</span>{" "}
-              to return to a blank canvas.
+              to return to a blank canvas. Name and notes save
+              automatically when you click outside the field.
             </p>
           </div>
         )}

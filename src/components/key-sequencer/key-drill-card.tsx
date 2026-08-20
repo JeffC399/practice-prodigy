@@ -67,7 +67,12 @@ export function KeyDrillCard({
         onClick={() => onLaunch(drill)}
         className="flex flex-col gap-1.5 p-3 text-left"
       >
-        <div className="flex items-center gap-2">
+        {/* Phase 99 — Reserve horizontal space for the absolutely-
+            positioned EDITING chip when it's visible, so long names
+            truncate cleanly instead of sliding under the chip. */}
+        <div
+          className={`flex items-center gap-2 ${isEditing ? "pr-16" : ""}`}
+        >
           <Play className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="flex-1 truncate font-medium text-foreground">
             {drill.name}
