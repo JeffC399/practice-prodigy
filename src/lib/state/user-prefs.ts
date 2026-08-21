@@ -355,6 +355,13 @@ export type UserPrefs = {
   /** High-contrast override — boosts fg/bg separation for readability. */
   highContrast: boolean;
   /**
+   * Slice B.15 (Phase 116) — When true, the routine player + take-over
+   * modules play subtle audio cues (rest-end chime, routine-complete
+   * chime). Default on; users can mute via the player top bar or in
+   * Settings. WebAudio-based, no external assets.
+   */
+  routineSounds: boolean;
+  /**
    * Slice A.9 (Phase 89) — User-defined practice categories layered
    * on top of the 10 built-ins. See ROUTINE-DESIGN.md §4.2. Managed
    * via a Settings UI in Slice E; empty by default. Custom category
@@ -419,6 +426,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   uiSaturation: UI_SATURATION_DEFAULT,
   cornerRadius: "normal",
   highContrast: false,
+  routineSounds: true,
   customCategories: [],
   proficiency: {},
   levelHistory: [],
@@ -526,6 +534,7 @@ type UserPrefsStore = UserPrefs & {
   setUiSaturation: (value: number) => void;
   setCornerRadius: (value: CornerRadius) => void;
   setHighContrast: (value: boolean) => void;
+  setRoutineSounds: (value: boolean) => void;
   /** Mark the first-visit onboarding hint as dismissed. */
   dismissOnboarding: () => void;
   /**
@@ -633,6 +642,7 @@ export const useUserPrefs = create<UserPrefsStore>()(
         }),
       setCornerRadius: (cornerRadius) => set({ cornerRadius }),
       setHighContrast: (highContrast) => set({ highContrast }),
+      setRoutineSounds: (routineSounds) => set({ routineSounds }),
       dismissOnboarding: () => set({ hasSeenOnboarding: true }),
       dismissKeySequencerOnboarding: () =>
         set({ hasSeenKeySequencerOnboarding: true }),

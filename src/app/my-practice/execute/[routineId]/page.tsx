@@ -4,6 +4,7 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FullScreenPlayer } from "@/components/my-practice/full-screen-player";
 import { RoutineOverview } from "@/components/my-practice/routine-overview";
+import { primeRoutineAudio } from "@/lib/audio/routine-sounds";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
 import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
@@ -84,6 +85,9 @@ export default function ExecuteRoutinePage() {
 
   const handleStart = () => {
     if (!routine) return;
+    // Warm up the WebAudio context on the Start gesture so
+    // auto-fired chimes later in the run don't get suspended.
+    primeRoutineAudio();
     startExecution(routineId);
   };
 

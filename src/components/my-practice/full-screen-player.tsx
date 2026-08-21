@@ -11,12 +11,18 @@ import {
   Play,
   SkipForward,
   Timer,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { VibeCheck } from "@/components/my-practice/vibe-check";
 import { CategoryChip } from "@/components/practice/category-chip";
+import {
+  playRestEndChime,
+  playRoutineCompleteChime,
+} from "@/lib/audio/routine-sounds";
 import {
   elapsedSecondsOnCurrentItem,
   useRoutineExecutor,
@@ -26,6 +32,7 @@ import {
   type Routine,
   type RoutineItem,
 } from "@/lib/practice/routine-types";
+import { useUserPrefs } from "@/lib/state/user-prefs";
 
 /**
  * FullScreenPlayer — Slice B.9 (Phase 109).
@@ -62,6 +69,8 @@ export function FullScreenPlayer({
   const previous = useRoutineExecutor((s) => s.previous);
   const pause = useRoutineExecutor((s) => s.pause);
   const resume = useRoutineExecutor((s) => s.resume);
+  const routineSounds = useUserPrefs((s) => s.routineSounds);
+  const setRoutineSounds = useUserPrefs((s) => s.setRoutineSounds);
 
   // 1Hz clock tick so the elapsed / countdown numbers update live.
   const [, forceTick] = useState(0);
@@ -84,6 +93,55 @@ export function FullScreenPlayer({
     if (state.status === "running") pause();
     else if (state.status === "paused") resume();
   }, [pause, resume]);
+
+  const handleToggleSounds = useCallback(() => {
+    setRoutineSounds(!useUserPrefs.getState().routineSounds);
+  }, [setRoutineSounds]);
+
+  // Rest auto-advance — when the current item is a rest with a positive
+  // target, elapsed >= target, and the run is still running, chime and
+  // move on. Rests are the only auto-advancing item type; drills etc.
+  // stay user-driven so a distracted user isn't yanked mid-passage.
+  const currentItem = execution
+    ? routine.items[execution.currentIndex]
+    : null;
+  const restAutoFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!execution || execution.status !== "running") return;
+    if (!currentItem || currentItem.type !== "rest") return;
+    if (currentItem.estimatedSeconds <= 0) return;
+    const elapsed = elapsedSecondsOnCurrentItem(execution);
+    if (elapsed < currentItem.estimatedSeconds) return;
+    // Guard so multiple ticks don't re-fire between the effect
+    // running and the store transitioning to the next item.
+    if (restAutoFiredRef.current === currentItem.id) return;
+    restAutoFiredRef.current = currentItem.id;
+    if (routineSounds) playRestEndChime();
+    advance({ outcome: "completed" });
+    // Intentionally no deps: must re-check every 1Hz tick against the
+    // live wall clock. The ref guard prevents double-firing per item.
+  });
+  // Reset the fired-ref when the item id changes so re-entering a
+  // rest (e.g. via Previous) can auto-fire again.
+  useEffect(() => {
+    if (!currentItem || currentItem.type !== "rest") {
+      restAutoFiredRef.current = null;
+    }
+  }, [currentItem]);
+
+  // Routine-complete chime — fire once when status flips to "complete".
+  const prevStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const status = execution?.status ?? null;
+    if (
+      status === "complete" &&
+      prevStatusRef.current !== "complete" &&
+      routineSounds
+    ) {
+      playRoutineCompleteChime();
+    }
+    prevStatusRef.current = status;
+  }, [execution?.status, routineSounds]);
 
   // Keyboard shortcuts.
   useEffect(() => {
@@ -110,6 +168,9 @@ export function FullScreenPlayer({
       } else if (e.key === "s" || e.key === "S") {
         e.preventDefault();
         handleSkip();
+      } else if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        handleToggleSounds();
       } else if (e.key === "Escape") {
         e.preventDefault();
         onExit();
@@ -117,7 +178,14 @@ export function FullScreenPlayer({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [handleAdvance, handleSkip, handleTogglePause, onExit, previous]);
+  }, [
+    handleAdvance,
+    handleSkip,
+    handleTogglePause,
+    handleToggleSounds,
+    onExit,
+    previous,
+  ]);
 
   if (!execution) {
     return (
@@ -133,7 +201,6 @@ export function FullScreenPlayer({
     return <EndOfRoutineScreen routine={routine} onExit={onExit} />;
   }
 
-  const currentItem = routine.items[execution.currentIndex];
   if (!currentItem) {
     return (
       <main className="flex min-h-screen flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
@@ -176,6 +243,24 @@ export function FullScreenPlayer({
           <span className="font-mono text-xs uppercase tracking-wider text-primary">
             Item {execution.currentIndex + 1} of {routine.items.length}
           </span>
+          <button
+            type="button"
+            onClick={handleToggleSounds}
+            aria-label={routineSounds ? "Mute routine sounds" : "Unmute routine sounds"}
+            aria-pressed={!routineSounds}
+            title={
+              routineSounds
+                ? "Sounds on — click to mute (M)"
+                : "Sounds off — click to unmute (M)"
+            }
+            className="ml-2 flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {routineSounds ? (
+              <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <VolumeX className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </button>
         </div>
       </header>
 
@@ -247,7 +332,7 @@ export function FullScreenPlayer({
           </button>
         </div>
         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
-          ← Prev · → Next · Space Pause · S Skip · Esc Exit
+          ← Prev · → Next · Space Pause · S Skip · M Mute · Esc Exit
         </p>
       </footer>
     </main>
