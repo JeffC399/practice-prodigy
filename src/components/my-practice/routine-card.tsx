@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { CategoryChip } from "@/components/practice/category-chip";
+import { getMethodology } from "@/lib/practice/methodologies";
 import {
   categoryTimeBreakdown,
   routineCategories,
@@ -132,11 +133,22 @@ export function RoutineCard({
             />
           </div>
         )}
-        {categories.length > 0 && (
-          <div className="pl-6 flex flex-wrap gap-1">
+        {(categories.length > 0 || routine.methodologyId) && (
+          <div className="pl-6 flex flex-wrap items-center gap-1">
             {categories.map((catId) => (
               <CategoryChip key={catId} categoryId={catId} size="sm" />
             ))}
+            {routine.methodologyId && (
+              <span
+                className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] tracking-wide text-primary"
+                title={
+                  getMethodology(routine.methodologyId)?.summary ?? undefined
+                }
+              >
+                {getMethodology(routine.methodologyId)?.name ??
+                  routine.methodologyId}
+              </span>
+            )}
           </div>
         )}
         <textarea

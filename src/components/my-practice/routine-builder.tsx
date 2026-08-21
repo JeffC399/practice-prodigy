@@ -20,6 +20,7 @@ import { ArrowLeft, GripVertical, ListChecks, Plus, Trash2 } from "lucide-react"
 import { useMemo, useState } from "react";
 import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { ItemPickerModal } from "@/components/my-practice/item-picker-modal";
+import { MethodologyPicker } from "@/components/my-practice/methodology-picker";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { getMethodology } from "@/lib/practice/methodologies";
 import { PRACTICE_MODULE_LABELS } from "@/lib/practice/types";
@@ -182,9 +183,20 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
           rows={2}
           className="w-full resize-none rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm text-muted-foreground focus:border-primary focus:outline-none focus:text-foreground"
         />
+        <div className="rounded-md border border-border/50 bg-background/60 px-3 py-2">
+          <MethodologyPicker
+            value={routine.methodologyId}
+            onChange={(next) =>
+              lib.updateRoutineMeta(routine.id, { methodologyId: next })
+            }
+            scope="per-routine"
+            label="Structural methodology"
+            hint="How the routine is organized as a whole (e.g. Interleaved, Pomodoro, Spaced Repetition). Optional. Distinct from per-item method."
+          />
+        </div>
         <p className="text-xs text-muted-foreground/70 leading-relaxed">
-          Name and notes save automatically when you click outside the
-          field. Add items below to build the routine sequence.
+          Name, notes, and methodology save automatically. Add items below
+          to build the routine sequence.
         </p>
       </header>
 
