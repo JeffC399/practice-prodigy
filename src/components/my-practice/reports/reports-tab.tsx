@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CategoryPanel } from "./category-panel";
 import { HeadlineStats } from "./headline-stats";
 import { ReportsRangePicker } from "./range-picker";
 import {
@@ -79,8 +80,9 @@ export function ReportsTab() {
             longestStreak={streaks.longest}
             range={range}
           />
-          {/* Category chart, heatmap, trend line, songs panel, level
-              panel, methodology chip — all layered in by D.3–D.8. */}
+          <CategoryPanel sessions={sessionsInRange} />
+          {/* Heatmap, trend line, songs panel, level panel,
+              methodology chip — all layered in by D.4–D.8. */}
         </>
       )}
     </section>
