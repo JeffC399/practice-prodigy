@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { CategoryChip } from "@/components/practice/category-chip";
 import {
   elapsedSecondsOnCurrentItem,
@@ -429,9 +430,12 @@ function ItemBody({
 }
 
 /**
- * End-of-routine celebration screen. Phase 111 (B.11) will layer the
- * per-category vibe-check on top of this; Phase 109 ships the basic
- * summary + primary "Done" button.
+ * End-of-routine celebration screen — Phase 111 (B.11).
+ *
+ * Shows a per-item breakdown with outcome tags + individual times,
+ * plus a category-time bar sourced from the actual per-item elapsed
+ * seconds (not the estimates — this is real practice data). Per-
+ * category vibe-check UI lands in B.12 as a distinct slice.
  */
 function EndOfRoutineScreen({
   routine,
@@ -441,44 +445,170 @@ function EndOfRoutineScreen({
   onExit: () => void;
 }) {
   const execution = useRoutineExecutor((s) => s.execution);
-  const totalSec =
-    execution?.completedItems.reduce((s, r) => s + r.secondsSpent, 0) ?? 0;
-  const completedCount =
-    execution?.completedItems.filter((r) => r.outcome !== "revisited").length ??
-    0;
+
+  // Fold multiple records for the same routine item (a user who
+  // revisited an item has 2+ records) into a single summary row.
+  const summaryRows = (() => {
+    if (!execution) return [];
+    const totals = new Map<
+      string,
+      { secondsSpent: number; outcome: "completed" | "skipped" | "revisited" }
+    >();
+    for (const r of execution.completedItems) {
+      const existing = totals.get(r.routineItemId);
+      if (existing) {
+        existing.secondsSpent += r.secondsSpent;
+        // A revisit is superseded once the item is properly completed.
+        if (r.outcome === "completed") existing.outcome = "completed";
+        else if (r.outcome === "skipped" && existing.outcome !== "completed") {
+          existing.outcome = "skipped";
+        }
+      } else {
+        totals.set(r.routineItemId, {
+          secondsSpent: r.secondsSpent,
+          outcome: r.outcome,
+        });
+      }
+    }
+    return routine.items.map((item) => {
+      const rec = totals.get(item.id);
+      return {
+        item,
+        secondsSpent: rec?.secondsSpent ?? 0,
+        outcome: rec?.outcome ?? ("skipped" as const),
+      };
+    });
+  })();
+
+  const totalSec = summaryRows.reduce((s, r) => s + r.secondsSpent, 0);
+  const completedCount = summaryRows.filter(
+    (r) => r.outcome === "completed",
+  ).length;
+  const skippedCount = summaryRows.filter(
+    (r) => r.outcome === "skipped" && r.secondsSpent === 0,
+  ).length;
+
+  // Category-time breakdown from ACTUAL elapsed seconds (not estimates).
+  const catTotals = new Map<string, number>();
+  for (const row of summaryRows) {
+    catTotals.set(
+      row.item.category,
+      (catTotals.get(row.item.category) ?? 0) + row.secondsSpent,
+    );
+  }
+  const categorySlices = Array.from(catTotals.entries())
+    .map(([categoryId, seconds]) => ({
+      categoryId,
+      seconds,
+      pct: totalSec > 0 ? seconds / totalSec : 0,
+    }))
+    .filter((s) => s.seconds > 0)
+    .sort((a, b) => b.seconds - a.seconds);
 
   return (
-    <main className="flex min-h-screen flex-1 flex-col items-center justify-center gap-8 px-6 py-12 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary">
-        <Check className="h-8 w-8" aria-hidden="true" />
-      </div>
-      <div className="flex max-w-xl flex-col gap-2">
-        <h2 className="text-2xl font-semibold text-foreground">
-          Routine complete
-        </h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Nice work. You practiced{" "}
-          <span className="font-medium text-foreground">
-            {completedCount} {completedCount === 1 ? "item" : "items"}
-          </span>{" "}
-          from &ldquo;{routine.name}&rdquo; for{" "}
-          <span className="font-medium text-foreground">
-            {formatDuration(totalSec)}
+    <main className="flex min-h-screen flex-1 flex-col items-center px-6 py-12">
+      <div className="flex w-full max-w-2xl flex-col items-center gap-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Check className="h-8 w-8" aria-hidden="true" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-2xl font-semibold text-foreground">
+              Routine complete
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              &ldquo;{routine.name}&rdquo; ·{" "}
+              <span className="font-medium text-foreground">
+                {formatDuration(totalSec)}
+              </span>{" "}
+              total ·{" "}
+              <span className="font-medium text-foreground">
+                {completedCount} completed
+              </span>
+              {skippedCount > 0 && (
+                <>
+                  {" · "}
+                  <span className="text-muted-foreground/70">
+                    {skippedCount} skipped
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Category-time breakdown */}
+        {categorySlices.length > 0 && (
+          <div className="flex w-full flex-col gap-2 rounded-md border border-border bg-background/40 px-4 py-3">
+            <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Time by category
+            </span>
+            <CategoryTimeBar slices={categorySlices} />
+          </div>
+        )}
+
+        {/* Per-item breakdown */}
+        <div className="flex w-full flex-col gap-2 rounded-md border border-border bg-background/40 px-4 py-3">
+          <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Per-item breakdown
           </span>
-          .
+          <ul className="flex flex-col divide-y divide-border/40">
+            {summaryRows.map((row, idx) => (
+              <li
+                key={row.item.id}
+                className="flex items-center gap-3 py-2"
+              >
+                <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground/70">
+                  {idx + 1}.
+                </span>
+                <span className="flex-1 truncate text-sm text-foreground">
+                  {row.item.label || itemFallbackLabel(row.item)}
+                </span>
+                <OutcomeTag outcome={row.outcome} />
+                <span className="w-16 shrink-0 text-right font-mono text-xs text-muted-foreground tabular-nums">
+                  {row.secondsSpent > 0
+                    ? formatDuration(row.secondsSpent)
+                    : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="text-xs text-muted-foreground/70 italic text-center">
+          Per-category vibe-check ships in Slice B.12; Reports will
+          aggregate this run into your practice history (Slice D).
         </p>
-        <p className="text-xs text-muted-foreground/70 italic">
-          Per-category vibe-check + detailed summary land in Slice B.11.
-        </p>
+
+        <button
+          type="button"
+          onClick={onExit}
+          className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Done
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={onExit}
-        className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-      >
-        Done
-      </button>
     </main>
+  );
+}
+
+/** Small colored tag for each summary row's outcome. */
+function OutcomeTag({
+  outcome,
+}: {
+  outcome: "completed" | "skipped" | "revisited";
+}) {
+  const meta = {
+    completed: { label: "Completed", cls: "border-primary/40 bg-primary/10 text-primary" },
+    skipped: { label: "Skipped", cls: "border-border/60 bg-background/60 text-muted-foreground" },
+    revisited: { label: "Revisited", cls: "border-border/60 bg-background/60 text-muted-foreground/70" },
+  }[outcome];
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${meta.cls}`}
+    >
+      {meta.label}
+    </span>
   );
 }
 
@@ -486,6 +616,16 @@ function formatTimer(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Fallback label for items whose author didn't provide one. Duplicated
+ * from routine-builder.tsx so both files stand alone — the helper is
+ * small and hyper-specific to display logic; not worth a shared file.
+ */
+function itemFallbackLabel(item: RoutineItem): string {
+  const typeLabel = ROUTINE_ITEM_TYPE_LABELS[item.type];
+  return `Untitled ${typeLabel.toLowerCase()}`;
 }
 
 function formatDuration(sec: number): string {

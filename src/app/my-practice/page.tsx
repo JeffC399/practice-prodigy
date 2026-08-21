@@ -1,6 +1,13 @@
 "use client";
 
-import { CalendarCheck, Construction, ListChecks, Plus } from "lucide-react";
+import {
+  CalendarCheck,
+  Construction,
+  ListChecks,
+  Play,
+  Plus,
+  X,
+} from "lucide-react";
 import { notFound, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import {
@@ -11,7 +18,11 @@ import {
 import { RoutineBuilder } from "@/components/my-practice/routine-builder";
 import { RoutineCard } from "@/components/my-practice/routine-card";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
-import { useRoutinesLibrary } from "@/lib/practice/routines-library";
+import { useRoutineExecutor } from "@/lib/practice/routine-executor";
+import {
+  getRoutineById,
+  useRoutinesLibrary,
+} from "@/lib/practice/routines-library";
 
 /**
  * My Practice — flagship module landing page.
@@ -197,6 +208,24 @@ function RoutinesTab({
 }) {
   const routines = useRoutinesLibrary((s) => s.routines);
   const saveRoutine = useRoutinesLibrary((s) => s.saveRoutine);
+  const router = useRouter();
+  const execution = useRoutineExecutor((s) => s.execution);
+  const exitExecution = useRoutineExecutor((s) => s.exit);
+
+  // Phase 111 — Resume-mid-routine banner. Rendered when a persisted
+  // execution exists AND it's still in progress (not yet complete).
+  // Resolves the routine name for display; if the routine got
+  // deleted while a run was persisted, silently clears the stale
+  // execution instead of showing a broken banner.
+  const resumableRoutine =
+    execution && execution.status !== "complete"
+      ? getRoutineById(execution.routineId) ?? null
+      : null;
+  useEffect(() => {
+    if (execution && execution.status !== "complete" && !resumableRoutine) {
+      exitExecution();
+    }
+  }, [execution, resumableRoutine, exitExecution]);
 
   const sorted = [...routines].sort((a, b) => {
     // Recently-run > recently-modified > alphabetical.
@@ -217,6 +246,48 @@ function RoutinesTab({
 
   return (
     <section className="flex flex-col gap-4">
+      {/* Phase 111 — Resume-mid-routine banner. */}
+      {resumableRoutine && execution && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border-2 border-primary/40 bg-primary/10 px-4 py-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-primary">
+              Routine in progress
+            </span>
+            <span className="text-sm text-foreground">
+              <span className="font-medium">{resumableRoutine.name}</span>
+              <span className="text-muted-foreground">
+                {" — item "}
+                {execution.currentIndex + 1} of{" "}
+                {resumableRoutine.items.length}
+              </span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => exitExecution()}
+              title="Discard the in-progress run"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/my-practice/execute/${resumableRoutine.id}`,
+                )
+              }
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              <Play className="h-3.5 w-3.5" aria-hidden="true" />
+              Resume
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-lg font-semibold text-foreground">
