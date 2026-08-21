@@ -11,13 +11,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { sheetPlayback } from "@/lib/audio/sheet-playback";
 import { PrintPolish } from "@/components/sheets/print-polish";
 import { ShareModal } from "@/components/sheets/share-modal";
 import { SheetSurface } from "@/components/sheets/sheet-surface";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { useSessionTracker } from "@/lib/tracking/session-tracker";
+import { useRoutineTakeover } from "@/lib/practice/routine-takeover";
+import { RoutineTakeoverChip } from "@/components/practice/routine-takeover-chip";
 
 /**
  * /sheets/[id] — read-only display + print view.
@@ -33,7 +35,16 @@ import { useSessionTracker } from "@/lib/tracking/session-tracker";
  * most platforms. CSS @media print rules hide the chrome
  * (header, footer, toolbar) so only the chart prints.
  */
+/** Suspense wrap — Phase 110 useSearchParams needs it for prerender. */
 export default function SheetViewPage() {
+  return (
+    <Suspense fallback={null}>
+      <SheetViewContent />
+    </Suspense>
+  );
+}
+
+function SheetViewContent() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const sheet = useSheetsLibrary((s) => s.sheets.find((x) => x.id === id));
@@ -127,10 +138,18 @@ export default function SheetViewPage() {
     }
   };
 
+  // Phase 110 — Routine take-over chip (renders only when active).
+  const takeover = useRoutineTakeover("leadsheet");
+
   // Phase 38 — mobile responsiveness pass (padding + wrap toolbar +
   // horizontal-scroll sheet wrapper).
   return (
-    <main id="main-content" className="flex flex-1 flex-col items-center px-3 py-4 sm:px-6 sm:py-8">
+    <main id="main-content" className="flex flex-1 flex-col">
+      <RoutineTakeoverChip
+        state={takeover}
+        isLast={takeover.currentIndex === takeover.totalItems}
+      />
+      <div className="flex flex-1 flex-col items-center px-3 py-4 sm:px-6 sm:py-8">
       <div className="flex w-full max-w-5xl flex-col gap-6">
         {/* Toolbar — hidden in print. Phase 34.7: Play is now the
             primary CTA (consume the sheet); Share, Print, Edit are
@@ -202,6 +221,7 @@ export default function SheetViewPage() {
         <div className="sheet-print-wrap overflow-x-auto">
           <SheetSurface sheet={sheet} measuresPerLine={sheet.measuresPerLine} />
         </div>
+      </div>
       </div>
 
       {/* Phase 34.7 — Share modal reused from the edit page. */}

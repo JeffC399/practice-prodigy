@@ -10,7 +10,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   METRONOME_SOUND_LABELS,
   METRONOME_SOUNDS,
@@ -28,6 +28,8 @@ import {
 } from "@/lib/state/metronome-prefs";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
 import { useSessionTracker } from "@/lib/tracking/session-tracker";
+import { useRoutineTakeover } from "@/lib/practice/routine-takeover";
+import { RoutineTakeoverChip } from "@/components/practice/routine-takeover-chip";
 
 /**
  * Standalone Metronome page (Phase 21).
@@ -59,7 +61,32 @@ const SUBDIVISION_OPTIONS: Array<{
 const TAP_HISTORY_MAX = 4;
 const TAP_RESET_MS = 2000;
 
+/**
+ * Next.js 16 requires useSearchParams() (used inside our
+ * useRoutineTakeover hook) to sit under a Suspense boundary on
+ * statically-prerendered pages. Wrapping the metronome's content in
+ * Suspense keeps the CSR-bailout clean.
+ */
 export default function MetronomePage() {
+  return (
+    <Suspense
+      fallback={
+        <main
+          id="main-content"
+          className="flex flex-1 flex-col items-center justify-center px-6 py-12"
+        >
+          <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Loading metronome…
+          </div>
+        </main>
+      }
+    >
+      <MetronomeContent />
+    </Suspense>
+  );
+}
+
+function MetronomeContent() {
   const prefs = useMetronomePrefs();
   const {
     bpm,
@@ -156,6 +183,22 @@ export default function MetronomePage() {
     if (!engineState.isPlaying) return;
     useSessionTracker.getState().reportActivity({ module: "metronome" });
   }, [engineState.isPlaying, engineState.currentBeat]);
+
+  // Phase 110 — Routine take-over. When active, auto-configure the
+  // metronome from the item's bpm + time signature so the user sees
+  // the routine's tempo the moment the page loads.
+  const takeover = useRoutineTakeover("metronome");
+  useEffect(() => {
+    if (!takeover.isActive) return;
+    const item = takeover.currentItem;
+    if (item?.type !== "metronome") return;
+    setBpm(item.bpm);
+    setBeatsPerMeasure(item.beatsPerMeasure);
+    setBeatUnit(item.beatUnit);
+    // Deps: fire once per take-over item change. `set*` are stable
+    // Zustand actions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [takeover.isActive, takeover.currentItem?.id]);
 
   // Live volume updates always (so muting during play works).
   useEffect(() => {
@@ -269,8 +312,13 @@ export default function MetronomePage() {
   }
 
   return (
-    <main id="main-content" className="flex flex-1 flex-col items-center px-6 py-8">
-      <div className="flex w-full max-w-3xl flex-col gap-8">
+    <main id="main-content" className="flex flex-1 flex-col">
+      <RoutineTakeoverChip
+        state={takeover}
+        isLast={takeover.currentIndex === takeover.totalItems}
+      />
+      <div className="flex flex-col items-center px-6 py-8">
+        <div className="flex w-full max-w-3xl flex-col gap-8">
         {/* Header */}
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold tracking-tight">Metronome</h1>
@@ -895,6 +943,7 @@ export default function MetronomePage() {
           <p className="text-[11px] text-muted-foreground">
             Settings persist locally · Spacebar toggles play
           </p>
+        </div>
         </div>
       </div>
     </main>

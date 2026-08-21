@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Minus, Play, Plus, Settings2, Square } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { keyDisplay, keySpokenForm } from "@/lib/key-sequencer/display";
@@ -21,6 +21,8 @@ import {
 } from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { useSessionTracker } from "@/lib/tracking/session-tracker";
+import { useRoutineTakeover } from "@/lib/practice/routine-takeover";
+import { RoutineTakeoverChip } from "@/components/practice/routine-takeover-chip";
 
 /**
  * Key Sequencer drill screen — Phase 45.2.
@@ -39,7 +41,16 @@ import { useSessionTracker } from "@/lib/tracking/session-tracker";
  * page except when typing in an input.
  */
 
+/** Suspense wrap — Phase 110 useSearchParams needs it for prerender. */
 export default function KeySequencerSessionPage() {
+  return (
+    <Suspense fallback={null}>
+      <KeySequencerSessionContent />
+    </Suspense>
+  );
+}
+
+function KeySequencerSessionContent() {
   const config = useKeySequencerConfig();
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const { state, start, stop } = useMetronome();
@@ -302,8 +313,15 @@ export default function KeySequencerSessionPage() {
     );
   }
 
+  // Phase 110 — Routine take-over chip (renders only when active).
+  const takeover = useRoutineTakeover("key-drill");
+
   return (
     <main id="main-content" className="flex flex-1 flex-col">
+      <RoutineTakeoverChip
+        state={takeover}
+        isLast={takeover.currentIndex === takeover.totalItems}
+      />
       {/* Phase 56 — Header rebuilt to mirror Arpeggios exactly.
           Layout: [Setup link] | [status chips] [jump controls]
           [tempo cluster] [time-sig] [drill length]. Chips use the

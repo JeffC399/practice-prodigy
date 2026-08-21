@@ -33,6 +33,8 @@ import { SHIPPED_DRILLS } from "@/lib/data/shipped-drills";
 import { useResumeSession } from "@/lib/state/resume-session";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { useSessionTracker } from "@/lib/tracking/session-tracker";
+import { useRoutineTakeover } from "@/lib/practice/routine-takeover";
+import { RoutineTakeoverChip } from "@/components/practice/routine-takeover-chip";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Minus,
@@ -46,7 +48,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 /** Summary surfaced in the DrillCompleteOverlay on natural completion. */
 type CompletedSummary = {
@@ -70,7 +72,20 @@ type CompletedSummary = {
  * (PROJECT-DESIGN.md §4.1 Always-Visible mode); Late-Reveal lands in
  * a polish slice.
  */
+/**
+ * Suspense wrap — required by Next.js 16 for statically-prerendered
+ * pages that call useSearchParams() (via useRoutineTakeover, added
+ * in Phase 110).
+ */
 export default function PracticeSessionPage() {
+  return (
+    <Suspense fallback={null}>
+      <PracticeSessionContent />
+    </Suspense>
+  );
+}
+
+function PracticeSessionContent() {
   const config = usePracticeConfig();
   const drillsLib = useDrillsLibrary();
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
@@ -745,8 +760,17 @@ export default function PracticeSessionPage() {
     metronomeEngine.jumpToBeat(target);
   };
 
+  // Phase 110 — Routine take-over. When the URL carries ?routineMode=1,
+  // we're inside a routine's execution. Render the chip in the header,
+  // otherwise everything works as before (isActive=false → no-op).
+  const takeover = useRoutineTakeover("drill");
+
   return (
     <main id="main-content" className="flex flex-1 flex-col">
+      <RoutineTakeoverChip
+        state={takeover}
+        isLast={takeover.currentIndex === takeover.totalItems}
+      />
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Link

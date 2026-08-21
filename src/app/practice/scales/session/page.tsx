@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Minus, Play, Plus, Settings2, Square } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { metronomeEngine } from "@/lib/audio/metronome";
 import { useMetronome } from "@/lib/audio/use-metronome";
 import { useScaleDrillConfig } from "@/lib/scale-driller/config-store";
@@ -20,6 +20,8 @@ import {
 } from "@/lib/state/practice-config";
 import { useUserPrefs } from "@/lib/state/user-prefs";
 import { useSessionTracker } from "@/lib/tracking/session-tracker";
+import { useRoutineTakeover } from "@/lib/practice/routine-takeover";
+import { RoutineTakeoverChip } from "@/components/practice/routine-takeover-chip";
 
 /**
  * Scale Driller drill screen — Phase 62.
@@ -31,7 +33,16 @@ import { useSessionTracker } from "@/lib/tracking/session-tracker";
  * with a secondary line showing spelled notes or interval degrees.
  */
 
+/** Suspense wrap — Phase 110 useSearchParams needs it for prerender. */
 export default function ScaleDrillerSessionPage() {
+  return (
+    <Suspense fallback={null}>
+      <ScaleDrillerSessionContent />
+    </Suspense>
+  );
+}
+
+function ScaleDrillerSessionContent() {
   const config = useScaleDrillConfig();
   const practiceLayout = useUserPrefs((s) => s.practiceLayout);
   const { state, start, stop } = useMetronome();
@@ -192,8 +203,15 @@ export default function ScaleDrillerSessionPage() {
     );
   }
 
+  // Phase 110 — Routine take-over chip (renders only when active).
+  const takeover = useRoutineTakeover("scale-drill");
+
   return (
     <main id="main-content" className="flex flex-1 flex-col">
+      <RoutineTakeoverChip
+        state={takeover}
+        isLast={takeover.currentIndex === takeover.totalItems}
+      />
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Link
