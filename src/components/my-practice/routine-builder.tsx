@@ -1,7 +1,23 @@
 "use client";
 
-import { ArrowLeft, ListChecks, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ArrowLeft, GripVertical, ListChecks, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { ItemPickerModal } from "@/components/my-practice/item-picker-modal";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { PRACTICE_MODULE_LABELS } from "@/lib/practice/types";
@@ -67,6 +83,37 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
   const handleAddItem = (item: RoutineItem) => {
     lib.updateRoutineItems(routine.id, [...routine.items, item]);
   };
+
+  // Phase 107 (B.7) — drag-reorder support via dnd-kit. Same sensor
+  // config as the Bass Arpeggios chord-pool reorder (4px activation
+  // distance keeps micro-drags from stealing click intent + full
+  // keyboard support via sortableKeyboardCoordinates).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIndex = routine.items.findIndex((i) => i.id === active.id);
+    const toIndex = routine.items.findIndex((i) => i.id === over.id);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const next = [...routine.items];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    lib.updateRoutineItems(routine.id, next);
+  };
+
+  // Stable memoized id array for SortableContext (dnd-kit re-runs some
+  // internal setup when the ref changes; memoizing keeps drop
+  // animation crisp).
+  const sortableIds = useMemo(
+    () => routine.items.map((i) => i.id),
+    [routine.items],
+  );
 
   return (
     <section className="flex flex-col gap-6">
@@ -191,22 +238,32 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
             </div>
           </div>
         ) : (
-          <ol className="flex flex-col gap-2">
-            {routine.items.map((item, idx) => (
-              <li key={item.id}>
-                <ItemRow
-                  item={item}
-                  index={idx}
-                  onDelete={() =>
-                    lib.updateRoutineItems(
-                      routine.id,
-                      routine.items.filter((i) => i.id !== item.id),
-                    )
-                  }
-                />
-              </li>
-            ))}
-          </ol>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={sortableIds}
+              strategy={verticalListSortingStrategy}
+            >
+              <ol className="flex flex-col gap-2">
+                {routine.items.map((item, idx) => (
+                  <SortableItemRow
+                    key={item.id}
+                    item={item}
+                    index={idx}
+                    onDelete={() =>
+                      lib.updateRoutineItems(
+                        routine.id,
+                        routine.items.filter((i) => i.id !== item.id),
+                      )
+                    }
+                  />
+                ))}
+              </ol>
+            </SortableContext>
+          </DndContext>
         )}
       </section>
 
@@ -221,11 +278,14 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
 }
 
 /**
- * One row in the items list. Shows position number, type + label,
- * category chip, and estimated duration. Delete uses the two-click
- * confirm pattern from RoutineCard for consistency.
+ * One row in the items list — Phase 107 makes it draggable.
+ *
+ * Position number renders alongside a drag handle on the left. Actual
+ * position is derived from array order (not the number displayed), so
+ * dnd-kit's reorder just triggers a store update and the numbers
+ * re-render naturally.
  */
-function ItemRow({
+function SortableItemRow({
   item,
   index,
   onDelete,
@@ -235,62 +295,91 @@ function ItemRow({
   onDelete: () => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-border bg-background/40 px-3 py-2">
-      <span className="w-6 shrink-0 text-right font-mono text-xs text-muted-foreground/70">
-        {index + 1}.
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
-            {item.label || itemFallbackLabel(item)}
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
-            {ROUTINE_ITEM_TYPE_LABELS[item.type]}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <CategoryChip categoryId={item.category} size="sm" />
-          {item.estimatedSeconds > 0 && (
-            <span className="font-mono text-[10px] text-muted-foreground/70">
-              {formatDuration(item.estimatedSeconds)}
-            </span>
-          )}
-        </div>
-      </div>
-      {confirmingDelete ? (
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(false)}
-            className="rounded-md border border-border bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onDelete();
-              setConfirmingDelete(false);
-            }}
-            className="rounded-md bg-destructive px-2 py-1 text-[10px] font-medium text-destructive-foreground transition-opacity hover:opacity-90"
-          >
-            Confirm
-          </button>
-        </div>
-      ) : (
+    <li ref={setNodeRef} style={style}>
+      <div className="flex items-center gap-2 rounded-md border border-border bg-background/40 px-3 py-2">
+        {/* Drag handle. Only this button carries the listeners so
+            clicking the row body doesn't accidentally start a drag. */}
         <button
           type="button"
-          onClick={() => setConfirmingDelete(true)}
-          aria-label={`Delete item ${item.label}`}
-          title="Delete item"
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          {...attributes}
+          {...listeners}
+          aria-label={`Reorder item ${index + 1}`}
+          title="Drag to reorder"
+          className="flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-background/60 hover:text-foreground active:cursor-grabbing"
         >
-          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          <GripVertical className="h-4 w-4" aria-hidden="true" />
         </button>
-      )}
-    </div>
+        <span className="w-6 shrink-0 text-right font-mono text-xs text-muted-foreground/70">
+          {index + 1}.
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium text-foreground">
+              {item.label || itemFallbackLabel(item)}
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              {ROUTINE_ITEM_TYPE_LABELS[item.type]}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CategoryChip categoryId={item.category} size="sm" />
+            {item.estimatedSeconds > 0 && (
+              <span className="font-mono text-[10px] text-muted-foreground/70">
+                {formatDuration(item.estimatedSeconds)}
+              </span>
+            )}
+          </div>
+        </div>
+        {confirmingDelete ? (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(false)}
+              className="rounded-md border border-border bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDelete();
+                setConfirmingDelete(false);
+              }}
+              className="rounded-md bg-destructive px-2 py-1 text-[10px] font-medium text-destructive-foreground transition-opacity hover:opacity-90"
+            >
+              Confirm
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            aria-label={`Delete item ${item.label}`}
+            title="Delete item"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    </li>
   );
 }
 
