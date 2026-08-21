@@ -5,6 +5,7 @@ import { CalendarHeatmap } from "./calendar-heatmap";
 import { CategoryPanel } from "./category-panel";
 import { DailyTrendLine } from "./daily-trend-line";
 import { HeadlineStats } from "./headline-stats";
+import { LevelsPanel } from "./levels-panel";
 import { ReportsRangePicker } from "./range-picker";
 import {
   getSessionsInRange,
@@ -88,10 +89,15 @@ export function ReportsTab() {
               picker). Deliberate — it's a momentum view, not a range
               slice. */}
           <CalendarHeatmap sessions={allSessions} />
-          {/* Songs panel, level panel, methodology chip — all layered
-              in by D.6–D.8. */}
+          {/* Songs panel, methodology chip — layered in by D.6 + D.8. */}
         </>
       )}
+
+      {/* Levels panel renders regardless of session data — even a
+          brand-new user should be able to set their proficiency, and
+          this is currently the only place to do it (until Slice E/F's
+          Profile tab ships a fuller manager). */}
+      <LevelsPanel />
     </section>
   );
 }
