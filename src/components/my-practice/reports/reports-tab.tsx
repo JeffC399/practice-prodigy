@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { CalendarHeatmap } from "./calendar-heatmap";
 import { CategoryPanel } from "./category-panel";
 import { DailyTrendLine } from "./daily-trend-line";
+import { ExportBar } from "./export-bar";
 import { HeadlineStats } from "./headline-stats";
 import { LevelsPanel } from "./levels-panel";
 import { MethodologyMix } from "./methodology-mix";
@@ -63,7 +64,7 @@ export function ReportsTab() {
   const isEmpty = allSessions.length === 0;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-4" data-reports-print-area>
       <header className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-foreground">Reports</h2>
         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -72,7 +73,12 @@ export function ReportsTab() {
         </p>
       </header>
 
-      <ReportsRangePicker value={range} onChange={setRange} />
+      <div className="no-print flex flex-wrap items-center justify-between gap-2">
+        <ReportsRangePicker value={range} onChange={setRange} />
+        {!isEmpty && (
+          <ExportBar sessionsInRange={sessionsInRange} range={range} />
+        )}
+      </div>
 
       {isEmpty ? (
         <EmptyState />

@@ -690,6 +690,49 @@
 }
 
 /* ==========================================================================
+ * Phase 126 (Slice D.10) — Print Reports.
+ *
+ * The Reports tab's Export → PDF flow fires window.print(). When the
+ * page carries the `.reports-print-mode` class on <html>, we hide
+ * everything except descendants of `[data-reports-print-area]` so the
+ * printed page shows just the analytics stack — no header, sidebar,
+ * or app chrome. The visibility-toggle pattern (rather than display:
+ * none) is robust regardless of how deep the print area sits in the
+ * DOM. Colors flip to a print-friendly light palette so ink cost
+ * stays sane on physical prints.
+ * ========================================================================== */
+@media print {
+  html.reports-print-mode body * {
+    visibility: hidden !important;
+  }
+  html.reports-print-mode [data-reports-print-area],
+  html.reports-print-mode [data-reports-print-area] * {
+    visibility: visible !important;
+  }
+  html.reports-print-mode [data-reports-print-area] .no-print {
+    display: none !important;
+  }
+  html.reports-print-mode {
+    background: white !important;
+    color: #111 !important;
+  }
+  html.reports-print-mode [data-reports-print-area] {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: white !important;
+    color: #111 !important;
+    padding: 0.5in !important;
+    max-width: 100% !important;
+  }
+  html.reports-print-mode [data-reports-print-area] section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+/* ==========================================================================
  * Phase 34.4 — Accent palette overrides (moved to end of file).
  *
  * Applied via the `accent-<color>` class on <html>. Each overrides
