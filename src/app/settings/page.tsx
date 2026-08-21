@@ -169,6 +169,8 @@ export default function SettingsPage() {
   const setCornerRadius = useUserPrefs((s) => s.setCornerRadius);
   const highContrast = useUserPrefs((s) => s.highContrast);
   const setHighContrast = useUserPrefs((s) => s.setHighContrast);
+  const routineSounds = useUserPrefs((s) => s.routineSounds);
+  const setRoutineSounds = useUserPrefs((s) => s.setRoutineSounds);
   const resetAppearance = useUserPrefs((s) => s.resetAppearance);
   const applyAppearanceSlice = useUserPrefs((s) => s.applyAppearanceSlice);
   const applyMood = useUserPrefs((s) => s.applyMood);
@@ -739,6 +741,24 @@ export default function SettingsPage() {
                 );
               })}
             </div>
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          tab="practice"
+          title="Routine sounds"
+          description="Audio cues in the My Practice routine player. When on, a soft chime plays when a rest ends (auto-advance) and a short triad when the whole routine finishes."
+          summary={routineSounds ? "On" : "Muted"}
+        >
+          <SettingsField
+            label="Play chimes"
+            hint="You can also toggle this from inside the player (top-bar speaker icon or the M key)."
+          >
+            <ToggleRow
+              value={routineSounds}
+              onChange={setRoutineSounds}
+              label={routineSounds ? "On" : "Muted"}
+            />
           </SettingsField>
         </SettingsSection>
 
