@@ -48,13 +48,14 @@ export function DrillItemComposer({
       emptyMessage="No drills yet. Save one on /practice, then come back."
       moduleDefaultCategory={MODULE_DEFAULT_CATEGORY.arpeggios}
       onCancel={onCancel}
-      onSubmit={({ pickedId, label, category, estimatedSeconds }) => {
+      onSubmit={({ pickedId, label, category, methodologyId, estimatedSeconds }) => {
         const item: RoutineItem = {
           id: newRoutineItemId(),
           type: "drill",
           drillId: pickedId,
           label,
           category,
+          methodologyId,
           estimatedSeconds,
         };
         onSubmit(item);

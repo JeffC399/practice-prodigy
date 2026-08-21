@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { CategoryPicker } from "@/components/practice/category-picker";
+import { MethodologyPicker } from "@/components/my-practice/methodology-picker";
 import type { CategoryId } from "@/lib/practice/categories";
 import {
   newRoutineItemId,
+  type MethodologyId,
   type RoutineItem,
 } from "@/lib/practice/routine-types";
 
@@ -42,6 +44,11 @@ export function RestItemComposer({
   const [minutes, setMinutes] = useState<number>(DEFAULT_MINUTES);
   const [guidance, setGuidance] = useState<string>("");
   const [category, setCategory] = useState<CategoryId>(DEFAULT_CATEGORY);
+  // Rests rarely have a methodology, so default to undefined — user can
+  // still tag one (e.g. Mental Practice for a visualization rest).
+  const [methodologyId, setMethodologyId] = useState<MethodologyId | undefined>(
+    undefined,
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -64,6 +71,7 @@ export function RestItemComposer({
       guidanceText: trimmedGuidance || undefined,
       label: label.trim() || "Rest",
       category,
+      methodologyId,
       estimatedSeconds: Math.max(0, Math.round(minutes * 60)),
     };
     onSubmit(item);
@@ -145,6 +153,13 @@ export function RestItemComposer({
           Defaults to Cool-down; try Warmup for pre-drill breathers.
         </span>
       </div>
+
+      <MethodologyPicker
+        value={methodologyId}
+        onChange={setMethodologyId}
+        scope="per-item"
+        hint="Usually blank for rests. Try Mental Practice for a visualization break."
+      />
 
       <div className="flex flex-wrap justify-end gap-2 pt-1">
         <button

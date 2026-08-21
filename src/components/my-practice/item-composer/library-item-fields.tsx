@@ -2,19 +2,22 @@
 
 import { CategoryChip } from "@/components/practice/category-chip";
 import { CategoryPicker } from "@/components/practice/category-picker";
+import { MethodologyPicker } from "@/components/my-practice/methodology-picker";
 import {
   BUILTIN_CATEGORY_LIST,
   type CategoryId,
 } from "@/lib/practice/categories";
-import { useUserPrefs } from "@/lib/state/user-prefs";
+import { defaultMethodologyForCategory } from "@/lib/practice/methodologies";
+import type { MethodologyId } from "@/lib/practice/routine-types";
 import { useEffect, useRef, useState } from "react";
 
 /**
- * LibraryItemFields — Slice B.5 (Phase 105).
+ * LibraryItemFields — Slice B.5 (Phase 105), + methodology in B.13.
  *
- * The shared form used by all three "pick a saved drill from library"
- * composers (drill / key-drill / scale-drill). Each per-type composer
- * wraps this and constructs the type-specific RoutineItem on Save.
+ * The shared form used by all four "pick a saved thing from library"
+ * composers (drill / key-drill / scale-drill / leadsheet). Each per-type
+ * composer wraps this and constructs the type-specific RoutineItem on
+ * Save.
  *
  * ## Fields
  *
@@ -24,11 +27,15 @@ import { useEffect, useRef, useState } from "react";
  *   3. Category: click-to-open picker popover (reuses CategoryPicker
  *      from Phase 91). Defaults to the picked item's own category (or
  *      the caller's module default when the item has none).
- *   4. Estimated minutes: numeric input; ~5 min is the sensible default
+ *   4. Methodology (Slice B.13): per-item picker, seeded via
+ *      `defaultMethodologyForCategory(category)` so switching category
+ *      re-suggests (until the user touches it manually).
+ *   5. Estimated minutes: numeric input; ~5 min is the sensible default
  *      for a drilling item (average practice slot).
  *
- * Called via `onSubmit({ pickedId, label, category, estimatedSeconds })`.
- * Parent constructs the discriminated-union RoutineItem.
+ * Called via `onSubmit({ pickedId, label, category, methodologyId,
+ * estimatedSeconds })`. Parent constructs the discriminated-union
+ * RoutineItem.
  */
 
 export type LibraryItemFieldsSubmit = {
@@ -36,6 +43,7 @@ export type LibraryItemFieldsSubmit = {
   pickedId: string;
   label: string;
   category: CategoryId;
+  methodologyId: MethodologyId | undefined;
   estimatedSeconds: number;
 };
 
@@ -58,13 +66,17 @@ export function LibraryItemFields({
   onSubmit: (fields: LibraryItemFieldsSubmit) => void;
   onCancel: () => void;
 }) {
-  const customCategories = useUserPrefs((s) => s.customCategories);
-
   const [pickedId, setPickedId] = useState<string>(library[0]?.id ?? "");
   const [label, setLabel] = useState<string>(library[0]?.name ?? "");
-  const [category, setCategory] = useState<CategoryId>(
-    library[0]?.category ?? moduleDefaultCategory,
+  const initialCategory: CategoryId =
+    library[0]?.category ?? moduleDefaultCategory;
+  const [category, setCategory] = useState<CategoryId>(initialCategory);
+  const [methodologyId, setMethodologyId] = useState<MethodologyId | undefined>(
+    () => defaultMethodologyForCategory(initialCategory),
   );
+  /** Tracks whether the user has manually touched methodology. Once true,
+   *  we stop auto-suggesting on category changes. */
+  const [methodologyTouched, setMethodologyTouched] = useState(false);
   const [minutes, setMinutes] = useState<number>(defaultEstimatedMinutes);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerContainerRef = useRef<HTMLDivElement | null>(null);
@@ -83,10 +95,15 @@ export function LibraryItemFields({
         setLabel(nextPick.name);
       }
       // Category always follows the picked item (or module default).
-      setCategory(nextPick.category ?? moduleDefaultCategory);
+      const nextCategory = nextPick.category ?? moduleDefaultCategory;
+      setCategory(nextCategory);
+      // Re-seed methodology from the new category (unless user touched).
+      if (!methodologyTouched) {
+        setMethodologyId(defaultMethodologyForCategory(nextCategory));
+      }
     }
     prevPickIdRef.current = pickedId;
-  }, [pickedId, library, label, moduleDefaultCategory]);
+  }, [pickedId, library, label, moduleDefaultCategory, methodologyTouched]);
 
   // Click-outside for the category picker popover.
   useEffect(() => {
@@ -106,6 +123,7 @@ export function LibraryItemFields({
       pickedId,
       label: label.trim() || library.find((l) => l.id === pickedId)?.name || "Untitled",
       category,
+      methodologyId,
       estimatedSeconds: Math.max(0, Math.round(minutes * 60)),
     });
   };
@@ -190,7 +208,14 @@ export function LibraryItemFields({
                   // "None" clears back to module default — items always
                   // have a required category, unlike the entity-level
                   // per-item picker which allows undefined.
-                  if (next !== undefined) setCategory(next);
+                  if (next !== undefined) {
+                    setCategory(next);
+                    // Re-seed methodology when category changes (unless
+                    // user has manually touched it).
+                    if (!methodologyTouched) {
+                      setMethodologyId(defaultMethodologyForCategory(next));
+                    }
+                  }
                   setPickerOpen(false);
                 }}
                 onDismiss={() => setPickerOpen(false)}
@@ -218,6 +243,17 @@ export function LibraryItemFields({
           </span>
         </label>
       </div>
+
+      {/* Methodology (per-item scope) */}
+      <MethodologyPicker
+        value={methodologyId}
+        onChange={(next) => {
+          setMethodologyId(next);
+          setMethodologyTouched(true);
+        }}
+        scope="per-item"
+        hint="How you'll practice this. Suggested from the category — override anytime."
+      />
 
       {/* Actions */}
       <div className="flex flex-wrap justify-end gap-2 pt-1">

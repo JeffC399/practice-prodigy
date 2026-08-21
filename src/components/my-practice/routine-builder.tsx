@@ -21,6 +21,7 @@ import { useMemo, useState } from "react";
 import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { ItemPickerModal } from "@/components/my-practice/item-picker-modal";
 import { CategoryChip } from "@/components/practice/category-chip";
+import { getMethodology } from "@/lib/practice/methodologies";
 import { PRACTICE_MODULE_LABELS } from "@/lib/practice/types";
 import {
   categoryTimeBreakdown,
@@ -339,8 +340,16 @@ function SortableItemRow({
               {ROUTINE_ITEM_TYPE_LABELS[item.type]}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <CategoryChip categoryId={item.category} size="sm" />
+            {item.methodologyId && (
+              <span
+                className="rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground"
+                title={getMethodology(item.methodologyId)?.summary ?? undefined}
+              >
+                {getMethodology(item.methodologyId)?.name ?? item.methodologyId}
+              </span>
+            )}
             {item.estimatedSeconds > 0 && (
               <span className="font-mono text-[10px] text-muted-foreground/70">
                 {formatDuration(item.estimatedSeconds)}

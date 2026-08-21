@@ -41,13 +41,14 @@ export function LeadsheetItemComposer({
       emptyMessage="No lead sheets yet. Create one on /sheets, then come back."
       moduleDefaultCategory={MODULE_DEFAULT_CATEGORY["lsb-playback"]}
       onCancel={onCancel}
-      onSubmit={({ pickedId, label, category, estimatedSeconds }) => {
+      onSubmit={({ pickedId, label, category, methodologyId, estimatedSeconds }) => {
         const item: RoutineItem = {
           id: newRoutineItemId(),
           type: "leadsheet",
           leadSheetId: pickedId,
           label,
           category,
+          methodologyId,
           estimatedSeconds,
         };
         onSubmit(item);

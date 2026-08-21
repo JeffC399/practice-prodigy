@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { CategoryPicker } from "@/components/practice/category-picker";
+import { MethodologyPicker } from "@/components/my-practice/methodology-picker";
 import type { CategoryId } from "@/lib/practice/categories";
+import { defaultMethodologyForCategory } from "@/lib/practice/methodologies";
 import {
   newRoutineItemId,
+  type MethodologyId,
   type RoutineItem,
 } from "@/lib/practice/routine-types";
 
@@ -38,6 +41,10 @@ export function CustomItemComposer({
   const [label, setLabel] = useState<string>("");
   const [instruction, setInstruction] = useState<string>("");
   const [category, setCategory] = useState<CategoryId>(DEFAULT_CATEGORY);
+  const [methodologyId, setMethodologyId] = useState<MethodologyId | undefined>(
+    () => defaultMethodologyForCategory(DEFAULT_CATEGORY),
+  );
+  const [methodologyTouched, setMethodologyTouched] = useState(false);
   const [minutes, setMinutes] = useState<number>(DEFAULT_MINUTES);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerContainerRef = useRef<HTMLDivElement | null>(null);
@@ -63,6 +70,7 @@ export function CustomItemComposer({
       instruction: instruction.trim(),
       label: label.trim(),
       category,
+      methodologyId,
       estimatedSeconds: Math.max(0, Math.round(minutes * 60)),
     };
     onSubmit(item);
@@ -115,7 +123,12 @@ export function CustomItemComposer({
               <CategoryPicker
                 value={category}
                 onChange={(next) => {
-                  if (next !== undefined) setCategory(next);
+                  if (next !== undefined) {
+                    setCategory(next);
+                    if (!methodologyTouched) {
+                      setMethodologyId(defaultMethodologyForCategory(next));
+                    }
+                  }
                   setPickerOpen(false);
                 }}
                 onDismiss={() => setPickerOpen(false)}
@@ -137,6 +150,16 @@ export function CustomItemComposer({
           />
         </label>
       </div>
+
+      <MethodologyPicker
+        value={methodologyId}
+        onChange={(next) => {
+          setMethodologyId(next);
+          setMethodologyTouched(true);
+        }}
+        scope="per-item"
+        hint="How you'll practice this. Suggested from the category — override anytime."
+      />
 
       <div className="flex flex-wrap justify-end gap-2 pt-1">
         <button

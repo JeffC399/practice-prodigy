@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { CategoryPicker } from "@/components/practice/category-picker";
+import { MethodologyPicker } from "@/components/my-practice/methodology-picker";
 import type { CategoryId } from "@/lib/practice/categories";
+import { defaultMethodologyForCategory } from "@/lib/practice/methodologies";
 import {
   newRoutineItemId,
+  type MethodologyId,
   type RoutineItem,
 } from "@/lib/practice/routine-types";
 import { TIME_SIGNATURES } from "@/lib/state/practice-config";
@@ -54,6 +57,10 @@ export function MetronomeItemComposer({
   const [category, setCategory] = useState<CategoryId>(
     MODULE_DEFAULT_CATEGORY.metronome,
   );
+  const [methodologyId, setMethodologyId] = useState<MethodologyId | undefined>(
+    () => defaultMethodologyForCategory(MODULE_DEFAULT_CATEGORY.metronome),
+  );
+  const [methodologyTouched, setMethodologyTouched] = useState(false);
   // Label state: tracked separately so the auto-generated default
   // updates when bpm/ts changes UNLESS the user has customized it.
   const [label, setLabel] = useState<string>(
@@ -92,6 +99,7 @@ export function MetronomeItemComposer({
       beatUnit,
       label: label.trim() || `Metronome — ${bpm} bpm ${beatsPerMeasure}/${beatUnit}`,
       category,
+      methodologyId,
       estimatedSeconds: Math.max(0, Math.round(minutes * 60)),
     };
     onSubmit(item);
@@ -179,7 +187,12 @@ export function MetronomeItemComposer({
               <CategoryPicker
                 value={category}
                 onChange={(next) => {
-                  if (next !== undefined) setCategory(next);
+                  if (next !== undefined) {
+                    setCategory(next);
+                    if (!methodologyTouched) {
+                      setMethodologyId(defaultMethodologyForCategory(next));
+                    }
+                  }
                   setPickerOpen(false);
                 }}
                 onDismiss={() => setPickerOpen(false)}
@@ -201,6 +214,16 @@ export function MetronomeItemComposer({
           />
         </label>
       </div>
+
+      <MethodologyPicker
+        value={methodologyId}
+        onChange={(next) => {
+          setMethodologyId(next);
+          setMethodologyTouched(true);
+        }}
+        scope="per-item"
+        hint="How you'll practice this. Suggested from the category — override anytime."
+      />
 
       <p className="text-[11px] text-muted-foreground/70">
         Per-beat accents aren&rsquo;t set here — use the standalone
