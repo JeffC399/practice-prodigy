@@ -6,6 +6,7 @@ import { CategoryPanel } from "./category-panel";
 import { DailyTrendLine } from "./daily-trend-line";
 import { HeadlineStats } from "./headline-stats";
 import { LevelsPanel } from "./levels-panel";
+import { MethodologyMix } from "./methodology-mix";
 import { ReportsRangePicker } from "./range-picker";
 import {
   getSessionsInRange,
@@ -84,12 +85,13 @@ export function ReportsTab() {
             range={range}
           />
           <CategoryPanel sessions={sessionsInRange} />
+          <MethodologyMix sessions={sessionsInRange} />
           <DailyTrendLine sessions={sessionsInRange} range={range} />
           {/* Heatmap uses its own last-12-weeks window (not the range
               picker). Deliberate — it's a momentum view, not a range
               slice. */}
           <CalendarHeatmap sessions={allSessions} />
-          {/* Songs panel, methodology chip — layered in by D.6 + D.8. */}
+          {/* Songs panel — layered in by D.6 once Slice C ships. */}
         </>
       )}
 

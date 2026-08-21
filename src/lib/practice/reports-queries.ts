@@ -1,4 +1,5 @@
 import type { CategoryId } from "./categories";
+import type { Routine, MethodologyId } from "./routine-types";
 import type {
   PracticeModule,
   PracticeSession,
@@ -252,4 +253,54 @@ export function distinctPracticeDays(
   const set = new Set<string>();
   for (const s of sessions) set.add(localDayKey(sessionStartMs(s)));
   return set.size;
+}
+
+/**
+ * Sentinel key for practice time that can't be attributed to any
+ * methodology — either ad-hoc use (no routine reference) or a
+ * routine item that had no methodology set. Kept as a distinct
+ * bucket rather than dropped so the chip's total matches the
+ * range's real total time.
+ */
+export const NO_METHODOLOGY_KEY = "__none__" as const;
+
+/**
+ * Aggregate practice seconds by methodology across the given sessions.
+ * Session items are resolved via their `routineItemId` — we walk the
+ * provided routines to find each item, then read its `methodologyId`.
+ * Items without a routine link (ad-hoc use) OR whose linked routine
+ * item has no methodology set fall into `NO_METHODOLOGY_KEY`.
+ *
+ * Deleted routines: if a session references a routine item that no
+ * longer exists, its time also falls into `NO_METHODOLOGY_KEY` (we
+ * can't recover the methodology after deletion). Reasonable — the
+ * user made a conscious deletion, so orphaned attribution goes to
+ * the unattributed bucket.
+ */
+export function secondsByMethodology(
+  sessions: readonly PracticeSession[],
+  routines: readonly Routine[],
+): Record<string, number> {
+  // Build a lookup: routineItemId → methodologyId | undefined. One
+  // pass over all routine items; O(items) total, cached across many
+  // session lookups.
+  const itemMethodMap = new Map<string, MethodologyId | undefined>();
+  for (const r of routines) {
+    for (const item of r.items) {
+      itemMethodMap.set(item.id, item.methodologyId);
+    }
+  }
+
+  const out: Record<string, number> = {};
+  for (const s of sessions) {
+    for (const item of s.items) {
+      let key: string = NO_METHODOLOGY_KEY;
+      if (item.routineItemId) {
+        const m = itemMethodMap.get(item.routineItemId);
+        if (m) key = m;
+      }
+      out[key] = (out[key] ?? 0) + item.durationSec;
+    }
+  }
+  return out;
 }
