@@ -37,7 +37,18 @@ import {
  * Same pattern as the KS editing badge from Phase 99.
  */
 
-export function RoutineCard({ routine }: { routine: Routine }) {
+export function RoutineCard({
+  routine,
+  onOpen,
+}: {
+  routine: Routine;
+  /**
+   * Phase 104 — When set, an "Open" affordance on the card navigates
+   * the user into the routine builder. Card still supports inline
+   * name/notes editing without navigation.
+   */
+  onOpen?: (id: string) => void;
+}) {
   const lib = useRoutinesLibrary();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -140,6 +151,17 @@ export function RoutineCard({ routine }: { routine: Routine }) {
           </>
         ) : (
           <>
+            {onOpen && (
+              <button
+                type="button"
+                onClick={() => onOpen(routine.id)}
+                aria-label={`Open routine ${routine.name} in the builder`}
+                title="Open in builder"
+                className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
+              >
+                Open
+              </button>
+            )}
             <button
               type="button"
               disabled

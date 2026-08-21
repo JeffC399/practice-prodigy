@@ -8,6 +8,7 @@ import {
   MyPracticeTabsShell,
   type MyPracticeTabId,
 } from "@/components/my-practice/tabs-shell";
+import { RoutineBuilder } from "@/components/my-practice/routine-builder";
 import { RoutineCard } from "@/components/my-practice/routine-card";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
 import { useRoutinesLibrary } from "@/lib/practice/routines-library";
@@ -63,6 +64,13 @@ function MyPracticeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = coerceMyPracticeTab(searchParams.get("tab"));
+  const openRoutineId = searchParams.get("routine");
+
+  // Look up the routine when a builder is open. Non-existent id →
+  // silently clear the param (defensive against a stale deep link).
+  const openRoutine = useRoutinesLibrary((s) =>
+    openRoutineId ? s.routines.find((r) => r.id === openRoutineId) : undefined,
+  );
 
   const handleTabChange = useCallback(
     (t: MyPracticeTabId) => {
@@ -71,10 +79,35 @@ function MyPracticeContent() {
       // doesn't jump on tab change.
       const params = new URLSearchParams(searchParams.toString());
       params.set("tab", t);
+      // Clear any open builder when the user switches tabs.
+      params.delete("routine");
       router.push(`/my-practice?${params.toString()}`, { scroll: false });
     },
     [router, searchParams],
   );
+
+  const handleOpenRoutine = useCallback(
+    (id: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "routines");
+      params.set("routine", id);
+      router.push(`/my-practice?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const handleCloseRoutine = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("routine");
+    router.push(`/my-practice?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  // Clear a stale ?routine= that points at a deleted routine.
+  useEffect(() => {
+    if (openRoutineId && !openRoutine) {
+      handleCloseRoutine();
+    }
+  }, [openRoutineId, openRoutine, handleCloseRoutine]);
 
   return (
     <main
@@ -101,7 +134,15 @@ function MyPracticeContent() {
           activeTab={activeTab}
           onTabChange={handleTabChange}
         >
-          {activeTab === "routines" && <RoutinesTab />}
+          {activeTab === "routines" &&
+            (openRoutine ? (
+              <RoutineBuilder
+                routine={openRoutine}
+                onClose={handleCloseRoutine}
+              />
+            ) : (
+              <RoutinesTab onOpenRoutine={handleOpenRoutine} />
+            ))}
           {activeTab === "songs" && (
             <ComingSoonTab
               title="Songs"
@@ -149,7 +190,11 @@ function MyPracticeContent() {
  * add a real builder (item picker, composer, save/discard flow);
  * the inline-edit path stays as the fast "just rename it" affordance.
  */
-function RoutinesTab() {
+function RoutinesTab({
+  onOpenRoutine,
+}: {
+  onOpenRoutine: (id: string) => void;
+}) {
   const routines = useRoutinesLibrary((s) => s.routines);
   const saveRoutine = useRoutinesLibrary((s) => s.saveRoutine);
 
@@ -163,10 +208,11 @@ function RoutinesTab() {
   });
 
   const handleBuild = () => {
-    saveRoutine({ name: "New routine" });
-    // Slice B.4 will replace this with a proper builder navigation.
-    // For now the new card just appears at the top of the list and
-    // the user can rename it inline.
+    const id = saveRoutine({ name: "New routine" });
+    // Phase 104 — Auto-open the builder on the freshly-created
+    // routine so the user drops straight into edit mode. Matches
+    // "click Build → build" natural flow.
+    onOpenRoutine(id);
   };
 
   return (
@@ -217,7 +263,11 @@ function RoutinesTab() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((routine) => (
-            <RoutineCard key={routine.id} routine={routine} />
+            <RoutineCard
+              key={routine.id}
+              routine={routine}
+              onOpen={onOpenRoutine}
+            />
           ))}
         </div>
       )}
