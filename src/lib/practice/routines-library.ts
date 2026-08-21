@@ -243,3 +243,44 @@ export function routineCategories(routine: Routine): CategoryId[] {
   }
   return out;
 }
+
+/**
+ * Read helper — Slice B.8 (Phase 108). Breaks a routine's total
+ * estimated time down by category. Returns an array of
+ * `{ categoryId, seconds, pct }` sorted by seconds desc so the
+ * biggest slice always sits first in the legend + the stacked bar.
+ *
+ * Items with `estimatedSeconds === 0` are still included (aggregated
+ * under their category) with 0 seconds; the bar/legend renderer skips
+ * zero-time entries. This keeps the aggregation lossless for callers
+ * that want the full category list.
+ *
+ * Reports (Slice D) will reuse this aggregation over a broader
+ * date range of SessionItems, so keep the shape symmetric.
+ */
+export type CategoryTimeSlice = {
+  categoryId: CategoryId;
+  seconds: number;
+  /** Fraction of the routine's total time, 0..1. NaN-safe when total=0. */
+  pct: number;
+};
+
+export function categoryTimeBreakdown(
+  routine: Routine,
+): CategoryTimeSlice[] {
+  const totals = new Map<CategoryId, number>();
+  for (const item of routine.items) {
+    const prev = totals.get(item.category) ?? 0;
+    totals.set(item.category, prev + Math.max(0, item.estimatedSeconds));
+  }
+  const total = Array.from(totals.values()).reduce((s, n) => s + n, 0);
+  const slices: CategoryTimeSlice[] = Array.from(totals.entries()).map(
+    ([categoryId, seconds]) => ({
+      categoryId,
+      seconds,
+      pct: total > 0 ? seconds / total : 0,
+    }),
+  );
+  slices.sort((a, b) => b.seconds - a.seconds);
+  return slices;
+}

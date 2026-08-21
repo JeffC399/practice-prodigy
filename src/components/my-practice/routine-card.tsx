@@ -1,9 +1,11 @@
 "use client";
 
 import { Copy, ListChecks, Play, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { CategoryChip } from "@/components/practice/category-chip";
 import {
+  categoryTimeBreakdown,
   routineCategories,
   useRoutinesLibrary,
 } from "@/lib/practice/routines-library";
@@ -55,6 +57,13 @@ export function RoutineCard({
   const itemCount = routine.items.length;
   const totalSec = totalEstimatedSeconds(routine);
   const categories = routineCategories(routine);
+  const timeBreakdown = useMemo(
+    () => categoryTimeBreakdown(routine),
+    [routine],
+  );
+  // Only show the mini time bar when at least ONE category has real
+  // time — a bar of all zeros would just render nothing anyway.
+  const hasEstimatedTime = timeBreakdown.some((s) => s.seconds > 0);
 
   const summaryParts: string[] = [
     `${itemCount} ${itemCount === 1 ? "item" : "items"}`,
@@ -101,6 +110,15 @@ export function RoutineCard({
         <div className="pl-6 truncate font-mono text-xs text-muted-foreground">
           {summary}
         </div>
+        {hasEstimatedTime && (
+          <div className="pl-6">
+            <CategoryTimeBar
+              slices={timeBreakdown}
+              showLegend={false}
+              barHeight={2}
+            />
+          </div>
+        )}
         {categories.length > 0 && (
           <div className="pl-6 flex flex-wrap gap-1">
             {categories.map((catId) => (

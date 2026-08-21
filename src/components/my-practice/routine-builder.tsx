@@ -18,11 +18,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeft, GripVertical, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { ItemPickerModal } from "@/components/my-practice/item-picker-modal";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { PRACTICE_MODULE_LABELS } from "@/lib/practice/types";
 import {
-  routineCategories,
+  categoryTimeBreakdown,
   useRoutinesLibrary,
 } from "@/lib/practice/routines-library";
 import {
@@ -78,7 +79,10 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const totalSec = totalEstimatedSeconds(routine);
-  const categories = routineCategories(routine);
+  const timeBreakdown = useMemo(
+    () => categoryTimeBreakdown(routine),
+    [routine],
+  );
 
   const handleAddItem = (item: RoutineItem) => {
     lib.updateRoutineItems(routine.id, [...routine.items, item]);
@@ -183,27 +187,24 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
         </p>
       </header>
 
-      {/* Summary bar — item count + total time + category mix */}
-      <div className="flex flex-wrap items-center gap-3 rounded-md border border-border/60 bg-background/40 px-4 py-2 font-mono text-xs text-muted-foreground">
-        <span>
-          {routine.items.length}{" "}
-          {routine.items.length === 1 ? "item" : "items"}
-        </span>
-        {totalSec > 0 && (
-          <>
-            <span className="text-muted-foreground/40">·</span>
-            <span>{formatDuration(totalSec)} total</span>
-          </>
-        )}
-        {categories.length > 0 && (
-          <>
-            <span className="text-muted-foreground/40">·</span>
-            <div className="flex flex-wrap gap-1">
-              {categories.map((catId) => (
-                <CategoryChip key={catId} categoryId={catId} size="sm" />
-              ))}
-            </div>
-          </>
+      {/* Summary bar — item count + total time + category time
+          breakdown (Phase 108). Stacked bar + legend gives users an
+          at-a-glance sense of "is this routine balanced?" */}
+      <div className="flex flex-col gap-3 rounded-md border border-border/60 bg-background/40 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-muted-foreground">
+          <span>
+            {routine.items.length}{" "}
+            {routine.items.length === 1 ? "item" : "items"}
+          </span>
+          {totalSec > 0 && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{formatDuration(totalSec)} total</span>
+            </>
+          )}
+        </div>
+        {routine.items.length > 0 && (
+          <CategoryTimeBar slices={timeBreakdown} />
         )}
       </div>
 
