@@ -204,6 +204,19 @@ export default function ScaleDrillerSessionPage() {
             <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Setup</span>
           </Link>
+          {/* Phase 100 — Drill name badge (matches Bass Arpeggios
+              + Key Sequencer header pattern). */}
+          {currentScaleDrill && (
+            <span className="hidden sm:flex items-center gap-2">
+              <span className="text-muted-foreground/40">|</span>
+              <span
+                className="text-sm font-medium text-foreground truncate max-w-[18rem]"
+                title={currentScaleDrill.name}
+              >
+                {currentScaleDrill.name}
+              </span>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">
           {RANDOM_ORDERING_STRATEGIES.has(config.ordering) && (

@@ -318,6 +318,21 @@ export default function KeySequencerSessionPage() {
             <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Setup</span>
           </Link>
+          {/* Phase 100 — Drill name badge (matches the Bass Arpeggios
+              header pattern). Divider + truncated name so the user
+              always knows which drill they're playing. Hidden on
+              small screens to avoid crowding the header chrome. */}
+          {currentKeyDrill && (
+            <span className="hidden sm:flex items-center gap-2">
+              <span className="text-muted-foreground/40">|</span>
+              <span
+                className="text-sm font-medium text-foreground truncate max-w-[18rem]"
+                title={currentKeyDrill.name}
+              >
+                {currentKeyDrill.name}
+              </span>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">
           {/* Status chips — same treatment as Arpeggios: Random /
