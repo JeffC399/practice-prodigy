@@ -3,6 +3,7 @@
 import { notFound, useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FullScreenPlayer } from "@/components/my-practice/full-screen-player";
+import { RoutineOverview } from "@/components/my-practice/routine-overview";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
 import { useKeySequencerConfig } from "@/lib/key-sequencer/config-store";
 import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
@@ -16,21 +17,28 @@ import { useDrillsLibrary } from "@/lib/state/drills-library";
 import { SHIPPED_DRILLS } from "@/lib/data/shipped-drills";
 
 /**
- * Routine executor entry point — Slice B.9 (Phase 109).
+ * Routine executor entry point — Slice B.9 (Phase 109), Slice B.14 (Phase 115).
  *
  * URL: `/my-practice/execute/[routineId]`.
  *
- * Behavior:
- *   - Feature-flag gate (same as /my-practice).
- *   - If the routineId doesn't resolve to a saved routine → 404.
- *   - On mount, starts a fresh execution via useRoutineExecutor.start().
- *     If there's already an active execution for a different routine,
- *     it's replaced. The B.11 "Resume routine?" prompt will guard
- *     this at the my-practice-tab level so users don't accidentally
- *     blow away an in-progress run.
- *   - Renders <FullScreenPlayer/> which drives the actual UI.
- *   - Exit navigates back to the routine builder for the same routine
- *     (natural place to iterate on the routine after a run).
+ * ## Flow
+ *
+ *   1. Feature-flag gate (same as /my-practice).
+ *   2. 404 if the routineId doesn't resolve to a saved routine.
+ *   3. If there IS an active execution for this routineId that isn't
+ *      complete → skip the overview, jump straight into the player
+ *      (resume case).
+ *   4. Otherwise → show RoutineOverview. The user hits "Start routine"
+ *      to actually begin, or "Not now" to bounce back to the routines
+ *      tab.
+ *   5. Once started, FullScreenPlayer drives the UI. Take-over items
+ *      (drill / key-drill / scale-drill / metronome / leadsheet) push
+ *      the module route; inline items (rest / custom) render in place.
+ *   6. Exit navigates back to the builder for the same routine.
+ *
+ * The overview is a lightweight pre-run gate — not a decision hurdle.
+ * It exists so accidental clicks on Launch don't blow away a resumable
+ * run, and so users see what they signed up for before the timer starts.
  */
 export default function ExecuteRoutinePage() {
   const params = useParams<{ routineId: string }>();
@@ -53,25 +61,17 @@ export default function ExecuteRoutinePage() {
   const exitExecution = useRoutineExecutor((s) => s.exit);
   const execution = useRoutineExecutor((s) => s.execution);
 
-  // Start the run on mount (only when the routine exists + we're not
-  // already running THIS routine).
-  useEffect(() => {
-    if (!mounted || !routine) return;
-    if (
-      execution &&
-      execution.routineId === routineId &&
-      execution.status !== "complete"
-    ) {
-      return;
-    }
-    startExecution(routineId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, routineId, routine]);
+  // Are we resuming an in-progress run for this same routine? If so,
+  // skip the overview. Note: a "complete" execution should NOT skip —
+  // the user is starting a fresh run of a routine they finished before.
+  const isResuming =
+    !!execution &&
+    execution.routineId === routineId &&
+    execution.status !== "complete";
 
-  // Phase 110 — Auto-navigate to the drilling module's page when the
-  // current item is a take-over type. The module's page renders the
-  // drill + a RoutineTakeoverChip. Advancing from the module route
-  // comes back here for the next item.
+  // Auto-navigate to the drilling module's page when the current item
+  // is a take-over type. Same as before, only fires once execution is
+  // running (i.e. post-overview or on resume).
   useEffect(() => {
     if (!mounted || !execution || !routine) return;
     if (execution.status !== "running") return;
@@ -82,17 +82,34 @@ export default function ExecuteRoutinePage() {
     router.push(target);
   }, [mounted, execution, routine, router]);
 
+  const handleStart = () => {
+    if (!routine) return;
+    startExecution(routineId);
+  };
+
   const handleExit = () => {
     exitExecution();
-    // Return to the routine builder so the user can tweak based on
-    // how the run went. Preserves the tab query param via the router
-    // history if they navigated in from there.
     router.push(`/my-practice?tab=routines&routine=${routineId}`);
+  };
+
+  const handleCancelOverview = () => {
+    router.push(`/my-practice?tab=routines`);
   };
 
   if (!mounted) return null;
   if (!routine) {
     notFound();
+  }
+
+  // Pre-run gate — only when there's no live execution for this routine.
+  if (!isResuming) {
+    return (
+      <RoutineOverview
+        routine={routine}
+        onStart={handleStart}
+        onCancel={handleCancelOverview}
+      />
+    );
   }
 
   return <FullScreenPlayer routine={routine} onExit={handleExit} />;
