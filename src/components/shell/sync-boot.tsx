@@ -5,6 +5,7 @@ import { customPatternsSyncAdapter } from "@/lib/sync/adapters/custom-patterns";
 import { drillsSyncAdapter } from "@/lib/sync/adapters/drills";
 import { keyDrillsSyncAdapter } from "@/lib/sync/adapters/key-drills";
 import { practiceSessionsSyncAdapter } from "@/lib/sync/adapters/practice-sessions";
+import { routinesSyncAdapter } from "@/lib/sync/adapters/routines";
 import { scaleDrillsSyncAdapter } from "@/lib/sync/adapters/scale-drills";
 import { sheetsSyncAdapter } from "@/lib/sync/adapters/sheets";
 import { userPrefsSyncAdapter } from "@/lib/sync/adapters/user-prefs";
@@ -36,6 +37,7 @@ export function SyncBoot(): null {
     registerSyncAdapter(sheetsSyncAdapter);
     registerSyncAdapter(customPatternsSyncAdapter);
     registerSyncAdapter(practiceSessionsSyncAdapter);
+    registerSyncAdapter(routinesSyncAdapter);
   }, []);
   return null;
 }
