@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarHeatmap } from "./calendar-heatmap";
 import { CategoryPanel } from "./category-panel";
+import { DailyTrendLine } from "./daily-trend-line";
 import { HeadlineStats } from "./headline-stats";
 import { ReportsRangePicker } from "./range-picker";
 import {
@@ -82,12 +83,13 @@ export function ReportsTab() {
             range={range}
           />
           <CategoryPanel sessions={sessionsInRange} />
+          <DailyTrendLine sessions={sessionsInRange} range={range} />
           {/* Heatmap uses its own last-12-weeks window (not the range
               picker). Deliberate — it's a momentum view, not a range
               slice. */}
           <CalendarHeatmap sessions={allSessions} />
-          {/* Trend line, songs panel, level panel, methodology chip —
-              all layered in by D.5–D.8. */}
+          {/* Songs panel, level panel, methodology chip — all layered
+              in by D.6–D.8. */}
         </>
       )}
     </section>
