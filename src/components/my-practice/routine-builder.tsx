@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { ItemPickerModal } from "@/components/my-practice/item-picker-modal";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { PRACTICE_MODULE_LABELS } from "@/lib/practice/types";
 import {
@@ -58,9 +59,14 @@ type RoutineBuilderProps = {
 
 export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
   const lib = useRoutinesLibrary();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const totalSec = totalEstimatedSeconds(routine);
   const categories = routineCategories(routine);
+
+  const handleAddItem = (item: RoutineItem) => {
+    lib.updateRoutineItems(routine.id, [...routine.items, item]);
+  };
 
   return (
     <section className="flex flex-col gap-6">
@@ -162,9 +168,8 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
           </h3>
           <button
             type="button"
-            disabled
-            title="Item picker + composers ship in Slice B.5–B.6."
-            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary opacity-50 cursor-not-allowed"
+            onClick={() => setPickerOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             Add item
@@ -177,14 +182,13 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
               <ListChecks className="h-5 w-5" aria-hidden="true" />
             </div>
             <div className="flex max-w-sm flex-col gap-1">
-              <p className="text-sm text-foreground">
-                No items yet.
-              </p>
+              <p className="text-sm text-foreground">No items yet.</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                A routine item can be a saved drill, a metronome, a
-                lead sheet, a rest, or a custom activity. The item
-                picker + composers ship in the next couple of phases
-                (B.5 – B.6).
+                Click <span className="font-medium text-foreground">+ Add item</span>{" "}
+                above to pick a saved drill (Bass Arpeggios, Key
+                Sequencer, or Scale Driller) and add it to the
+                sequence. Metronome / lead sheet / custom / rest ship
+                in the next phase.
               </p>
             </div>
           </div>
@@ -207,6 +211,13 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
           </ol>
         )}
       </section>
+
+      {/* Item type picker + composer modal — Slice B.5 (Phase 105). */}
+      <ItemPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSubmit={handleAddItem}
+      />
     </section>
   );
 }
