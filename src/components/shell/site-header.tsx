@@ -11,6 +11,7 @@ import {
   type ModuleEntry,
 } from "@/lib/modules/registry";
 import { AccountChip } from "./account-chip";
+import { PracticeChip } from "./practice-chip";
 import { SyncStatusChip } from "./sync-status-chip";
 
 /**
@@ -54,6 +55,10 @@ export function SiteHeader() {
         {/* Phase 81 (Slice A.3) — SyncStatusChip shows aggregate sync
             state across all registered stores. Hidden entirely for
             signed-out users so anonymous browsing has zero visual noise. */}
+        {/* Phase 123 (Slice D.9) — PracticeChip shows today's total +
+            current streak. Hidden entirely when both are zero, so
+            first-time users see zero extra chrome. */}
+        <PracticeChip />
         <SyncStatusChip />
         <AccountChip />
         <ModuleSwitcher current={current} />
