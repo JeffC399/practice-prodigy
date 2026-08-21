@@ -15,6 +15,7 @@ import {
   MyPracticeTabsShell,
   type MyPracticeTabId,
 } from "@/components/my-practice/tabs-shell";
+import { ReportsTab } from "@/components/my-practice/reports/reports-tab";
 import { RoutineBuilder } from "@/components/my-practice/routine-builder";
 import { RoutineCard } from "@/components/my-practice/routine-card";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
@@ -161,13 +162,7 @@ function MyPracticeContent() {
               blurb="Track the pieces you're learning or maintaining. Attach lead sheets, note the sections you're focused on, see per-song practice time roll up in Reports."
             />
           )}
-          {activeTab === "reports" && (
-            <ComingSoonTab
-              title="Reports"
-              slice="Slice D"
-              blurb="Where did your practice time actually go? Category breakdowns, streaks, and per-song / per-routine time — all rolled up from the sessions that already accumulate silently in the background."
-            />
-          )}
+          {activeTab === "reports" && <ReportsTab />}
           {activeTab === "methodology" && (
             <ComingSoonTab
               title="Methodology"
