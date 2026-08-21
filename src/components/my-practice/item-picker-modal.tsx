@@ -13,8 +13,12 @@ import {
   Rows3,
   Timer,
 } from "lucide-react";
+import { CustomItemComposer } from "@/components/my-practice/item-composer/custom-item-composer";
 import { DrillItemComposer } from "@/components/my-practice/item-composer/drill-item-composer";
 import { KeyDrillItemComposer } from "@/components/my-practice/item-composer/key-drill-item-composer";
+import { LeadsheetItemComposer } from "@/components/my-practice/item-composer/leadsheet-item-composer";
+import { MetronomeItemComposer } from "@/components/my-practice/item-composer/metronome-item-composer";
+import { RestItemComposer } from "@/components/my-practice/item-composer/rest-item-composer";
 import { ScaleDrillItemComposer } from "@/components/my-practice/item-composer/scale-drill-item-composer";
 import {
   ROUTINE_ITEM_TYPE_DESCRIPTIONS,
@@ -68,22 +72,23 @@ const TYPE_ICONS: Record<RoutineItemType, LucideIcon> = {
 };
 
 /**
- * Types whose composer ships in Phase 105. Others render disabled in
- * the picker with a tooltip noting the slice that will enable them.
- * Extended as B.6 (+4 types), Slice C (+song), future modules
- * (+ear-training) land.
+ * Types whose composer is live. Extended per slice.
+ *   Phase 105 (B.5): drill / key-drill / scale-drill.
+ *   Phase 106 (B.6): + metronome / leadsheet / custom / rest.
+ *   Slice C: + song.
+ *   Future module: + ear-training.
  */
 const READY_TYPES: readonly RoutineItemType[] = [
   "drill",
   "key-drill",
   "scale-drill",
+  "metronome",
+  "leadsheet",
+  "custom",
+  "rest",
 ];
 
 const DEFERRED_TOOLTIPS: Partial<Record<RoutineItemType, string>> = {
-  metronome: "Metronome composer ships in B.6.",
-  leadsheet: "Lead sheet composer ships in B.6.",
-  custom: "Custom-activity composer ships in B.6.",
-  rest: "Rest composer ships in B.6.",
   song: "Songs library ships in Slice C.",
   "ear-training": "Ear training is a future module.",
 };
@@ -247,6 +252,30 @@ export function ItemPickerModal({
         )}
         {step.kind === "composer" && step.type === "scale-drill" && (
           <ScaleDrillItemComposer
+            onSubmit={handleSubmit}
+            onCancel={onClose}
+          />
+        )}
+        {step.kind === "composer" && step.type === "metronome" && (
+          <MetronomeItemComposer
+            onSubmit={handleSubmit}
+            onCancel={onClose}
+          />
+        )}
+        {step.kind === "composer" && step.type === "leadsheet" && (
+          <LeadsheetItemComposer
+            onSubmit={handleSubmit}
+            onCancel={onClose}
+          />
+        )}
+        {step.kind === "composer" && step.type === "custom" && (
+          <CustomItemComposer
+            onSubmit={handleSubmit}
+            onCancel={onClose}
+          />
+        )}
+        {step.kind === "composer" && step.type === "rest" && (
+          <RestItemComposer
             onSubmit={handleSubmit}
             onCancel={onClose}
           />

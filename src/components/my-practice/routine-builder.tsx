@@ -185,10 +185,8 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
               <p className="text-sm text-foreground">No items yet.</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Click <span className="font-medium text-foreground">+ Add item</span>{" "}
-                above to pick a saved drill (Bass Arpeggios, Key
-                Sequencer, or Scale Driller) and add it to the
-                sequence. Metronome / lead sheet / custom / rest ship
-                in the next phase.
+                above to pick a saved drill, add a metronome, insert a
+                rest, or write your own custom activity.
               </p>
             </div>
           </div>
