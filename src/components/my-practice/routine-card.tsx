@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy, ListChecks, Play, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { CategoryChip } from "@/components/practice/category-chip";
@@ -52,7 +53,19 @@ export function RoutineCard({
   onOpen?: (id: string) => void;
 }) {
   const lib = useRoutinesLibrary();
+  const router = useRouter();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const handleLaunch = () => {
+    // Guard: don't route to executor for a totally empty routine —
+    // it would just show the empty-routine screen. Nudge the user
+    // to open the builder and add items instead.
+    if (routine.items.length === 0) {
+      onOpen?.(routine.id);
+      return;
+    }
+    router.push(`/my-practice/execute/${routine.id}`);
+  };
 
   const itemCount = routine.items.length;
   const totalSec = totalEstimatedSeconds(routine);
@@ -182,10 +195,14 @@ export function RoutineCard({
             )}
             <button
               type="button"
-              disabled
-              title="Routine player ships in B.9."
-              aria-label="Launch routine (coming in B.9)"
-              className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground/50 cursor-not-allowed"
+              onClick={handleLaunch}
+              aria-label={`Launch routine ${routine.name}`}
+              title={
+                itemCount === 0
+                  ? "Add items first"
+                  : "Launch routine (full-screen player)"
+              }
+              className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-primary/40 bg-primary/15 px-2 text-[11px] font-medium text-primary transition-colors hover:bg-primary/25"
             >
               <Play className="h-3.5 w-3.5" aria-hidden="true" />
               Launch
