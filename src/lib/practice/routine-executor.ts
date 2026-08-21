@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getRoutineById, useRoutinesLibrary } from "./routines-library";
+import type {
+  SessionCategoryFeedback,
+  SessionCategoryFeedbackRating,
+} from "./types";
+import type { CategoryId } from "./categories";
 
 /**
  * useRoutineExecutor — Slice B.9 (Phase 109).
@@ -86,6 +91,13 @@ export type RoutineExecution = {
   currentIndex: number;
   /** Per-item timing records, appended when the user leaves an item. */
   completedItems: CompletedItemRecord[];
+  /**
+   * Slice B.12 (Phase 112) — Per-category vibe-check captured on the
+   * end-of-routine summary screen. Optional (user can skip all).
+   * Empty array = user hasn't touched the vibe-check yet OR skipped.
+   * Feeds AI Coach "recent feel" signals + Reports narratives.
+   */
+  categoryFeedback: SessionCategoryFeedback[];
 };
 
 type RoutineExecutorStore = {
@@ -122,6 +134,24 @@ type RoutineExecutorStore = {
    * a completed one.
    */
   exit: () => void;
+
+  /**
+   * Slice B.12 (Phase 112) — Set the vibe-check rating for one
+   * category. Overwrites any prior rating for that category (users
+   * can change their mind before hitting Done). No-op when no
+   * execution is active.
+   */
+  setCategoryFeedback: (
+    categoryId: CategoryId,
+    rating: SessionCategoryFeedbackRating,
+  ) => void;
+
+  /**
+   * Slice B.12 (Phase 112) — Clear any captured vibe-check ratings.
+   * Wired to the "Skip all" button on the end screen so a user who
+   * accidentally tapped can back out cleanly.
+   */
+  clearCategoryFeedback: () => void;
 
   /** Clear all execution state without recording anything. Test-only. */
   _reset: () => void;
@@ -163,6 +193,7 @@ export const useRoutineExecutor = create<RoutineExecutorStore>()(
             pausedAt: null,
             currentIndex: 0,
             completedItems: [],
+            categoryFeedback: [],
           },
         });
         // Stamp lastRunAt on the routine so it sorts recent-first.
@@ -285,6 +316,33 @@ export const useRoutineExecutor = create<RoutineExecutorStore>()(
           }
         }
         set({ execution: null });
+      },
+
+      setCategoryFeedback: (categoryId, rating) => {
+        const state = get();
+        if (!state.execution) return;
+        // ?? [] guards against executions persisted before B.12
+        // when this field didn't exist yet.
+        const others = (state.execution.categoryFeedback ?? []).filter(
+          (f) => f.categoryId !== categoryId,
+        );
+        set({
+          execution: {
+            ...state.execution,
+            categoryFeedback: [...others, { categoryId, rating }],
+          },
+        });
+      },
+
+      clearCategoryFeedback: () => {
+        const state = get();
+        if (!state.execution) return;
+        set({
+          execution: {
+            ...state.execution,
+            categoryFeedback: [],
+          },
+        });
       },
 
       _reset: () => set({ execution: null }),

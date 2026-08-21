@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
+import { VibeCheck } from "@/components/my-practice/vibe-check";
 import { CategoryChip } from "@/components/practice/category-chip";
 import {
   elapsedSecondsOnCurrentItem,
@@ -575,18 +576,35 @@ function EndOfRoutineScreen({
           </ul>
         </div>
 
+        {/* Phase 112 — Per-category vibe-check. Renders one row per
+            category the routine touched; fully skippable via the
+            Skip-all button below. */}
+        <VibeCheck routine={routine} />
+
         <p className="text-xs text-muted-foreground/70 italic text-center">
-          Per-category vibe-check ships in Slice B.12; Reports will
-          aggregate this run into your practice history (Slice D).
+          Reports will aggregate this run into your practice history
+          (Slice D).
         </p>
 
-        <button
-          type="button"
-          onClick={onExit}
-          className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          Done
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              useRoutineExecutor.getState().clearCategoryFeedback();
+              onExit();
+            }}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Skip all
+          </button>
+          <button
+            type="button"
+            onClick={onExit}
+            className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </main>
   );

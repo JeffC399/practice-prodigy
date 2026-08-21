@@ -100,6 +100,44 @@ export type PracticeSession = {
 };
 
 /**
+ * Slice B.12 (Phase 112) — Per-category vibe-check captured at the
+ * end of a routine. Rating scale from ROUTINE-DESIGN.md §4.3:
+ *
+ *   1 = Rough      · struggled the whole way
+ *   2 = Struggled  · worked but felt hard
+ *   3 = OK         · did the reps; nothing special
+ *   4 = Solid      · felt good
+ *   5 = Great      · locked in / breakthroughs
+ *
+ * The AI Coach reads recent feedback as a "how are they feeling
+ * about X" signal ("your last three Ear Training sessions were
+ * rated Rough — want a gentler routine today?"). Ratings never
+ * auto-change proficiency levels — only the user changes those.
+ */
+export type SessionCategoryFeedbackRating = 1 | 2 | 3 | 4 | 5;
+
+export type SessionCategoryFeedback = {
+  categoryId: CategoryId;
+  rating: SessionCategoryFeedbackRating;
+};
+
+/** Ordered labels + descriptors used by the vibe-check UI. */
+export const VIBE_CHECK_RATINGS: ReadonlyArray<{
+  value: SessionCategoryFeedbackRating;
+  label: string;
+  hint: string;
+}> = [
+  { value: 1, label: "Rough", hint: "Struggled the whole way." },
+  { value: 2, label: "Struggled", hint: "Worked but felt hard." },
+  { value: 3, label: "OK", hint: "Did the reps; nothing special." },
+  { value: 4, label: "Solid", hint: "Felt good." },
+  { value: 5, label: "Great", hint: "Locked in / breakthroughs." },
+] as const;
+
+// Re-import CategoryId at the type position — already imported at the
+// top of this file so no additional import statement needed.
+
+/**
  * Fresh session id generator. Uses the same `${prefix}_${base36}_${suffix}`
  * shape as every other collection store (see docs/SUPABASE-SCHEMA.md §1).
  */
