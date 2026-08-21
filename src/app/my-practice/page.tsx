@@ -8,6 +8,7 @@ import {
   MyPracticeTabsShell,
   type MyPracticeTabId,
 } from "@/components/my-practice/tabs-shell";
+import { RoutineCard } from "@/components/my-practice/routine-card";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
 import { useRoutinesLibrary } from "@/lib/practice/routines-library";
 
@@ -136,13 +137,37 @@ function MyPracticeContent() {
 }
 
 /**
- * Routines tab body. Phase 102 ships the empty state only — Phase
- * 103 (B.3) adds routine cards + real Build flow. Even the "Build
- * routine" button is a placeholder disabled state until B.4 wires
- * the routine builder.
+ * Routines tab body — Slice B.3 (Phase 103).
+ *
+ * Two states:
+ *   1. Empty (no routines saved): friendly hero + big Build button.
+ *   2. Populated: grid of RoutineCards, sorted by lastRunAt desc
+ *      (recently-run first) then updatedAt desc.
+ *
+ * The Build button in Phase 103 creates a fresh empty routine and
+ * lets the user rename it inline on the resulting card. B.4 will
+ * add a real builder (item picker, composer, save/discard flow);
+ * the inline-edit path stays as the fast "just rename it" affordance.
  */
 function RoutinesTab() {
-  const routineCount = useRoutinesLibrary((s) => s.routines.length);
+  const routines = useRoutinesLibrary((s) => s.routines);
+  const saveRoutine = useRoutinesLibrary((s) => s.saveRoutine);
+
+  const sorted = [...routines].sort((a, b) => {
+    // Recently-run > recently-modified > alphabetical.
+    const lastRunDelta = (b.lastRunAt ?? 0) - (a.lastRunAt ?? 0);
+    if (lastRunDelta !== 0) return lastRunDelta;
+    const updatedDelta = b.updatedAt - a.updatedAt;
+    if (updatedDelta !== 0) return updatedDelta;
+    return a.name.localeCompare(b.name);
+  });
+
+  const handleBuild = () => {
+    saveRoutine({ name: "New routine" });
+    // Slice B.4 will replace this with a proper builder navigation.
+    // For now the new card just appears at the top of the list and
+    // the user can rename it inline.
+  };
 
   return (
     <section className="flex flex-col gap-4">
@@ -152,45 +177,50 @@ function RoutinesTab() {
             Your routines
           </h2>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            {routineCount === 0
-              ? "No routines yet. Build your first one below."
-              : `${routineCount} saved routine${routineCount === 1 ? "" : "s"}.`}
+            {routines.length === 0
+              ? "No routines yet. Build your first one to get started."
+              : `${routines.length} saved routine${routines.length === 1 ? "" : "s"}. Recently run appear first.`}
           </p>
         </div>
         <button
           type="button"
-          disabled
-          title="Routine builder ships in the next slice (B.4)."
-          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary opacity-50 cursor-not-allowed"
+          onClick={handleBuild}
+          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Build routine
         </button>
       </div>
 
-      {/* Empty-state hero. Slice B.3 replaces with routine cards +
-          a proper empty-state variant that only renders when the
-          library is truly empty. */}
-      <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border/60 bg-background/30 px-6 py-16 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <ListChecks className="h-6 w-6" aria-hidden="true" />
+      {routines.length === 0 ? (
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border/60 bg-background/30 px-6 py-16 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <ListChecks className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <div className="flex max-w-md flex-col gap-2">
+            <h3 className="text-base font-medium text-foreground">
+              Your routines will live here
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              A routine is an ordered list of practice items — a warmup
+              drill, then a scale study, then a song section, then a
+              cool-down. Build one, launch it, and Practice Prodigy
+              walks you through item by item while the session tracker
+              records what happened.
+            </p>
+            <p className="text-xs text-muted-foreground/70 italic">
+              Add items to the routine in the next slice (B.4–B.7);
+              press play in Slice B.9.
+            </p>
+          </div>
         </div>
-        <div className="flex max-w-md flex-col gap-2">
-          <h3 className="text-base font-medium text-foreground">
-            Your routines will live here
-          </h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            A routine is an ordered list of practice items — a warmup
-            drill, then a scale study, then a song section, then a
-            cool-down. Build one, launch it, and Practice Prodigy walks
-            you through item by item while the session tracker records
-            what happened.
-          </p>
-          <p className="text-xs text-muted-foreground/70 italic">
-            The routine builder + player land in the next few phases.
-          </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {sorted.map((routine) => (
+            <RoutineCard key={routine.id} routine={routine} />
+          ))}
         </div>
-      </div>
+      )}
     </section>
   );
 }
