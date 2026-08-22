@@ -18,6 +18,7 @@ import {
 import { ReportsTab } from "@/components/my-practice/reports/reports-tab";
 import { RoutineBuilder } from "@/components/my-practice/routine-builder";
 import { RoutineCard } from "@/components/my-practice/routine-card";
+import { SongsTab } from "@/components/my-practice/songs-tab";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
 import { useRoutineExecutor } from "@/lib/practice/routine-executor";
 import {
@@ -155,13 +156,7 @@ function MyPracticeContent() {
             ) : (
               <RoutinesTab onOpenRoutine={handleOpenRoutine} />
             ))}
-          {activeTab === "songs" && (
-            <ComingSoonTab
-              title="Songs"
-              slice="Slice C"
-              blurb="Track the pieces you're learning or maintaining. Attach lead sheets, note the sections you're focused on, see per-song practice time roll up in Reports."
-            />
-          )}
+          {activeTab === "songs" && <SongsTab />}
           {activeTab === "reports" && <ReportsTab />}
           {activeTab === "methodology" && (
             <ComingSoonTab
