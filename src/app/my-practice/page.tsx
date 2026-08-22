@@ -6,8 +6,10 @@ import {
   ListChecks,
   Play,
   Plus,
+  Sparkles,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { notFound, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import {
@@ -156,9 +158,19 @@ function MyPracticeContent() {
     >
       <div className="flex w-full max-w-6xl flex-col gap-6">
         <header className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-            <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
-            My Practice
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              My Practice
+            </div>
+            <Link
+              href="/my-practice/coach"
+              className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
+              title="Open the AI Coach chat"
+            >
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              AI Coach
+            </Link>
           </div>
           <h1 className="text-2xl font-semibold text-foreground">
             Build, run, and understand your practice
