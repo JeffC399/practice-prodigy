@@ -9,7 +9,9 @@ import {
   type AiModelId,
 } from "@/lib/ai/ai-config";
 import { buildContextBody } from "@/lib/ai/context-assembly";
+import { parseRoutineDraft } from "@/lib/ai/routine-parser";
 import { buildPassiveSystemPrompt } from "@/lib/ai/system-prompts";
+import { RoutineDraftCard } from "./routine-draft-card";
 
 /**
  * ChatView — Slice F.4 (Phase 140).
@@ -223,9 +225,14 @@ function MessageBubble({
     .map((p) => p.text ?? "")
     .join("");
 
+  // Slice F.5 (Phase 142) — Look for a routine draft in assistant
+  // messages. When found, render the draft card BELOW the raw text
+  // so the user sees both what the AI said and the actionable draft.
+  const draft = !isUser && text ? parseRoutineDraft(text) : null;
+
   return (
     <div
-      className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}
+      className={`flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}
     >
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
         {isUser ? "You" : "AI Coach"}
@@ -241,6 +248,11 @@ function MessageBubble({
           <span className="italic text-muted-foreground">(empty message)</span>
         )}
       </div>
+      {draft && (
+        <div className="w-full max-w-[90%]">
+          <RoutineDraftCard draft={draft} />
+        </div>
+      )}
     </div>
   );
 }
