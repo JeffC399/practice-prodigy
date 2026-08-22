@@ -91,6 +91,13 @@ function SheetViewContent() {
     return () => clearInterval(handle);
   }, [isPlaying, id, sheet?.category]);
 
+  // Phase 110 — Routine take-over chip (renders only when active).
+  // MUST live above the `!mounted` + `!sheet` early returns: React's
+  // rules of hooks require every hook to run in the same order on
+  // every render, including the pre-hydration render that hits those
+  // early returns.
+  const takeover = useRoutineTakeover("leadsheet");
+
   if (!mounted) {
     return (
       <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-6 py-12">
@@ -137,9 +144,6 @@ function SheetViewContent() {
       setIsLoadingAudio(false);
     }
   };
-
-  // Phase 110 — Routine take-over chip (renders only when active).
-  const takeover = useRoutineTakeover("leadsheet");
 
   // Phase 38 — mobile responsiveness pass (padding + wrap toolbar +
   // horizontal-scroll sheet wrapper).

@@ -300,6 +300,13 @@ function KeySequencerSessionContent() {
     return () => document.removeEventListener("keydown", onKey);
   }, [handleToggle]);
 
+  // Phase 110 — Routine take-over chip (renders only when active).
+  // MUST live above the `!mounted` early return: React's rules of
+  // hooks require every hook to run in the same order on every
+  // render, including the pre-hydration render that hits the early
+  // return.
+  const takeover = useRoutineTakeover("key-drill");
+
   if (!mounted) {
     return (
       <main
@@ -312,9 +319,6 @@ function KeySequencerSessionContent() {
       </main>
     );
   }
-
-  // Phase 110 — Routine take-over chip (renders only when active).
-  const takeover = useRoutineTakeover("key-drill");
 
   return (
     <main id="main-content" className="flex flex-1 flex-col">
