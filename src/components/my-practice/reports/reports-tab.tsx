@@ -9,6 +9,7 @@ import { HeadlineStats } from "./headline-stats";
 import { LevelsPanel } from "./levels-panel";
 import { MethodologyMix } from "./methodology-mix";
 import { ReportsRangePicker } from "./range-picker";
+import { SongsProgressPanel } from "./songs-progress-panel";
 import {
   getSessionsInRange,
   type ReportsRange,
@@ -97,9 +98,14 @@ export function ReportsTab() {
               picker). Deliberate — it's a momentum view, not a range
               slice. */}
           <CalendarHeatmap sessions={allSessions} />
-          {/* Songs panel — layered in by D.6 once Slice C ships. */}
         </>
       )}
+
+      {/* Songs progress panel (Slice C.5 / D.6) — renders whenever the
+          user has any songs; hidden entirely when the songs library
+          is empty. Independent of session-empty state so a brand-new
+          user can still see the shell. */}
+      <SongsProgressPanel />
 
       {/* Levels panel renders regardless of session data — even a
           brand-new user should be able to set their proficiency, and
