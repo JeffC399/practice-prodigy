@@ -2,12 +2,13 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Loader2, Send, Sparkles } from "lucide-react";
-import { useCallback, useMemo, useRef, useState, type FormEvent } from "react";
+import { Loader2, MessageSquarePlus, Send, Sparkles, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   useAiCoachConfig,
   type AiModelId,
 } from "@/lib/ai/ai-config";
+import { useAiCoachHistory } from "@/lib/ai/coach-history";
 import { buildContextBody } from "@/lib/ai/context-assembly";
 import { parseRoutineDraft } from "@/lib/ai/routine-parser";
 import { buildPassiveSystemPrompt } from "@/lib/ai/system-prompts";
@@ -49,6 +50,26 @@ export function ChatView() {
   const byokKey = useAiCoachConfig((s) => s.byokKey);
   const authPath = useAiCoachConfig((s) => s.authPath);
 
+  const conversations = useAiCoachHistory((s) => s.conversations);
+  const activeConversationId = useAiCoachHistory(
+    (s) => s.activeConversationId,
+  );
+  const ensureActive = useAiCoachHistory((s) => s.ensureActive);
+  const saveMessages = useAiCoachHistory((s) => s.saveMessages);
+  const createNewConversation = useAiCoachHistory((s) => s.createNew);
+  const openConversation = useAiCoachHistory((s) => s.openConversation);
+  const deleteConversation = useAiCoachHistory((s) => s.deleteConversation);
+
+  // Seed the active conversation on first mount.
+  useEffect(() => {
+    ensureActive();
+  }, [ensureActive]);
+
+  const activeConversation = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId) ?? null,
+    [conversations, activeConversationId],
+  );
+
   // Recreate the transport when model / byokKey change so subsequent
   // messages use the new config. Memo keeps referential stability
   // within a single config state. The system prompt + context body
@@ -72,14 +93,47 @@ export function ChatView() {
     [model, byokKey],
   );
 
-  const { messages, sendMessage, status, error, regenerate } = useChat({
-    transport,
-  });
+  // Key useChat by the active conversation id so switching or
+  // creating one gets a fresh hook instance seeded with the stored
+  // messages. Without the key, useChat's internal state would leak
+  // across conversation switches.
+  const { messages, sendMessage, status, error, regenerate, setMessages } =
+    useChat({
+      id: activeConversationId ?? undefined,
+      transport,
+      messages: activeConversation?.messages ?? [],
+    });
+
+  // Persist to history whenever the message log changes. Skips the
+  // empty initial state so a freshly-created conversation doesn't
+  // pointlessly re-persist on every mount.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    if (messages.length === 0) return;
+    saveMessages(messages);
+  }, [messages, activeConversationId, saveMessages]);
 
   const [composerText, setComposerText] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const isStreaming = status === "streaming" || status === "submitted";
+
+  const handleNewChat = () => {
+    createNewConversation();
+    setMessages([]);
+    setComposerText("");
+  };
+
+  const handleOpenConversation = (id: string) => {
+    openConversation(id);
+    setComposerText("");
+  };
+
+  const handleDeleteConversation = (id: string) => {
+    deleteConversation(id);
+    // If we deleted the active one, useChat will re-key on the new
+    // activeConversationId and seed from that conversation's messages.
+  };
 
   const submit = useCallback(
     (text: string) => {
@@ -117,6 +171,14 @@ export function ChatView() {
         </div>
         <AuthPathChip authPath={authPath} model={model} />
       </header>
+
+      <HistoryStrip
+        conversations={conversations}
+        activeId={activeConversationId}
+        onOpen={handleOpenConversation}
+        onNew={handleNewChat}
+        onDelete={handleDeleteConversation}
+      />
 
       {/* Message log */}
       <div
@@ -280,6 +342,74 @@ function AuthPathChip({
       <span>{authPath === "byok" ? "BYOK" : "Gateway"}</span>
       <span className="text-muted-foreground/40">·</span>
       <span className="text-foreground">{model}</span>
+    </div>
+  );
+}
+
+function HistoryStrip({
+  conversations,
+  activeId,
+  onOpen,
+  onNew,
+  onDelete,
+}: {
+  conversations: ReturnType<typeof useAiCoachHistory.getState>["conversations"];
+  activeId: string | null;
+  onOpen: (id: string) => void;
+  onNew: () => void;
+  onDelete: (id: string) => void;
+}) {
+  // Sort most-recent first for the strip. Preserves the strip's
+  // "recent up top" mental model regardless of insertion order.
+  const sorted = useMemo(
+    () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt),
+    [conversations],
+  );
+
+  return (
+    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      <button
+        type="button"
+        onClick={onNew}
+        title="Start a fresh conversation"
+        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
+      >
+        <MessageSquarePlus className="h-3 w-3" aria-hidden="true" />
+        New
+      </button>
+      {sorted.map((c) => {
+        const active = c.id === activeId;
+        return (
+          <div
+            key={c.id}
+            className={`group inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              active
+                ? "border-primary/50 bg-primary/10 text-foreground"
+                : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => onOpen(c.id)}
+              className="max-w-[10rem] truncate normal-case tracking-normal text-xs"
+              title={c.title}
+            >
+              {c.title}
+            </button>
+            {conversations.length > 1 && (
+              <button
+                type="button"
+                onClick={() => onDelete(c.id)}
+                aria-label={`Delete conversation ${c.title}`}
+                title="Delete"
+                className="rounded-md p-0.5 text-muted-foreground/70 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+              >
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
