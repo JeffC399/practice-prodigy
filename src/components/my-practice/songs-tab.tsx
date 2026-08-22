@@ -1,9 +1,10 @@
 "use client";
 
-import { Music, Plus, Search } from "lucide-react";
+import { FileText, Music, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { SongCard } from "./song-card";
 import { SongFormModal } from "./song-form-modal";
+import { SongImportFromSheets } from "./song-import-from-sheets";
 import {
   SONG_STATUS_LABELS,
   SONG_STATUS_ORDER,
@@ -53,6 +54,7 @@ export function SongsTab() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [importerOpen, setImporterOpen] = useState(false);
 
   const filtered = useMemo(
     () => filterAndSort(songs, statusFilter, sortMode, search),
@@ -76,7 +78,10 @@ export function SongsTab() {
     return (
       <>
         <section className="flex flex-col gap-6">
-          <TabHeader onAdd={handleAdd} />
+          <TabHeader
+            onAdd={handleAdd}
+            onOpenImporter={() => setImporterOpen(true)}
+          />
           <EmptyState onAdd={handleAdd} />
         </section>
         {editingId && (
@@ -85,6 +90,10 @@ export function SongsTab() {
             onClose={() => setEditingId(null)}
           />
         )}
+        <SongImportFromSheets
+          open={importerOpen}
+          onClose={() => setImporterOpen(false)}
+        />
       </>
     );
   }
@@ -92,7 +101,10 @@ export function SongsTab() {
   return (
     <>
       <section className="flex flex-col gap-4">
-        <TabHeader onAdd={handleAdd} />
+        <TabHeader
+          onAdd={handleAdd}
+          onOpenImporter={() => setImporterOpen(true)}
+        />
 
         <div className="flex flex-wrap items-center gap-3">
           <StatusFilterTabs value={statusFilter} onChange={setStatusFilter} />
@@ -123,13 +135,23 @@ export function SongsTab() {
           onClose={() => setEditingId(null)}
         />
       )}
+      <SongImportFromSheets
+        open={importerOpen}
+        onClose={() => setImporterOpen(false)}
+      />
     </>
   );
 }
 
-function TabHeader({ onAdd }: { onAdd: () => void }) {
+function TabHeader({
+  onAdd,
+  onOpenImporter,
+}: {
+  onAdd: () => void;
+  onOpenImporter: () => void;
+}) {
   return (
-    <header className="flex items-center justify-between gap-3">
+    <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-foreground">Songs</h2>
         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -137,14 +159,25 @@ function TabHeader({ onAdd }: { onAdd: () => void }) {
           them to routines to log per-song practice time.
         </p>
       </div>
-      <button
-        type="button"
-        onClick={onAdd}
-        className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25"
-      >
-        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-        Add song
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenImporter}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          title="Import songs from your existing lead sheets"
+        >
+          <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+          Import from sheets
+        </button>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          Add song
+        </button>
+      </div>
     </header>
   );
 }
