@@ -8,6 +8,8 @@ import {
   useAiCoachConfig,
   type AiModelId,
 } from "@/lib/ai/ai-config";
+import { buildContextBody } from "@/lib/ai/context-assembly";
+import { buildPassiveSystemPrompt } from "@/lib/ai/system-prompts";
 
 /**
  * ChatView — Slice F.4 (Phase 140).
@@ -47,7 +49,10 @@ export function ChatView() {
 
   // Recreate the transport when model / byokKey change so subsequent
   // messages use the new config. Memo keeps referential stability
-  // within a single config state.
+  // within a single config state. The system prompt + context body
+  // are rebuilt fresh on every send (via prepareSendMessagesRequest)
+  // so the AI always sees the current library snapshot, not one
+  // frozen at transport-create time.
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -58,6 +63,7 @@ export function ChatView() {
             messages,
             model,
             byokKey: byokKey || undefined,
+            systemPrompt: buildPassiveSystemPrompt(buildContextBody()),
           },
         }),
       }),
