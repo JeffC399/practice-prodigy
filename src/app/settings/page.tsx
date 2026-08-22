@@ -21,6 +21,16 @@ import {
   type SettingsTabId,
 } from "@/components/settings/settings-tabs-shell";
 import {
+  AgencyModePickerField,
+  ByokKeyField,
+  ModelPickerField,
+} from "@/components/settings/ai-coach-settings";
+import {
+  AI_AGENCY_LABELS,
+  AI_MODEL_LABELS,
+  useAiCoachConfig,
+} from "@/lib/ai/ai-config";
+import {
   decodeAppearance,
   encodeAppearance,
 } from "@/lib/state/share-appearance";
@@ -171,6 +181,9 @@ export default function SettingsPage() {
   const setHighContrast = useUserPrefs((s) => s.setHighContrast);
   const routineSounds = useUserPrefs((s) => s.routineSounds);
   const setRoutineSounds = useUserPrefs((s) => s.setRoutineSounds);
+  const aiModel = useAiCoachConfig((s) => s.model);
+  const aiAuthPath = useAiCoachConfig((s) => s.authPath);
+  const aiAgencyMode = useAiCoachConfig((s) => s.agencyMode);
   const resetAppearance = useUserPrefs((s) => s.resetAppearance);
   const applyAppearanceSlice = useUserPrefs((s) => s.applyAppearanceSlice);
   const applyMood = useUserPrefs((s) => s.applyMood);
@@ -759,6 +772,39 @@ export default function SettingsPage() {
               onChange={setRoutineSounds}
               label={routineSounds ? "On" : "Muted"}
             />
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          tab="ai-coach"
+          title="AI Coach"
+          description="Model + provider key for the AI Coach chat. Gateway auth (default) uses Practice Prodigy's own quota — zero setup for you. BYOK routes AI calls through your own Anthropic or OpenAI key."
+          summary={
+            <>
+              {AI_MODEL_LABELS[aiModel]} · {aiAuthPath === "byok" ? "BYOK" : "Gateway"}
+            </>
+          }
+        >
+          <SettingsField label="Model">
+            <ModelPickerField />
+          </SettingsField>
+
+          <SettingsField
+            label="Your own key (optional)"
+            hint="Paste an Anthropic or OpenAI API key to route AI calls through it instead of the Gateway. Leave empty to use the Gateway default."
+          >
+            <ByokKeyField />
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          tab="ai-coach"
+          title="Agency mode"
+          description="How much control the AI Coach has over your library. Passive is safest — the AI can only draft routines from items you've already built. Active (coming soon) lets the AI create + edit + suggest with your confirmation."
+          summary={AI_AGENCY_LABELS[aiAgencyMode]}
+        >
+          <SettingsField label="Mode">
+            <AgencyModePickerField />
           </SettingsField>
         </SettingsSection>
 

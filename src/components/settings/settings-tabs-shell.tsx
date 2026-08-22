@@ -5,6 +5,7 @@ import {
   Database,
   ListMusic,
   Palette,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -40,6 +41,7 @@ export type SettingsTabId =
   | "appearance"
   | "music-display"
   | "practice"
+  | "ai-coach"
   | "accessibility"
   | "data-account";
 
@@ -70,6 +72,13 @@ export const SETTINGS_TABS: SettingsTabEntry[] = [
     label: "Practice",
     icon: ListMusic,
     description: "Practice-screen layout and drill defaults.",
+  },
+  {
+    id: "ai-coach",
+    label: "AI Coach",
+    icon: Sparkles,
+    description:
+      "Model, provider key, and how much agency the AI has over your library.",
   },
   {
     id: "accessibility",
