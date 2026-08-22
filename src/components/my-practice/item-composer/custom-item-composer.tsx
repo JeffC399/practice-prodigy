@@ -159,6 +159,7 @@ export function CustomItemComposer({
         }}
         scope="per-item"
         hint="How you'll practice this. Suggested from the category — override anytime."
+        suggestContext={{ label, category, type: "custom" }}
       />
 
       <div className="flex flex-wrap justify-end gap-2 pt-1">

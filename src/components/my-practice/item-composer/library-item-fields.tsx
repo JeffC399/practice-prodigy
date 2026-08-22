@@ -54,6 +54,7 @@ export function LibraryItemFields({
   emptyMessage,
   moduleDefaultCategory,
   defaultEstimatedMinutes = 5,
+  itemType,
   onSubmit,
   onCancel,
 }: {
@@ -63,6 +64,13 @@ export function LibraryItemFields({
   emptyMessage: string;
   moduleDefaultCategory: CategoryId;
   defaultEstimatedMinutes?: number;
+  /**
+   * Slice F.7 (Phase 143) — Passed to the AI-suggest picker so the
+   * server can bias its recommendation based on the item type
+   * (drill / leadsheet / etc.). Optional so existing callers keep
+   * working; without it, the "?" button is hidden.
+   */
+  itemType?: string;
   onSubmit: (fields: LibraryItemFieldsSubmit) => void;
   onCancel: () => void;
 }) {
@@ -253,6 +261,15 @@ export function LibraryItemFields({
         }}
         scope="per-item"
         hint="How you'll practice this. Suggested from the category — override anytime."
+        suggestContext={
+          itemType
+            ? {
+                label,
+                category,
+                type: itemType,
+              }
+            : undefined
+        }
       />
 
       {/* Actions */}

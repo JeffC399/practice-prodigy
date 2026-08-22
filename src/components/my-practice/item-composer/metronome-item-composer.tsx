@@ -223,6 +223,7 @@ export function MetronomeItemComposer({
         }}
         scope="per-item"
         hint="How you'll practice this. Suggested from the category — override anytime."
+        suggestContext={{ label, category, type: "metronome" }}
       />
 
       <p className="text-[11px] text-muted-foreground/70">

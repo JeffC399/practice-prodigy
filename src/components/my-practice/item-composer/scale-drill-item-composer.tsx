@@ -38,6 +38,7 @@ export function ScaleDrillItemComposer({
       library={library}
       emptyMessage="No Scale Driller drills yet. Build one on /practice/scales, then come back."
       moduleDefaultCategory={MODULE_DEFAULT_CATEGORY["scale-driller"]}
+      itemType="scale-drill"
       onCancel={onCancel}
       onSubmit={({ pickedId, label, category, methodologyId, estimatedSeconds }) => {
         const item: RoutineItem = {

@@ -55,6 +55,7 @@ export function SongItemComposer({
       emptyMessage="No songs yet. Add one on the Songs tab, then come back."
       moduleDefaultCategory={MODULE_DEFAULT_CATEGORY["my-practice"]}
       defaultEstimatedMinutes={10}
+      itemType="song"
       onCancel={onCancel}
       onSubmit={({ pickedId, label, category, methodologyId, estimatedSeconds }) => {
         const item: RoutineItem = {

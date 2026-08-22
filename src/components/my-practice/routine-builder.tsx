@@ -16,11 +16,15 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, GripVertical, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, GripVertical, Loader2, ListChecks, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CategoryTimeBar } from "@/components/my-practice/category-time-bar";
 import { ItemPickerModal } from "@/components/my-practice/item-picker-modal";
 import { MethodologyPicker } from "@/components/my-practice/methodology-picker";
+import {
+  inputFromRoutineItem,
+  suggestMethodologyForItems,
+} from "@/lib/ai/suggest-methodology";
 import { CategoryChip } from "@/components/practice/category-chip";
 import { getMethodology } from "@/lib/practice/methodologies";
 import { PRACTICE_MODULE_LABELS } from "@/lib/practice/types";
@@ -79,6 +83,46 @@ type RoutineBuilderProps = {
 export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
   const lib = useRoutinesLibrary();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [aiAssigning, setAiAssigning] = useState(false);
+  const [aiAssignMsg, setAiAssignMsg] = useState<string | null>(null);
+
+  const blankMethodologyCount = useMemo(
+    () => routine.items.filter((it) => !it.methodologyId).length,
+    [routine.items],
+  );
+
+  const handleAiAssign = async () => {
+    // Slice F.8 (Phase 143) — Bulk-assign methodologies to every
+    // item that doesn't already have one. Items with an existing
+    // methodology are skipped so the AI can't clobber user picks.
+    const blanks = routine.items.filter((it) => !it.methodologyId);
+    if (blanks.length === 0) return;
+    setAiAssigning(true);
+    setAiAssignMsg(null);
+    try {
+      const suggestions = await suggestMethodologyForItems(
+        blanks.map(inputFromRoutineItem),
+      );
+      if (!suggestions) {
+        setAiAssignMsg("AI suggest failed. Try again or set methods manually.");
+        return;
+      }
+      const byId = new Map(suggestions.map((s) => [s.itemId, s.methodologyId]));
+      const nextItems = routine.items.map((it) => {
+        if (it.methodologyId) return it;
+        const suggested = byId.get(it.id);
+        if (suggested === undefined || suggested === null) return it;
+        return { ...it, methodologyId: suggested };
+      });
+      lib.updateRoutineItems(routine.id, nextItems);
+      const filled = suggestions.filter((s) => s.methodologyId).length;
+      setAiAssignMsg(
+        `Filled ${filled} of ${blanks.length} blank method${blanks.length === 1 ? "" : "s"}.`,
+      );
+    } finally {
+      setAiAssigning(false);
+    }
+  };
 
   const totalSec = totalEstimatedSeconds(routine);
   const timeBreakdown = useMemo(
@@ -223,19 +267,44 @@ export function RoutineBuilder({ routine, onClose }: RoutineBuilderProps) {
 
       {/* Items section */}
       <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Items
           </h3>
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25"
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            Add item
-          </button>
+          <div className="flex items-center gap-2">
+            {blankMethodologyCount > 0 && (
+              <button
+                type="button"
+                onClick={handleAiAssign}
+                disabled={aiAssigning}
+                title={`AI Coach fills the ${blankMethodologyCount} blank methodology field${
+                  blankMethodologyCount === 1 ? "" : "s"
+                } on this routine`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {aiAssigning ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                AI: assign methodologies
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              Add item
+            </button>
+          </div>
         </div>
+        {aiAssignMsg && (
+          <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            {aiAssignMsg}
+          </p>
+        )}
 
         {routine.items.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border/60 bg-background/20 px-6 py-10 text-center">

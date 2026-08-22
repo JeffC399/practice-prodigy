@@ -159,6 +159,7 @@ export function RestItemComposer({
         onChange={setMethodologyId}
         scope="per-item"
         hint="Usually blank for rests. Try Mental Practice for a visualization break."
+        suggestContext={{ label, category, type: "rest" }}
       />
 
       <div className="flex flex-wrap justify-end gap-2 pt-1">

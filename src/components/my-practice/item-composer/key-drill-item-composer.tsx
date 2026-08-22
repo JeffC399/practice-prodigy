@@ -41,6 +41,7 @@ export function KeyDrillItemComposer({
       library={library}
       emptyMessage="No Key Sequencer drills yet. Build one on /practice/keys, then come back."
       moduleDefaultCategory={MODULE_DEFAULT_CATEGORY["key-sequencer"]}
+      itemType="key-drill"
       onCancel={onCancel}
       onSubmit={({ pickedId, label, category, methodologyId, estimatedSeconds }) => {
         const item: RoutineItem = {

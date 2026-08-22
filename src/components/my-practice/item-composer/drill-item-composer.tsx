@@ -47,6 +47,7 @@ export function DrillItemComposer({
       library={library}
       emptyMessage="No drills yet. Save one on /practice, then come back."
       moduleDefaultCategory={MODULE_DEFAULT_CATEGORY.arpeggios}
+      itemType="drill"
       onCancel={onCancel}
       onSubmit={({ pickedId, label, category, methodologyId, estimatedSeconds }) => {
         const item: RoutineItem = {
