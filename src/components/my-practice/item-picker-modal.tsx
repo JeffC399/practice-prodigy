@@ -20,6 +20,7 @@ import { LeadsheetItemComposer } from "@/components/my-practice/item-composer/le
 import { MetronomeItemComposer } from "@/components/my-practice/item-composer/metronome-item-composer";
 import { RestItemComposer } from "@/components/my-practice/item-composer/rest-item-composer";
 import { ScaleDrillItemComposer } from "@/components/my-practice/item-composer/scale-drill-item-composer";
+import { SongItemComposer } from "@/components/my-practice/item-composer/song-item-composer";
 import {
   ROUTINE_ITEM_TYPE_DESCRIPTIONS,
   ROUTINE_ITEM_TYPE_LABELS,
@@ -84,12 +85,12 @@ const READY_TYPES: readonly RoutineItemType[] = [
   "scale-drill",
   "metronome",
   "leadsheet",
+  "song",
   "custom",
   "rest",
 ];
 
 const DEFERRED_TOOLTIPS: Partial<Record<RoutineItemType, string>> = {
-  song: "Songs library ships in Slice C.",
   "ear-training": "Ear training is a future module.",
 };
 
@@ -276,6 +277,12 @@ export function ItemPickerModal({
         )}
         {step.kind === "composer" && step.type === "rest" && (
           <RestItemComposer
+            onSubmit={handleSubmit}
+            onCancel={onClose}
+          />
+        )}
+        {step.kind === "composer" && step.type === "song" && (
+          <SongItemComposer
             onSubmit={handleSubmit}
             onCancel={onClose}
           />

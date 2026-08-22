@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getRoutineById, useRoutinesLibrary } from "./routines-library";
+import { useSongsLibrary } from "./songs-library";
+import type { RoutineItem } from "./routine-types";
 import type {
   SessionCategoryFeedback,
   SessionCategoryFeedbackRating,
@@ -211,11 +213,17 @@ export const useRoutineExecutor = create<RoutineExecutorStore>()(
         const currentItem = routine.items[currentIndex];
         if (!currentItem) return;
         const secondsSpent = elapsedSecondsOnCurrentItem(state.execution);
+        const outcome = opts?.outcome ?? "completed";
         const record: CompletedItemRecord = {
           routineItemId: currentItem.id,
           secondsSpent,
-          outcome: opts?.outcome ?? "completed",
+          outcome,
         };
+
+        // Slice C.4 (Phase 131) — Song per-item practice attribution.
+        // Only count actually-completed items so a stray Skip on a
+        // song doesn't inflate its total.
+        attributeSongPractice(currentItem, secondsSpent, outcome);
 
         const nextIndex = currentIndex + 1;
         const isDone = nextIndex >= routine.items.length;
@@ -249,6 +257,12 @@ export const useRoutineExecutor = create<RoutineExecutorStore>()(
               outcome: "revisited",
             }
           : null;
+
+        // Credit song practice even on Previous — the user practiced
+        // that time regardless of navigation direction.
+        if (currentItem) {
+          attributeSongPractice(currentItem, secondsSpent, "revisited");
+        }
 
         const now = Date.now();
         set({
@@ -313,6 +327,10 @@ export const useRoutineExecutor = create<RoutineExecutorStore>()(
               secondsSpent,
               outcome: "skipped",
             });
+            // The user actually played that time — credit songs the
+            // same as a Skip during advance() does (which is: not at
+            // all). Kept symmetric so users aren't surprised by
+            // "practice appeared after I exited" vs "after I skipped."
           }
         }
         set({ execution: null });
@@ -354,3 +372,21 @@ export const useRoutineExecutor = create<RoutineExecutorStore>()(
     },
   ),
 );
+
+/**
+ * Slice C.4 (Phase 131) — When the item the user just left is a song,
+ * bump that song's totalPracticeSeconds + lastPracticedAt via the
+ * songs library. Skipped items don't get credit (the user explicitly
+ * said "I didn't practice this"). Revisits and completions both do.
+ * No-op for non-song items and for zero-seconds runs.
+ */
+function attributeSongPractice(
+  item: RoutineItem,
+  secondsSpent: number,
+  outcome: "completed" | "skipped" | "revisited",
+): void {
+  if (item.type !== "song") return;
+  if (outcome === "skipped") return;
+  if (secondsSpent <= 0) return;
+  useSongsLibrary.getState().recordPractice(item.songId, secondsSpent);
+}

@@ -11,6 +11,7 @@ import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
 import { useRoutineExecutor } from "@/lib/practice/routine-executor";
 import { getRoutineById } from "@/lib/practice/routines-library";
 import type { RoutineItem } from "@/lib/practice/routine-types";
+import { getSongById } from "@/lib/practice/songs-library";
 import { useScaleDrillConfig } from "@/lib/scale-driller/config-store";
 import { useScaleDrillsLibrary } from "@/lib/scale-driller/library-store";
 import { usePracticeConfig } from "@/lib/state/practice-config";
@@ -177,10 +178,20 @@ function takeoverRouteFor(item: RoutineItem): string | null {
       return "/metronome?routineMode=1";
     case "leadsheet":
       return `/sheets/${item.leadSheetId}?routineMode=1`;
+    case "song": {
+      // Slice C.4 (Phase 131) — Songs with a linked lead sheet open
+      // that sheet's playback surface, same as a `leadsheet` item.
+      // Songs without a linked sheet fall through to inline rendering
+      // in the FullScreenPlayer (title + notes + timer).
+      const song = getSongById(item.songId);
+      if (song?.leadSheetId) {
+        return `/sheets/${song.leadSheetId}?routineMode=1`;
+      }
+      return null;
+    }
     // Rendered inline by FullScreenPlayer:
     case "rest":
     case "custom":
-    case "song":
     case "ear-training":
       return null;
   }

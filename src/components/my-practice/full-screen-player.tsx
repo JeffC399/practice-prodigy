@@ -23,6 +23,7 @@ import {
   playRestEndChime,
   playRoutineCompleteChime,
 } from "@/lib/audio/routine-sounds";
+import { useSongsLibrary } from "@/lib/practice/songs-library";
 import {
   elapsedSecondsOnCurrentItem,
   useRoutineExecutor,
@@ -471,6 +472,14 @@ function ItemBody({
       );
     }
 
+    case "song": {
+      // Unlinked songs (no linked lead sheet) render inline here.
+      // Linked songs are auto-routed to the sheet's playback surface
+      // by takeoverRouteFor, so this branch only fires for the
+      // unlinked case.
+      return <SongInlineBody item={item} timeChip={timeChip} header={header} />;
+    }
+
     // Drill types — placeholder for now; B.10 wires the module take-over.
     case "drill":
     case "key-drill":
@@ -513,6 +522,59 @@ function ItemBody({
       );
     }
   }
+}
+
+/**
+ * SongInlineBody — Slice C.4 (Phase 131).
+ *
+ * Renders a song routine item inline in the player when the song
+ * has no linked lead sheet. Shows title, artist (if any), personal
+ * notes (if any), and the item's time chip. Users work the song
+ * on their instrument; the player just clocks the time.
+ */
+function SongInlineBody({
+  item,
+  header,
+  timeChip,
+}: {
+  item: Extract<RoutineItem, { type: "song" }>;
+  header: React.ReactNode;
+  timeChip: React.ReactNode;
+}) {
+  const song = useSongsLibrary((s) =>
+    s.songs.find((x) => x.id === item.songId),
+  );
+
+  return (
+    <div className="flex max-w-2xl flex-col items-center gap-8">
+      {header}
+      <div className="flex flex-col items-center gap-3">
+        <Music className="h-8 w-8 text-primary/70" aria-hidden="true" />
+        <div className="flex flex-col items-center gap-1 text-center">
+          <span className="text-lg font-semibold text-foreground">
+            {song?.title ?? item.label}
+          </span>
+          {song?.artist && (
+            <span className="text-sm text-muted-foreground">
+              {song.artist}
+            </span>
+          )}
+        </div>
+        {song?.personalNotes && (
+          <p className="max-w-xl text-center text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+            {song.personalNotes}
+          </p>
+        )}
+        {!song && (
+          <p className="text-xs italic text-muted-foreground">
+            This song was deleted from your library — the timer still
+            runs, but no practice will be attributed to it.
+          </p>
+        )}
+      </div>
+      {timeChip}
+    </div>
+  );
 }
 
 /**
