@@ -3,6 +3,7 @@
 import { Music, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { SongCard } from "./song-card";
+import { SongFormModal } from "./song-form-modal";
 import {
   SONG_STATUS_LABELS,
   SONG_STATUS_ORDER,
@@ -51,6 +52,7 @@ export function SongsTab() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () => filterAndSort(songs, statusFilter, sortMode, search),
@@ -60,9 +62,11 @@ export function SongsTab() {
   const isEmpty = songs.length === 0;
 
   const handleAdd = () => {
-    saveSong({ title: "New song" });
-    // Scroll to top so the freshly-created card (which appended to the
-    // list) is visible after re-sort. Recent sort will bubble it up.
+    const id = saveSong({ title: "New song" });
+    // Open the fuller form modal immediately so the user can flesh
+    // out the metadata (artist / key / status / linked sheet) rather
+    // than being left staring at a placeholder title.
+    setEditingId(id);
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -70,40 +74,56 @@ export function SongsTab() {
 
   if (isEmpty) {
     return (
-      <section className="flex flex-col gap-6">
-        <TabHeader onAdd={handleAdd} />
-        <EmptyState onAdd={handleAdd} />
-      </section>
+      <>
+        <section className="flex flex-col gap-6">
+          <TabHeader onAdd={handleAdd} />
+          <EmptyState onAdd={handleAdd} />
+        </section>
+        {editingId && (
+          <SongFormModal
+            songId={editingId}
+            onClose={() => setEditingId(null)}
+          />
+        )}
+      </>
     );
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <TabHeader onAdd={handleAdd} />
+    <>
+      <section className="flex flex-col gap-4">
+        <TabHeader onAdd={handleAdd} />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <StatusFilterTabs value={statusFilter} onChange={setStatusFilter} />
-        <SortMenu value={sortMode} onChange={setSortMode} />
-        <SearchBox value={search} onChange={setSearch} />
-      </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusFilterTabs value={statusFilter} onChange={setStatusFilter} />
+          <SortMenu value={sortMode} onChange={setSortMode} />
+          <SearchBox value={search} onChange={setSearch} />
+        </div>
 
-      {filtered.length === 0 ? (
-        <FilteredEmptyState
-          onClear={() => {
-            setStatusFilter("active");
-            setSearch("");
-          }}
+        {filtered.length === 0 ? (
+          <FilteredEmptyState
+            onClear={() => {
+              setStatusFilter("active");
+              setSearch("");
+            }}
+          />
+        ) : (
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((song) => (
+              <li key={song.id}>
+                <SongCard song={song} onEdit={setEditingId} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {editingId && (
+        <SongFormModal
+          songId={editingId}
+          onClose={() => setEditingId(null)}
         />
-      ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((song) => (
-            <li key={song.id}>
-              <SongCard song={song} />
-            </li>
-          ))}
-        </ul>
       )}
-    </section>
+    </>
   );
 }
 
