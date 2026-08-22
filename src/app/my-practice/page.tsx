@@ -20,6 +20,10 @@ import { ReportsTab } from "@/components/my-practice/reports/reports-tab";
 import { RoutineBuilder } from "@/components/my-practice/routine-builder";
 import { RoutineCard } from "@/components/my-practice/routine-card";
 import { SongsTab } from "@/components/my-practice/songs-tab";
+import {
+  templateToRoutineItems,
+  type MethodologyTemplate,
+} from "@/lib/practice/methodology-library";
 import { isMyPracticeEnabled } from "@/lib/feature-flags";
 import { useRoutineExecutor } from "@/lib/practice/routine-executor";
 import {
@@ -116,6 +120,28 @@ function MyPracticeContent() {
     router.push(`/my-practice?${params.toString()}`, { scroll: false });
   }, [router, searchParams]);
 
+  const handleTryTemplate = useCallback(
+    (template: MethodologyTemplate) => {
+      // Slice E.6 (Phase 137) — Load a methodology template as a
+      // fresh routine, then jump to the builder so the user can
+      // edit before running (or hit Launch directly).
+      const items = templateToRoutineItems(template);
+      const id = useRoutinesLibrary.getState().saveRoutine({
+        name: template.name,
+        notes: template.description,
+        items,
+        methodologyId: template.methodologyId,
+        source: "template",
+        sourceRef: template.id,
+      });
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "routines");
+      params.set("routine", id);
+      router.push(`/my-practice?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
   // Clear a stale ?routine= that points at a deleted routine.
   useEffect(() => {
     if (openRoutineId && !openRoutine) {
@@ -159,7 +185,9 @@ function MyPracticeContent() {
             ))}
           {activeTab === "songs" && <SongsTab />}
           {activeTab === "reports" && <ReportsTab />}
-          {activeTab === "methodology" && <MethodologyTab />}
+          {activeTab === "methodology" && (
+            <MethodologyTab onTryTemplate={handleTryTemplate} />
+          )}
           {activeTab === "profile" && (
             <ComingSoonTab
               title="Profile"

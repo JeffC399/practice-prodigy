@@ -5,6 +5,12 @@ import {
   type MethodologyTemplate,
 } from "./methodology-content.generated";
 import { getMethodology, type MethodologyEntry } from "./methodologies";
+import {
+  newRoutineItemId,
+  type RoutineItem,
+  type RoutineItemType,
+} from "./routine-types";
+import type { CategoryId } from "./categories";
 
 /**
  * Methodology library — Slice E.1 (Phase 135).
@@ -102,4 +108,91 @@ export function listMethodologyBundles(): MethodologyBundle[] {
     if (bundle) out.push(bundle);
   }
   return out;
+}
+
+/**
+ * Slice E.6 (Phase 137) — Convert a template's loose item shape
+ * (as loaded from JSON) into `RoutineItem` variants with freshly
+ * minted ids. The template author is expected to match the
+ * RoutineItem discriminated union; unknown types get dropped
+ * (defensive against typos or future variants that ship before
+ * templates catch up).
+ *
+ * Returns just the items array + suggested routine name — the
+ * caller (usually the /my-practice page) is responsible for calling
+ * `useRoutinesLibrary.saveRoutine` with `source: "template"` and
+ * `sourceRef: template.methodologyId` so provenance is recorded.
+ */
+export function templateToRoutineItems(
+  template: MethodologyTemplate,
+): RoutineItem[] {
+  const out: RoutineItem[] = [];
+  for (const raw of template.items) {
+    const converted = convertTemplateItem(raw);
+    if (converted) out.push(converted);
+  }
+  return out;
+}
+
+const SUPPORTED_TYPES: readonly RoutineItemType[] = [
+  "drill",
+  "key-drill",
+  "scale-drill",
+  "metronome",
+  "leadsheet",
+  "song",
+  "custom",
+  "rest",
+];
+
+function convertTemplateItem(
+  raw: MethodologyTemplate["items"][number],
+): RoutineItem | null {
+  if (!SUPPORTED_TYPES.includes(raw.type as RoutineItemType)) return null;
+  const base = {
+    id: newRoutineItemId(),
+    label: raw.label,
+    category: raw.category as CategoryId,
+    estimatedSeconds: raw.estimatedSeconds,
+    methodologyId: raw.methodologyId,
+  };
+  switch (raw.type as RoutineItemType) {
+    case "drill":
+      if (!raw.drillId) return null;
+      return { ...base, type: "drill", drillId: raw.drillId };
+    case "key-drill":
+      if (!raw.keyDrillId) return null;
+      return { ...base, type: "key-drill", keyDrillId: raw.keyDrillId };
+    case "scale-drill":
+      if (!raw.scaleDrillId) return null;
+      return { ...base, type: "scale-drill", scaleDrillId: raw.scaleDrillId };
+    case "metronome":
+      return {
+        ...base,
+        type: "metronome",
+        bpm: raw.bpm ?? 60,
+        beatsPerMeasure: raw.beatsPerMeasure ?? 4,
+        beatUnit: raw.beatUnit ?? 4,
+      };
+    case "leadsheet":
+      if (!raw.leadSheetId) return null;
+      return { ...base, type: "leadsheet", leadSheetId: raw.leadSheetId };
+    case "song":
+      if (!raw.songId) return null;
+      return { ...base, type: "song", songId: raw.songId };
+    case "custom":
+      return {
+        ...base,
+        type: "custom",
+        instruction: raw.instruction ?? "",
+      };
+    case "rest":
+      return {
+        ...base,
+        type: "rest",
+        guidanceText: raw.guidanceText,
+      };
+    case "ear-training":
+      return null; // Ear training module hasn't shipped yet.
+  }
 }
