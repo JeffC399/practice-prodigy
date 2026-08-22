@@ -15,6 +15,7 @@ import {
   MyPracticeTabsShell,
   type MyPracticeTabId,
 } from "@/components/my-practice/tabs-shell";
+import { MethodologyTab } from "@/components/my-practice/methodology/methodology-tab";
 import { ReportsTab } from "@/components/my-practice/reports/reports-tab";
 import { RoutineBuilder } from "@/components/my-practice/routine-builder";
 import { RoutineCard } from "@/components/my-practice/routine-card";
@@ -158,13 +159,7 @@ function MyPracticeContent() {
             ))}
           {activeTab === "songs" && <SongsTab />}
           {activeTab === "reports" && <ReportsTab />}
-          {activeTab === "methodology" && (
-            <ComingSoonTab
-              title="Methodology"
-              slice="Slice E"
-              blurb="A library of practice methods — Deliberate Practice, Slow Practice, Chunking, Interleaving, Pomodoro, Spaced Repetition, and more — each with a starter routine template you can adapt."
-            />
-          )}
+          {activeTab === "methodology" && <MethodologyTab />}
           {activeTab === "profile" && (
             <ComingSoonTab
               title="Profile"
