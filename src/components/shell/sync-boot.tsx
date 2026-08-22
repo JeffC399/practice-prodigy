@@ -8,6 +8,7 @@ import { practiceSessionsSyncAdapter } from "@/lib/sync/adapters/practice-sessio
 import { routinesSyncAdapter } from "@/lib/sync/adapters/routines";
 import { scaleDrillsSyncAdapter } from "@/lib/sync/adapters/scale-drills";
 import { sheetsSyncAdapter } from "@/lib/sync/adapters/sheets";
+import { songsSyncAdapter } from "@/lib/sync/adapters/songs";
 import { userPrefsSyncAdapter } from "@/lib/sync/adapters/user-prefs";
 import { registerSyncAdapter } from "@/lib/sync/sync-registry";
 
@@ -38,6 +39,7 @@ export function SyncBoot(): null {
     registerSyncAdapter(customPatternsSyncAdapter);
     registerSyncAdapter(practiceSessionsSyncAdapter);
     registerSyncAdapter(routinesSyncAdapter);
+    registerSyncAdapter(songsSyncAdapter);
   }, []);
   return null;
 }
