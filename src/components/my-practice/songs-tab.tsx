@@ -2,6 +2,7 @@
 
 import { FileText, Music, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { CollectionsAutoSuggestBanner } from "./collections-auto-suggest-banner";
 import { CollectionsSectionedList } from "./collections-sectioned-list";
 import { SongCard } from "./song-card";
 import { SongFormModal } from "./song-form-modal";
@@ -121,18 +122,25 @@ export function SongsTab() {
             }}
           />
         ) : (
-          <CollectionsSectionedList
-            items={filtered}
-            memberType="song"
-            sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-            renderItem={(song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                onEdit={setEditingId}
-              />
-            )}
-          />
+          <>
+            <CollectionsAutoSuggestBanner
+              items={filtered}
+              getName={(s) => s.title}
+              memberType="song"
+            />
+            <CollectionsSectionedList
+              items={filtered}
+              memberType="song"
+              sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              renderItem={(song) => (
+                <SongCard
+                  key={song.id}
+                  song={song}
+                  onEdit={setEditingId}
+                />
+              )}
+            />
+          </>
         )}
       </section>
       {editingId && (

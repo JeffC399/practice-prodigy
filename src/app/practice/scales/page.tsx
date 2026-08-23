@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
@@ -235,24 +236,31 @@ export default function ScaleDrillerSetupPage() {
                   No custom drills yet. Build a pool below and save it as a drill.
                 </p>
               ) : (
-                <CollectionsSectionedList
-                  items={userDrills}
-                  memberType="scale-drill"
-                  sectionClassName="flex flex-col gap-2"
-                  renderItem={(d) => (
-                    <ScaleDrillCard
-                      key={d.id}
-                      drill={d}
-                      justLoaded={justLoadedDrillId === d.id}
-                      onLaunch={() => handleLaunchDrill(d)}
-                      onEdit={() => handleEditDrill(d)}
-                      onDelete={() => drillsLib.deleteDrill(d.id)}
-                      onSetCategory={(cat) =>
-                        drillsLib.setDrillCategory(d.id, cat)
-                      }
-                    />
-                  )}
-                />
+                <>
+                  <CollectionsAutoSuggestBanner
+                    items={userDrills}
+                    getName={(d) => d.name}
+                    memberType="scale-drill"
+                  />
+                  <CollectionsSectionedList
+                    items={userDrills}
+                    memberType="scale-drill"
+                    sectionClassName="flex flex-col gap-2"
+                    renderItem={(d) => (
+                      <ScaleDrillCard
+                        key={d.id}
+                        drill={d}
+                        justLoaded={justLoadedDrillId === d.id}
+                        onLaunch={() => handleLaunchDrill(d)}
+                        onEdit={() => handleEditDrill(d)}
+                        onDelete={() => drillsLib.deleteDrill(d.id)}
+                        onSetCategory={(cat) =>
+                          drillsLib.setDrillCategory(d.id, cat)
+                        }
+                      />
+                    )}
+                  />
+                </>
               )}
             </div>
           )}

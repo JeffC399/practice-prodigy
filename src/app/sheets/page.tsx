@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import { SheetThumbnail } from "@/components/sheets/sheet-thumbnail";
@@ -271,11 +272,17 @@ export default function SheetsLibraryPage() {
             </button>
           </div>
         ) : (
-          <CollectionsSectionedList
-            items={filteredSheets}
-            memberType="leadsheet"
-            sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
-            renderItem={(sheet) => (
+          <>
+            <CollectionsAutoSuggestBanner
+              items={filteredSheets}
+              getName={(sh) => sh.title || "Untitled sheet"}
+              memberType="leadsheet"
+            />
+            <CollectionsSectionedList
+              items={filteredSheets}
+              memberType="leadsheet"
+              sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
+              renderItem={(sheet) => (
               <div
                 key={sheet.id}
                 className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card/40 transition-all hover:border-primary/40 hover:shadow-md"
@@ -379,8 +386,9 @@ export default function SheetsLibraryPage() {
                   )}
                 </div>
               </div>
-            )}
-          />
+              )}
+            />
+          </>
         )}
       </div>
     </main>

@@ -60,6 +60,7 @@ import {
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import type { CategoryId } from "@/lib/practice/categories";
@@ -913,11 +914,17 @@ export default function PracticeSetupPage() {
                 )}
               </div>
             ) : (
-              <CollectionsSectionedList
-                items={userDrills}
-                memberType="drill"
-                sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
-                renderItem={(drill) => (
+              <>
+                <CollectionsAutoSuggestBanner
+                  items={userDrills}
+                  getName={(d) => d.name}
+                  memberType="drill"
+                />
+                <CollectionsSectionedList
+                  items={userDrills}
+                  memberType="drill"
+                  sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                  renderItem={(drill) => (
                   <DrillCard
                     key={drill.id}
                     drill={drill}
@@ -935,7 +942,8 @@ export default function PracticeSetupPage() {
                     }
                   />
                 )}
-              />
+                />
+              </>
             )}
           </FormSection>
 

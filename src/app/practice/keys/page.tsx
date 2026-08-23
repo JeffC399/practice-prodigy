@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
+import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
@@ -554,6 +555,12 @@ export default function KeySequencerSetupPage() {
                   .
                 </p>
               ) : (
+                <>
+                  <CollectionsAutoSuggestBanner
+                    items={userDrills}
+                    getName={(d) => d.name}
+                    memberType="key-drill"
+                  />
                 <CollectionsSectionedList
                   items={userDrills}
                   memberType="key-drill"
@@ -577,6 +584,7 @@ export default function KeySequencerSetupPage() {
                     />
                   )}
                 />
+                </>
               )}
             </>
           )}
