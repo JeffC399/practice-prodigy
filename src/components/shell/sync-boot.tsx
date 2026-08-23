@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { collectionsSyncAdapter } from "@/lib/sync/adapters/collections";
 import { customPatternsSyncAdapter } from "@/lib/sync/adapters/custom-patterns";
 import { drillsSyncAdapter } from "@/lib/sync/adapters/drills";
 import { keyDrillsSyncAdapter } from "@/lib/sync/adapters/key-drills";
@@ -40,6 +41,7 @@ export function SyncBoot(): null {
     registerSyncAdapter(practiceSessionsSyncAdapter);
     registerSyncAdapter(routinesSyncAdapter);
     registerSyncAdapter(songsSyncAdapter);
+    registerSyncAdapter(collectionsSyncAdapter);
   }, []);
   return null;
 }
