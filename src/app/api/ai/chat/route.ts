@@ -125,7 +125,26 @@ export async function POST(req: Request) {
       headers: usingBYOK ? providerHeaders(model, byokKey.trim()) : undefined,
     });
 
-    return result.toUIMessageStreamResponse();
+    // Slice F.12 (Phase 155) — Attach token usage to the assistant
+    // message's metadata so the client can display + accumulate it
+    // per conversation. AI SDK v7 exposes usage via the `finish`
+    // part; we pipe it into the message metadata channel that the
+    // client's useChat reads.
+    return result.toUIMessageStreamResponse({
+      messageMetadata: ({ part }) => {
+        if (part.type === "finish") {
+          return {
+            usage: {
+              inputTokens: part.totalUsage?.inputTokens,
+              outputTokens: part.totalUsage?.outputTokens,
+              totalTokens: part.totalUsage?.totalTokens,
+              model,
+            },
+          };
+        }
+        return undefined;
+      },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(

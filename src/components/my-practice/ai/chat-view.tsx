@@ -9,6 +9,10 @@ import {
   type AiModelId,
 } from "@/lib/ai/ai-config";
 import { useAiCoachHistory } from "@/lib/ai/coach-history";
+import {
+  formatTokenCount,
+  useAiCoachUsage,
+} from "@/lib/ai/coach-usage";
 import { buildContextBody } from "@/lib/ai/context-assembly";
 import { parseRoutineDraft } from "@/lib/ai/routine-parser";
 import { buildPassiveSystemPrompt } from "@/lib/ai/system-prompts";
@@ -59,6 +63,12 @@ export function ChatView() {
   const createNewConversation = useAiCoachHistory((s) => s.createNew);
   const openConversation = useAiCoachHistory((s) => s.openConversation);
   const deleteConversation = useAiCoachHistory((s) => s.deleteConversation);
+
+  const recordUsage = useAiCoachUsage((s) => s.recordUsage);
+  const clearUsage = useAiCoachUsage((s) => s.clearUsage);
+  const conversationUsage = useAiCoachUsage((s) =>
+    activeConversationId ? s.byConversation[activeConversationId] : undefined,
+  );
 
   // Seed the active conversation on first mount.
   useEffect(() => {
@@ -113,6 +123,25 @@ export function ChatView() {
     saveMessages(messages);
   }, [messages, activeConversationId, saveMessages]);
 
+  // Slice F.12 (Phase 155) — Sink assistant-message usage into the
+  // per-conversation accumulator. Only the LAST assistant message's
+  // metadata.usage matters — we've already recorded prior ones on
+  // previous ticks, so re-recording would double-count. We track the
+  // last-recorded message id in a ref and no-op when it hasn't changed.
+  const lastUsageRecordedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (lastUsageRecordedRef.current === last.id) return;
+    const meta = (last as { metadata?: unknown }).metadata as
+      | { usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; model?: string } }
+      | undefined;
+    if (!meta?.usage) return;
+    lastUsageRecordedRef.current = last.id;
+    recordUsage(activeConversationId, meta.usage);
+  }, [messages, activeConversationId, recordUsage]);
+
   const [composerText, setComposerText] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -131,6 +160,9 @@ export function ChatView() {
 
   const handleDeleteConversation = (id: string) => {
     deleteConversation(id);
+    // Also clear the per-conversation usage bucket so token counts
+    // don't linger for deleted conversations.
+    clearUsage(id);
     // If we deleted the active one, useChat will re-key on the new
     // activeConversationId and seed from that conversation's messages.
   };
@@ -169,7 +201,17 @@ export function ChatView() {
             check-in.
           </p>
         </div>
-        <AuthPathChip authPath={authPath} model={model} />
+        <div className="flex items-center gap-1.5">
+          {conversationUsage && conversationUsage.totalTokens > 0 && (
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+              title={`Conversation total: ${conversationUsage.inputTokens} in + ${conversationUsage.outputTokens} out across ${conversationUsage.messageCount} message${conversationUsage.messageCount === 1 ? "" : "s"}`}
+            >
+              {formatTokenCount(conversationUsage.totalTokens)}
+            </span>
+          )}
+          <AuthPathChip authPath={authPath} model={model} />
+        </div>
       </header>
 
       <HistoryStrip
