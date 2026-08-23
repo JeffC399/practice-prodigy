@@ -60,6 +60,7 @@ import {
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import type { CategoryId } from "@/lib/practice/categories";
 import {
   isShippedDrill,
@@ -2592,11 +2593,20 @@ function DrillCard({
           category set (they don't currently), so we skip the row
           entirely for them to keep the tile tight. */}
       {onSetCategory && (
-        <div className="flex items-center justify-start px-3 pb-2">
+        <div className="flex flex-wrap items-center gap-2 px-3 pb-2">
           <CategoryChipWithPopover
             value={drill.category}
             onChange={onSetCategory}
           />
+          {/* Slice I.3 (Phase 150) — CollectionsChip hidden on shipped
+              drills; those don't have stable ids across users so a
+              collection membership wouldn't sync coherently. */}
+          {!isShipped && (
+            <CollectionsChip
+              member={{ type: "drill", id: drill.id }}
+              align="left"
+            />
+          )}
         </div>
       )}
     </div>

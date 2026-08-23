@@ -12,6 +12,7 @@ import {
   type SongStatus,
 } from "@/lib/practice/songs-library";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
+import { CollectionsChip } from "./collections-chip";
 
 /**
  * SongCard — Slice C.2 (Phase 129).
@@ -130,6 +131,10 @@ export function SongCard({
               Sheet
             </Link>
           )}
+          <CollectionsChip
+            member={{ type: "song", id: song.id }}
+            align="left"
+          />
         </div>
       </div>
 

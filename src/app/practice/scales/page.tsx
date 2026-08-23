@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
 import { OnboardingCard } from "@/components/shared/onboarding-card";
 import { PresetChip } from "@/components/shared/preset-chip";
@@ -971,12 +972,17 @@ function ScaleDrillCard({
       {/* Slice A.10 (Phase 92) — Category chip pinned to the card's
           trailing edge next to the actions. Positioned to the LEFT of
           the launch button title so it doesn't get lost in the
-          hover-revealed actions column. */}
+          hover-revealed actions column.
+          Slice I.3 (Phase 150) — CollectionsChip sits next to it. */}
       {onSetCategory && (
-        <div className="ml-2 shrink-0">
+        <div className="ml-2 flex shrink-0 items-center gap-2">
           <CategoryChipWithPopover
             value={drill.category}
             onChange={onSetCategory}
+            align="right"
+          />
+          <CollectionsChip
+            member={{ type: "scale-drill", id: drill.id }}
             align="right"
           />
         </div>

@@ -3,6 +3,7 @@
 import { Copy, Pencil, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import type { KeyDrill } from "@/lib/key-sequencer/types";
 import type { CategoryId } from "@/lib/practice/categories";
 import { ORDERING_STRATEGY_DISPLAY_NAMES } from "@/lib/state/practice-config";
@@ -92,12 +93,19 @@ export function KeyDrillCard({
       </button>
 
       {/* Slice A.10 (Phase 92) — Category chip footer. Always visible
-          so users can see + change the category at a glance. */}
+          so users can see + change the category at a glance.
+          Slice I.3 (Phase 150) — CollectionsChip lives here too so
+          the two "which bucket does this drill belong to?" affordances
+          sit together. */}
       {onSetCategory && (
-        <div className="flex items-center justify-start border-t border-border/60 bg-background/30 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 bg-background/30 px-3 py-2">
           <CategoryChipWithPopover
             value={drill.category}
             onChange={onSetCategory}
+          />
+          <CollectionsChip
+            member={{ type: "key-drill", id: drill.id }}
+            align="left"
           />
         </div>
       )}

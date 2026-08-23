@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { SheetThumbnail } from "@/components/sheets/sheet-thumbnail";
 import { decodeSheet } from "@/lib/sheets/share";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
@@ -321,13 +322,18 @@ export default function SheetsLibraryPage() {
                 </Link>
                 {/* Slice A.10 (Phase 92) — Category chip pinned to the
                     card footer. Always visible so users can see + change
-                    the category without hovering into the actions bar. */}
-                <div className="flex items-center justify-start border-t border-border/60 bg-background/30 px-3 py-2">
+                    the category without hovering into the actions bar.
+                    Slice I.3 (Phase 150) — CollectionsChip sits alongside. */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-border/60 bg-background/30 px-3 py-2">
                   <CategoryChipWithPopover
                     value={sheet.category}
                     onChange={(cat) =>
                       updateSheet(sheet.id, { category: cat })
                     }
+                  />
+                  <CollectionsChip
+                    member={{ type: "leadsheet", id: sheet.id }}
+                    align="left"
                   />
                 </div>
                 {/* Phase 41.1 — Icons hidden by default on non-touch
