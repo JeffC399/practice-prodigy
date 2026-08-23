@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderTree, Pencil, Trash2 } from "lucide-react";
+import { FolderTree, Pencil, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
   useCollections,
@@ -26,14 +26,23 @@ import {
 export function CollectionCard({
   collection,
   onEdit,
+  onRun,
 }: {
   collection: Collection;
   onEdit: (id: string) => void;
+  /**
+   * Slice I.6 (Phase 153) — When set, a Run button appears that
+   * converts the collection's members into a new routine and jumps
+   * to the builder. Owned by CollectionsTab so it can use the
+   * router without importing next/navigation here.
+   */
+  onRun?: (id: string) => void;
 }) {
   const deleteCollection = useCollections((s) => s.deleteCollection);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const memberCount = collection.members.length;
+  const runnable = onRun && memberCount > 0;
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border-2 border-border bg-background/40 transition-all hover:border-primary/60 hover:bg-primary/5 hover:shadow-md">
@@ -70,6 +79,18 @@ export function CollectionCard({
       </div>
 
       <div className="flex items-center justify-end gap-1 border-t border-border/60 bg-background/30 px-3 py-2 opacity-100 transition-opacity md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto md:group-focus-within:opacity-100 md:group-focus-within:pointer-events-auto">
+        {runnable && (
+          <button
+            type="button"
+            onClick={() => onRun!(collection.id)}
+            aria-label={`Run collection ${collection.name} as a new routine`}
+            title="Convert this collection to a new routine + open in builder"
+            className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
+          >
+            <Play className="h-3 w-3" aria-hidden="true" />
+            Run
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onEdit(collection.id)}

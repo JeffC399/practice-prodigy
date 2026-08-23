@@ -293,3 +293,132 @@ export function collectionsContaining(
     .getState()
     .collections.filter((c) => isMemberIn(c.members, member));
 }
+
+// ────────────────────── Collection → routine conversion (Slice I.6)
+
+import { newRoutineItemId, type RoutineItem } from "./routine-types";
+import { useDrillsLibrary } from "@/lib/state/drills-library";
+import { useKeyDrillsLibrary } from "@/lib/key-sequencer/library-store";
+import { useScaleDrillsLibrary } from "@/lib/scale-driller/library-store";
+import { useSheetsLibrary } from "@/lib/state/sheets-library";
+import { useSongsLibrary } from "./songs-library";
+import { SHIPPED_DRILLS } from "@/lib/data/shipped-drills";
+import { MODULE_DEFAULT_CATEGORY } from "@/lib/tracking/category-defaults";
+import type { CategoryId } from "./categories";
+
+/**
+ * Slice I.6 (Phase 153) — Convert a collection's members into fresh
+ * `RoutineItem`s so the collection can be launched as a routine.
+ *
+ * Each member ref is resolved against the corresponding library
+ * store. Members that reference deleted items (dangling refs) are
+ * silently dropped so a stale collection still produces a runnable
+ * routine.
+ *
+ * Every item gets:
+ *   - Fresh routine-item id (never reuses the source id)
+ *   - Label from the source item's name / title
+ *   - Category from the source (falling back to the module default)
+ *   - Default estimatedSeconds of 5 minutes (the routine builder can
+ *     tweak these before the user launches)
+ */
+export function collectionToRoutineItems(
+  collection: Collection,
+): RoutineItem[] {
+  const out: RoutineItem[] = [];
+  for (const member of collection.members) {
+    const item = resolveMember(member);
+    if (item) out.push(item);
+  }
+  return out;
+}
+
+const DEFAULT_SECONDS = 300;
+
+function resolveMember(member: CollectionMember): RoutineItem | null {
+  const baseId = newRoutineItemId();
+  switch (member.type) {
+    case "drill": {
+      const drill =
+        useDrillsLibrary
+          .getState()
+          .drills.find((d) => d.id === member.id) ??
+        SHIPPED_DRILLS.find((d) => d.id === member.id);
+      if (!drill) return null;
+      return {
+        id: baseId,
+        type: "drill",
+        drillId: member.id,
+        label: drill.name,
+        category:
+          (drill.category as CategoryId | undefined) ??
+          MODULE_DEFAULT_CATEGORY.arpeggios,
+        estimatedSeconds: DEFAULT_SECONDS,
+      };
+    }
+    case "key-drill": {
+      const drill = useKeyDrillsLibrary
+        .getState()
+        .drills.find((d) => d.id === member.id);
+      if (!drill) return null;
+      return {
+        id: baseId,
+        type: "key-drill",
+        keyDrillId: member.id,
+        label: drill.name,
+        category:
+          (drill.category as CategoryId | undefined) ??
+          MODULE_DEFAULT_CATEGORY["key-sequencer"],
+        estimatedSeconds: DEFAULT_SECONDS,
+      };
+    }
+    case "scale-drill": {
+      const drill = useScaleDrillsLibrary
+        .getState()
+        .drills.find((d) => d.id === member.id);
+      if (!drill) return null;
+      return {
+        id: baseId,
+        type: "scale-drill",
+        scaleDrillId: member.id,
+        label: drill.name,
+        category:
+          (drill.category as CategoryId | undefined) ??
+          MODULE_DEFAULT_CATEGORY["scale-driller"],
+        estimatedSeconds: DEFAULT_SECONDS,
+      };
+    }
+    case "leadsheet": {
+      const sheet = useSheetsLibrary
+        .getState()
+        .sheets.find((s) => s.id === member.id);
+      if (!sheet) return null;
+      return {
+        id: baseId,
+        type: "leadsheet",
+        leadSheetId: member.id,
+        label: sheet.title || "Untitled sheet",
+        category:
+          (sheet.category as CategoryId | undefined) ??
+          MODULE_DEFAULT_CATEGORY["lsb-playback"],
+        estimatedSeconds: DEFAULT_SECONDS,
+      };
+    }
+    case "song": {
+      const song = useSongsLibrary
+        .getState()
+        .songs.find((s) => s.id === member.id);
+      if (!song) return null;
+      return {
+        id: baseId,
+        type: "song",
+        songId: member.id,
+        label: song.title,
+        // Songs don't carry their own category; fall back to the
+        // my-practice module default (Repertoire).
+        category: MODULE_DEFAULT_CATEGORY["my-practice"],
+        estimatedSeconds: DEFAULT_SECONDS * 2, // Songs default to ~10min.
+      };
+    }
+  }
+}

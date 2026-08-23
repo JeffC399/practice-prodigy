@@ -1,10 +1,15 @@
 "use client";
 
 import { FolderTree, Plus } from "lucide-react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
 import { CollectionCard } from "./collection-card";
 import { CollectionFormModal } from "./collection-form-modal";
-import { useCollections } from "@/lib/practice/collections";
+import {
+  collectionToRoutineItems,
+  useCollections,
+} from "@/lib/practice/collections";
+import { useRoutinesLibrary } from "@/lib/practice/routines-library";
 
 /**
  * CollectionsTab — Slice I.2 (Phase 149).
@@ -29,6 +34,26 @@ export function CollectionsTab() {
   const openCreate = () => setEditingId(null);
   const openEdit = (id: string) => setEditingId(id);
   const closeForm = () => setEditingId(undefined);
+
+  const router = useRouter();
+  const handleRun = useCallback(
+    (collectionId: string) => {
+      const collection = useCollections
+        .getState()
+        .collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      const items = collectionToRoutineItems(collection);
+      const id = useRoutinesLibrary.getState().saveRoutine({
+        name: collection.name,
+        notes: collection.description,
+        items,
+        source: "template",
+        sourceRef: collection.id,
+      });
+      router.push(`/my-practice?tab=routines&routine=${id}`);
+    },
+    [router],
+  );
 
   return (
     <>
@@ -60,7 +85,11 @@ export function CollectionsTab() {
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sorted.map((c) => (
               <li key={c.id}>
-                <CollectionCard collection={c} onEdit={openEdit} />
+                <CollectionCard
+                collection={c}
+                onEdit={openEdit}
+                onRun={handleRun}
+              />
               </li>
             ))}
           </ul>
