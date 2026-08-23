@@ -61,6 +61,7 @@ import {
 import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
+import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import type { CategoryId } from "@/lib/practice/categories";
 import {
   isShippedDrill,
@@ -912,8 +913,11 @@ export default function PracticeSetupPage() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {userDrills.map((drill) => (
+              <CollectionsSectionedList
+                items={userDrills}
+                memberType="drill"
+                sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                renderItem={(drill) => (
                   <DrillCard
                     key={drill.id}
                     drill={drill}
@@ -930,8 +934,8 @@ export default function PracticeSetupPage() {
                       drillsLib.setDrillCategory(drill.id, cat)
                     }
                   />
-                ))}
-              </div>
+                )}
+              />
             )}
           </FormSection>
 

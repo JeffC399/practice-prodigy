@@ -2,6 +2,7 @@
 
 import { FileText, Music, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { CollectionsSectionedList } from "./collections-sectioned-list";
 import { SongCard } from "./song-card";
 import { SongFormModal } from "./song-form-modal";
 import { SongImportFromSheets } from "./song-import-from-sheets";
@@ -120,13 +121,18 @@ export function SongsTab() {
             }}
           />
         ) : (
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((song) => (
-              <li key={song.id}>
-                <SongCard song={song} onEdit={setEditingId} />
-              </li>
-            ))}
-          </ul>
+          <CollectionsSectionedList
+            items={filtered}
+            memberType="song"
+            sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            renderItem={(song) => (
+              <SongCard
+                key={song.id}
+                song={song}
+                onEdit={setEditingId}
+              />
+            )}
+          />
         )}
       </section>
       {editingId && (

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
+import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import { SheetThumbnail } from "@/components/sheets/sheet-thumbnail";
 import { decodeSheet } from "@/lib/sheets/share";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
@@ -270,19 +271,11 @@ export default function SheetsLibraryPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {/* Phase 41 — Card layout redesign:
-                • Full-width thumbnail (fills the card via ResizeObserver
-                  scale — no more dead space on the right at wider grid
-                  columns).
-                • Title + metadata in a padded body block below.
-                • Edit / delete icons docked in a border-top footer bar
-                  at the bottom, normalized to identical inline-flex
-                  h-7 w-7 boxes so link vs button rendering can't nudge
-                  their alignment.
-                • Whole card body (thumbnail + metadata) is one <Link>
-                  so the entire surface opens the view page. */}
-            {filteredSheets.map((sheet) => (
+          <CollectionsSectionedList
+            items={filteredSheets}
+            memberType="leadsheet"
+            sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
+            renderItem={(sheet) => (
               <div
                 key={sheet.id}
                 className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card/40 transition-all hover:border-primary/40 hover:shadow-md"
@@ -386,8 +379,8 @@ export default function SheetsLibraryPage() {
                   )}
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
       </div>
     </main>

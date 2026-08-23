@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
+import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
@@ -553,8 +554,11 @@ export default function KeySequencerSetupPage() {
                   .
                 </p>
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {userDrills.map((d) => (
+                <CollectionsSectionedList
+                  items={userDrills}
+                  memberType="key-drill"
+                  sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                  renderItem={(d) => (
                     <KeyDrillCard
                       key={d.id}
                       drill={d}
@@ -571,8 +575,8 @@ export default function KeySequencerSetupPage() {
                         drillsLib.setDrillCategory(d.id, cat)
                       }
                     />
-                  ))}
-                </div>
+                  )}
+                />
               )}
             </>
           )}
