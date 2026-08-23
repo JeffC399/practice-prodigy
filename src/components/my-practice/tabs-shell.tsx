@@ -3,6 +3,7 @@
 import {
   BarChart3,
   BookOpen,
+  FolderTree,
   ListChecks,
   Music,
   UserCircle,
@@ -32,6 +33,7 @@ import type { ReactNode } from "react";
 export type MyPracticeTabId =
   | "routines"
   | "songs"
+  | "collections"
   | "reports"
   | "methodology"
   | "profile";
@@ -56,6 +58,13 @@ export const MY_PRACTICE_TABS: MyPracticeTabEntry[] = [
     label: "Songs",
     icon: Music,
     description: "Your repertoire — songs you're learning or maintaining.",
+  },
+  {
+    id: "collections",
+    label: "Collections",
+    icon: FolderTree,
+    description:
+      "Cross-module groups — bundle drills, sheets, and songs around a theme.",
   },
   {
     id: "reports",

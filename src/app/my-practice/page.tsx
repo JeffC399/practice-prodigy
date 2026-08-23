@@ -17,6 +17,7 @@ import {
   MyPracticeTabsShell,
   type MyPracticeTabId,
 } from "@/components/my-practice/tabs-shell";
+import { CollectionsTab } from "@/components/my-practice/collections-tab";
 import { MethodologyTab } from "@/components/my-practice/methodology/methodology-tab";
 import { ReportsTab } from "@/components/my-practice/reports/reports-tab";
 import { RoutineBuilder } from "@/components/my-practice/routine-builder";
@@ -196,6 +197,7 @@ function MyPracticeContent() {
               <RoutinesTab onOpenRoutine={handleOpenRoutine} />
             ))}
           {activeTab === "songs" && <SongsTab />}
+          {activeTab === "collections" && <CollectionsTab />}
           {activeTab === "reports" && <ReportsTab />}
           {activeTab === "methodology" && (
             <MethodologyTab onTryTemplate={handleTryTemplate} />
