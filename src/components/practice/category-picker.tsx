@@ -45,6 +45,13 @@ type CategoryPickerProps = {
   onDismiss?: () => void;
   /** Optional header shown above the list (e.g. "Change category"). */
   heading?: string;
+  /**
+   * Optional element whose clicks should NOT dismiss the picker. Use
+   * this to point at the trigger that opened the picker, so clicking
+   * it to close doesn't race with the outside-click handler and
+   * immediately reopen.
+   */
+  ignoreRef?: React.RefObject<HTMLElement | null>;
 };
 
 export function CategoryPicker({
@@ -52,6 +59,7 @@ export function CategoryPicker({
   onChange,
   onDismiss,
   heading,
+  ignoreRef,
 }: CategoryPickerProps) {
   const customCategories = useUserPrefs((s) => s.customCategories);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -59,7 +67,10 @@ export function CategoryPicker({
   useEffect(() => {
     if (!onDismiss) return;
     const onDown = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) onDismiss();
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (ignoreRef?.current?.contains(target)) return;
+      onDismiss();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onDismiss();
@@ -70,7 +81,7 @@ export function CategoryPicker({
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [onDismiss]);
+  }, [onDismiss, ignoreRef]);
 
   const currentMeta = value
     ? resolveCategoryMeta(value, customCategories)
