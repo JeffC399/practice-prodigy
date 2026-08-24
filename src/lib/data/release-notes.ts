@@ -34,6 +34,18 @@ export type ReleaseNote = {
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: "2026-08-24-my-practice-alpha",
+    date: "August 24, 2026",
+    headline: "My Practice is live — α launch",
+    bullets: [
+      "Build routines from drills, sheets, songs, custom activities, and rests — run them end-to-end with a timer + auto-advance",
+      "Track songs you're learning; per-song practice time rolls up automatically",
+      "Cross-module Collections — group related items under one theme",
+      "Reports tab: category time, streaks, calendar heatmap, methodology mix — everything the session tracker has silently been accumulating",
+      "AI Coach chat drafts routines from your library, suggests methodologies, and proposes new songs and collections with your confirmation",
+    ],
+  },
+  {
     id: "2026-07-11-basic-tier-complete",
     date: "July 11, 2026",
     headline: "Lead Sheet Builder Basic Tier is complete",

@@ -96,7 +96,7 @@ export const MODULES: ModuleEntry[] = [
           bucket: "next" as const,
         })),
     description:
-      "The flagship module. Compose practice routines from every module. AI Coach drafts personalized sessions. Track every minute by category; build methodology-based templates. See ROUTINE-DESIGN.md v0.2 for the full flagship design + MY-PRACTICE-BUILD-PLAN.md for the 8-slice build.",
+      "The flagship module. Build routines from every drilling module, track songs in your repertoire, group things into cross-module Collections, and see where your time went in Reports (streaks, category time, calendar heatmap). AI Coach chat drafts routines from your library, suggests methodologies, and can propose new songs / collections with your approval.",
     icon: CalendarCheck,
   },
   {
