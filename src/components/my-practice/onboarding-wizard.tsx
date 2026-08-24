@@ -12,7 +12,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listMethodologyTemplates,
   templateToRoutineItems,
@@ -81,6 +81,16 @@ export function MyPracticeOnboardingWizard({
     ).filter((t): t is MethodologyTemplate => t !== undefined);
     return featured;
   }, []);
+
+  // Esc closes for a11y — matches every other modal in the app.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 

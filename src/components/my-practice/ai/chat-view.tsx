@@ -238,9 +238,15 @@ export function ChatView() {
         onDelete={handleDeleteConversation}
       />
 
-      {/* Message log */}
+      {/* Message log — aria-live="polite" so assistant streaming
+          gets announced to screen readers. role="log" gives the
+          right semantics for a growing conversation transcript. */}
       <div
         ref={scrollRef}
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-label="AI Coach conversation"
         className="flex flex-1 flex-col gap-3 overflow-y-auto rounded-md border border-border/60 bg-background/30 p-4"
       >
         {messages.length === 0 && !isStreaming && <EmptyState />}

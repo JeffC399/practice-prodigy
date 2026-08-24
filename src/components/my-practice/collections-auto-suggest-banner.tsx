@@ -63,7 +63,11 @@ export function CollectionsAutoSuggestBanner<TItem extends { id: string }>({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex flex-wrap items-center gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2"
+    >
       <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-sm text-foreground">
