@@ -315,6 +315,12 @@ export type UserPrefs = {
    */
   hasSeenScaleDrillerOnboarding: boolean;
   /**
+   * Slice G.1 (Phase 159) — Has the user dismissed the 3-step
+   * My Practice onboarding wizard? The wizard auto-opens on the
+   * first visit to /my-practice and never again once dismissed.
+   */
+  hasSeenMyPracticeOnboarding: boolean;
+  /**
    * Phase 44 — id of the last release note the user dismissed. When
    * the top entry in RELEASE_NOTES has a different id, the "What's
    * new" modal auto-opens on first mount. Undefined = first-ever
@@ -410,6 +416,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   hasSeenOnboarding: false,
   hasSeenKeySequencerOnboarding: false,
   hasSeenScaleDrillerOnboarding: false,
+  hasSeenMyPracticeOnboarding: false,
   // Phase 34 defaults preserve the original brand look.
   themePalette: "default",
   customAccent: null,
@@ -544,6 +551,7 @@ type UserPrefsStore = UserPrefs & {
   dismissKeySequencerOnboarding: () => void;
   /** Phase 62 — Same for the Scale Driller onboarding. */
   dismissScaleDrillerOnboarding: () => void;
+  dismissMyPracticeOnboarding: () => void;
   /** Phase 44 — Stamp the id of the release note the user just saw. */
   markReleaseNoteSeen: (id: string) => void;
   /** Reset all prefs to defaults. Used by the future Settings reset action. */
@@ -648,6 +656,8 @@ export const useUserPrefs = create<UserPrefsStore>()(
         set({ hasSeenKeySequencerOnboarding: true }),
       dismissScaleDrillerOnboarding: () =>
         set({ hasSeenScaleDrillerOnboarding: true }),
+      dismissMyPracticeOnboarding: () =>
+        set({ hasSeenMyPracticeOnboarding: true }),
       markReleaseNoteSeen: (id) => set({ lastSeenReleaseId: id }),
       resetAll: () => set(DEFAULT_USER_PREFS),
       resetAppearance: () =>

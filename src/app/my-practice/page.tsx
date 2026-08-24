@@ -19,6 +19,11 @@ import {
 } from "@/components/my-practice/tabs-shell";
 import { CollectionsTab } from "@/components/my-practice/collections-tab";
 import { MethodologyTab } from "@/components/my-practice/methodology/methodology-tab";
+import {
+  createRoutineFromTemplate,
+  MyPracticeOnboardingWizard,
+  useMyPracticeOnboarding,
+} from "@/components/my-practice/onboarding-wizard";
 import { ReportsTab } from "@/components/my-practice/reports/reports-tab";
 import { RoutineBuilder } from "@/components/my-practice/routine-builder";
 import { RoutineCard } from "@/components/my-practice/routine-card";
@@ -152,6 +157,37 @@ function MyPracticeContent() {
     }
   }, [openRoutineId, openRoutine, handleCloseRoutine]);
 
+  // Slice G.1 (Phase 159) — First-visit onboarding wizard. Opens on
+  // first mount for users who haven't dismissed it. Dismiss handler
+  // also marks the pref so it never re-opens.
+  const { seen: seenOnboarding, dismiss: dismissOnboarding } =
+    useMyPracticeOnboarding();
+  const [wizardOpen, setWizardOpen] = useState(false);
+  useEffect(() => {
+    // MyPracticeContent only renders after MyPracticePage's mounted
+    // guard passes, so we can consult the pref directly.
+    if (!seenOnboarding) {
+      setWizardOpen(true);
+    }
+  }, [seenOnboarding]);
+  const closeWizard = useCallback(() => {
+    setWizardOpen(false);
+    dismissOnboarding();
+  }, [dismissOnboarding]);
+  const handleWizardTryTemplate = useCallback(
+    (template: Parameters<typeof createRoutineFromTemplate>[0]) => {
+      const id = createRoutineFromTemplate(template);
+      // Navigate to the builder for the freshly-created routine so
+      // the user lands on a functional edit surface, not the wizard's
+      // afterglow.
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "routines");
+      params.set("routine", id);
+      router.push(`/my-practice?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
   return (
     <main
       id="main-content"
@@ -211,6 +247,11 @@ function MyPracticeContent() {
           )}
         </MyPracticeTabsShell>
       </div>
+      <MyPracticeOnboardingWizard
+        open={wizardOpen}
+        onClose={closeWizard}
+        onTryTemplate={handleWizardTryTemplate}
+      />
     </main>
   );
 }
