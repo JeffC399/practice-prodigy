@@ -26,9 +26,17 @@ import {
 export function CollectionsMembershipPicker({
   member,
   onDismiss,
+  ignoreRef,
 }: {
   member: CollectionMember;
   onDismiss: () => void;
+  /**
+   * Optional element whose clicks should NOT dismiss the picker. Use
+   * this to point at the toggle button that opens the picker, so
+   * clicking it again just closes via its own onClick handler instead
+   * of first dismissing (which would race with the reopen click).
+   */
+  ignoreRef?: React.RefObject<HTMLElement | null>;
 }) {
   const collections = useCollections((s) => s.collections);
   const addMember = useCollections((s) => s.addMember);
@@ -41,11 +49,14 @@ export function CollectionsMembershipPicker({
   const inputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onDismiss();
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (ignoreRef?.current?.contains(target)) return;
+      onDismiss();
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [onDismiss]);
+  }, [onDismiss, ignoreRef]);
 
   // Auto-focus the "new collection" input when the picker opens with
   // no collections yet — that's the ONLY productive action from the
