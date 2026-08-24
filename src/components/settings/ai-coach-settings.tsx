@@ -172,7 +172,8 @@ export function AgencyModePickerField() {
   const agencyMode = useAiCoachConfig((s) => s.agencyMode);
   const setAgencyMode = useAiCoachConfig((s) => s.setAgencyMode);
   const modes: AiAgencyMode[] = ["passive", "active"];
-  const ACTIVE_READY = false; // Flip when Phase 146 ships.
+  // Slice F.10 (Phase 157) — Active mode shipped. Users can opt in.
+  const ACTIVE_READY = true;
 
   return (
     <div className="flex flex-col gap-2">

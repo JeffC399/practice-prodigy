@@ -1,5 +1,9 @@
-import { streamText, type ModelMessage } from "ai";
+import { streamText, tool, type ModelMessage } from "ai";
 import { NextResponse } from "next/server";
+import {
+  activeModeToolInputSchemas,
+  type ActiveModeToolName,
+} from "@/lib/ai/tools";
 
 /**
  * /api/ai/chat — Slice F.1 (Phase 139).
@@ -55,6 +59,13 @@ type ChatRequestBody = {
   model?: string;
   systemPrompt?: string;
   byokKey?: string;
+  /**
+   * Slice F.10 (Phase 157) — When true, expose Active-mode tools
+   * (propose_song, propose_collection, propose_routine). Client
+   * confirms + executes each tool call locally. Default false so
+   * Passive mode remains the safe default.
+   */
+  agencyMode?: "passive" | "active";
 };
 
 export async function POST(req: Request) {
@@ -73,6 +84,7 @@ export async function POST(req: Request) {
     model = "anthropic/claude-sonnet-4-6",
     systemPrompt,
     byokKey,
+    agencyMode = "passive",
   } = body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -113,6 +125,16 @@ export async function POST(req: Request) {
     // provider. If Vercel Gateway isn't reachable (e.g. missing
     // AI_GATEWAY_API_KEY in dev), the SDK will surface a clear
     // error the client can display.
+    // Slice F.10 (Phase 157) — Active mode exposes tools whose calls
+    // stream down to the client as tool-call parts. The client
+    // renders a confirmation card + dispatches the mutation locally
+    // when the user confirms, then feeds the tool result back into
+    // the conversation via useChat's addToolResult.
+    const tools =
+      agencyMode === "active"
+        ? buildActiveModeTools()
+        : undefined;
+
     const result = streamText({
       model,
       messages,
@@ -123,6 +145,7 @@ export async function POST(req: Request) {
       // direct-to-provider bypass, we'd import the provider SDK
       // directly here — for now, hybrid is simpler.
       headers: usingBYOK ? providerHeaders(model, byokKey.trim()) : undefined,
+      tools,
     });
 
     // Slice F.12 (Phase 155) — Attach token usage to the assistant
@@ -175,3 +198,39 @@ function providerHeaders(
       return { authorization: `Bearer ${key}` };
   }
 }
+
+/**
+ * Build the Active-mode tool set for AI SDK v7. Each tool is
+ * declared with its Zod input schema + a short description. NONE
+ * of the tools have server-side execute() functions — the model's
+ * tool call streams down to the client as a tool-input part, and
+ * the client executes the mutation locally after the user confirms.
+ * The `execute` omission signals "human-in-the-loop" per AI SDK v7
+ * docs.
+ */
+function buildActiveModeTools() {
+  return {
+    propose_song: tool({
+      description: TOOL_DESCRIPTIONS.propose_song,
+      inputSchema: activeModeToolInputSchemas.propose_song,
+    }),
+    propose_collection: tool({
+      description: TOOL_DESCRIPTIONS.propose_collection,
+      inputSchema: activeModeToolInputSchemas.propose_collection,
+    }),
+    propose_routine: tool({
+      description: TOOL_DESCRIPTIONS.propose_routine,
+      inputSchema: activeModeToolInputSchemas.propose_routine,
+    }),
+  };
+}
+
+const TOOL_DESCRIPTIONS: Record<ActiveModeToolName, string> = {
+  propose_song:
+    "Propose adding a song to the user's repertoire library. Requires their confirmation before the song is created. Use when the user names a piece they want to work on.",
+  propose_collection:
+    "Propose creating a new cross-module collection (a named group that can contain drills / sheets / songs together). Requires user confirmation. Use when the user asks to organize related material.",
+  propose_routine:
+    "Propose creating a full routine with named items in order. Requires user confirmation before it's saved. Items can reference existing library ids from the context — invalid refs are rejected client-side.",
+};
+

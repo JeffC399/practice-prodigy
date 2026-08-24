@@ -15,8 +15,12 @@ import {
 } from "@/lib/ai/coach-usage";
 import { buildContextBody } from "@/lib/ai/context-assembly";
 import { parseRoutineDraft } from "@/lib/ai/routine-parser";
-import { buildPassiveSystemPrompt } from "@/lib/ai/system-prompts";
+import {
+  buildActiveSystemPrompt,
+  buildPassiveSystemPrompt,
+} from "@/lib/ai/system-prompts";
 import { RoutineDraftCard } from "./routine-draft-card";
+import { ToolProposalCard } from "./tool-proposal-card";
 
 /**
  * ChatView — Slice F.4 (Phase 140).
@@ -53,6 +57,7 @@ export function ChatView() {
   const model = useAiCoachConfig((s) => s.model);
   const byokKey = useAiCoachConfig((s) => s.byokKey);
   const authPath = useAiCoachConfig((s) => s.authPath);
+  const agencyMode = useAiCoachConfig((s) => s.agencyMode);
 
   const conversations = useAiCoachHistory((s) => s.conversations);
   const activeConversationId = useAiCoachHistory(
@@ -96,23 +101,34 @@ export function ChatView() {
             messages,
             model,
             byokKey: byokKey || undefined,
-            systemPrompt: buildPassiveSystemPrompt(buildContextBody()),
+            agencyMode,
+            systemPrompt:
+              agencyMode === "active"
+                ? buildActiveSystemPrompt(buildContextBody())
+                : buildPassiveSystemPrompt(buildContextBody()),
           },
         }),
       }),
-    [model, byokKey],
+    [model, byokKey, agencyMode],
   );
 
   // Key useChat by the active conversation id so switching or
   // creating one gets a fresh hook instance seeded with the stored
   // messages. Without the key, useChat's internal state would leak
   // across conversation switches.
-  const { messages, sendMessage, status, error, regenerate, setMessages } =
-    useChat({
-      id: activeConversationId ?? undefined,
-      transport,
-      messages: activeConversation?.messages ?? [],
-    });
+  const {
+    messages,
+    sendMessage,
+    status,
+    error,
+    regenerate,
+    setMessages,
+    addToolResult,
+  } = useChat({
+    id: activeConversationId ?? undefined,
+    transport,
+    messages: activeConversation?.messages ?? [],
+  });
 
   // Persist to history whenever the message log changes. Skips the
   // empty initial state so a freshly-created conversation doesn't
@@ -229,7 +245,17 @@ export function ChatView() {
       >
         {messages.length === 0 && !isStreaming && <EmptyState />}
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            onToolResult={(toolName, toolCallId, result) => {
+              addToolResult({
+                tool: toolName,
+                toolCallId,
+                output: result,
+              });
+            }}
+          />
         ))}
         {isStreaming && messages.at(-1)?.role !== "assistant" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -314,25 +340,49 @@ export function ChatView() {
   );
 }
 
+type MessagePart = {
+  type: string;
+  text?: string;
+  toolCallId?: string;
+  toolName?: string;
+  input?: unknown;
+  state?: string;
+};
+
 function MessageBubble({
   message,
+  onToolResult,
 }: {
   message: {
     id: string;
     role: string;
-    parts: Array<{ type: string; text?: string }>;
+    parts: MessagePart[];
   };
+  onToolResult: (
+    toolName: string,
+    toolCallId: string,
+    result: unknown,
+  ) => void;
 }) {
   const isUser = message.role === "user";
-  const text = message.parts
-    .filter((p) => p.type === "text")
-    .map((p) => p.text ?? "")
-    .join("");
+  const textParts = message.parts.filter((p) => p.type === "text");
+  const text = textParts.map((p) => p.text ?? "").join("");
+
+  // Slice F.10 (Phase 157) — Extract tool-call parts. Their part.type
+  // in AI SDK v7 is `tool-<toolName>`; we render each as a
+  // ToolProposalCard. Only the "input-available" state produces the
+  // interactive confirm card — "output-available" means the user
+  // already resolved it.
+  const toolCalls = message.parts.filter((p) =>
+    p.type.startsWith("tool-"),
+  );
 
   // Slice F.5 (Phase 142) — Look for a routine draft in assistant
-  // messages. When found, render the draft card BELOW the raw text
-  // so the user sees both what the AI said and the actionable draft.
-  const draft = !isUser && text ? parseRoutineDraft(text) : null;
+  // text when no tool call was used.
+  const draft =
+    !isUser && text && toolCalls.length === 0
+      ? parseRoutineDraft(text)
+      : null;
 
   return (
     <div
@@ -341,21 +391,50 @@ function MessageBubble({
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
         {isUser ? "You" : "AI Coach"}
       </span>
-      <div
-        className={`max-w-[90%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm leading-relaxed ${
-          isUser
-            ? "border border-primary/40 bg-primary/10 text-foreground"
-            : "border border-border/60 bg-background/60 text-foreground"
-        }`}
-      >
-        {text || (
-          <span className="italic text-muted-foreground">(empty message)</span>
-        )}
-      </div>
+      {text && (
+        <div
+          className={`max-w-[90%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm leading-relaxed ${
+            isUser
+              ? "border border-primary/40 bg-primary/10 text-foreground"
+              : "border border-border/60 bg-background/60 text-foreground"
+          }`}
+        >
+          {text}
+        </div>
+      )}
+      {toolCalls.map((tc, i) => {
+        // AI SDK v7 encodes tool calls as parts with type
+        // "tool-<toolName>". Strip the prefix to get the name.
+        const toolName = tc.type.startsWith("tool-")
+          ? tc.type.slice(5)
+          : tc.type;
+        const toolCallId = tc.toolCallId ?? `${message.id}-${i}`;
+        const input = tc.input;
+        // Show the card only while input is available; skip when the
+        // client has already dispatched a result (output-available
+        // or output-error states).
+        const isPending = tc.state === "input-available";
+        if (!isPending) return null;
+        return (
+          <div key={toolCallId} className="w-full max-w-[90%]">
+            <ToolProposalCard
+              toolName={toolName}
+              toolCallId={toolCallId}
+              input={input}
+              onResolved={(resolution) =>
+                onToolResult(toolName, toolCallId, resolution)
+              }
+            />
+          </div>
+        );
+      })}
       {draft && (
         <div className="w-full max-w-[90%]">
           <RoutineDraftCard draft={draft} />
         </div>
+      )}
+      {!text && toolCalls.length === 0 && (
+        <span className="italic text-muted-foreground">(empty message)</span>
       )}
     </div>
   );
