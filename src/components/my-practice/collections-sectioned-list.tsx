@@ -25,6 +25,8 @@ import {
   ChevronRight,
   FolderTree,
   GripVertical,
+  Lightbulb,
+  X,
 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { BulkAddToCollectionMenu } from "./bulk-add-to-collection-menu";
@@ -34,6 +36,7 @@ import {
   type CollectionMember,
   type CollectionMemberType,
 } from "@/lib/practice/collections";
+import { usePersistedState } from "@/lib/util/persisted-state";
 
 /**
  * CollectionsSectionedList — Slice I.4 (Phase 151), + DnD in Phase 163.
@@ -130,6 +133,13 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const bulkTriggerRef = useRef<HTMLButtonElement | null>(null);
 
+  // First-run drag hint. Shown once per user (persisted per module via
+  // memberType) until they either dismiss it or actually drag
+  // something. Only surfaces when they have both items AND at least
+  // one collection — otherwise there's nowhere to drag to yet.
+  const [dragHintDismissed, setDragHintDismissed] =
+    usePersistedState<boolean>(`drag-hint:${memberType}`, false);
+
   const exitSelectionMode = () => {
     setSelectionMode(false);
     setSelected(new Set());
@@ -170,6 +180,10 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
     const activeId = String(active.id);
     const overId = String(over.id);
     if (activeId === overId) return;
+
+    // First successful drag → the user has clearly discovered the
+    // feature; no need to keep suggesting it.
+    if (!dragHintDismissed) setDragHintDismissed(true);
 
     const sourceSection = findSectionOfItem(activeId);
     if (!sourceSection) return;
@@ -299,6 +313,34 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
           onCommitted={exitSelectionMode}
         />
       )}
+
+      {!dragHintDismissed &&
+        !selectionMode &&
+        collections.length > 0 &&
+        items.length > 0 && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5"
+          >
+            <Lightbulb
+              className="h-3.5 w-3.5 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+              <span className="text-foreground">Tip —</span> hover a card to
+              reveal the grip in its lower-left corner, then drag to move
+              items between collections.
+            </span>
+            <button
+              type="button"
+              onClick={() => setDragHintDismissed(true)}
+              aria-label="Dismiss tip"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-background/60 hover:text-foreground"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+            </button>
+          </div>
+        )}
 
       {collections.length === 0 ? (
         <div className={sectionClassName}>
