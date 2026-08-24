@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyDrillCard } from "@/components/key-sequencer/key-drill-card";
 import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
+import { usePersistedState } from "@/lib/util/persisted-state";
 import { KeySequencerLivePreview } from "@/components/key-sequencer/live-preview";
 import { PromptRowEditor } from "@/components/key-sequencer/prompt-row-editor";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
@@ -183,8 +184,14 @@ export default function KeySequencerSetupPage() {
   );
 
   // Phase 47 — both sections collapsible with summary chips.
-  const [customOpen, setCustomOpen] = useState(true);
-  const [builtInsOpen, setBuiltInsOpen] = useState(true);
+  const [customOpen, setCustomOpen] = usePersistedState(
+    "keys:custom-drills-open",
+    true,
+  );
+  const [builtInsOpen, setBuiltInsOpen] = usePersistedState(
+    "keys:built-in-drills-open",
+    true,
+  );
 
   // Phase 49 — Edit-click feedback:
   // • justLoadedDrillId flags the drill card that was just clicked so

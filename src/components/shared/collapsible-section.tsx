@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { usePersistedState } from "@/lib/util/persisted-state";
 
 /**
  * Bordered section that collapses to a compact header row with a
@@ -27,6 +28,7 @@ export function CollapsibleSection({
   open: openProp,
   onOpenChange,
   className,
+  persistKey,
 }: {
   title: string;
   summary: ReactNode;
@@ -36,12 +38,29 @@ export function CollapsibleSection({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
+  /**
+   * Optional stable id — when provided, open/closed state is persisted
+   * across page navigation + reload via localStorage. Omit for
+   * ephemeral sections (settings pages that already collapse on route
+   * change, one-off panels).
+   */
+  persistKey?: string;
 }) {
-  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  // Split state hooks by mode so we don't pay for both. `usePersistedState`
+  // reads from localStorage on mount; `useState` doesn't.
+  const [persistedOpen, setPersistedOpen] = usePersistedState<boolean>(
+    `collapsible:${persistKey ?? "__unused__"}`,
+    defaultOpen,
+  );
+  const [ephemeralOpen, setEphemeralOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
-  const open = isControlled ? openProp : internalOpen;
+  const uncontrolledOpen = persistKey ? persistedOpen : ephemeralOpen;
+  const open = isControlled ? openProp : uncontrolledOpen;
   const setOpen = (next: boolean) => {
-    if (!isControlled) setInternalOpen(next);
+    if (!isControlled) {
+      if (persistKey) setPersistedOpen(next);
+      else setEphemeralOpen(next);
+    }
     onOpenChange?.(next);
   };
   return (

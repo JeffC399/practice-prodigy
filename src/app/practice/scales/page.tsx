@@ -18,6 +18,7 @@ import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
 import { ClampedNumberInput } from "@/components/shared/clamped-number-input";
 import { OnboardingCard } from "@/components/shared/onboarding-card";
+import { usePersistedState } from "@/lib/util/persisted-state";
 import { PresetChip } from "@/components/shared/preset-chip";
 import type { CategoryId } from "@/lib/practice/categories";
 import { PITCH_CLASSES } from "@/lib/music/chord";
@@ -81,8 +82,14 @@ export default function ScaleDrillerSetupPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [customOpen, setCustomOpen] = useState(true);
-  const [builtInsOpen, setBuiltInsOpen] = useState(true);
+  const [customOpen, setCustomOpen] = usePersistedState(
+    "scales:custom-drills-open",
+    true,
+  );
+  const [builtInsOpen, setBuiltInsOpen] = usePersistedState(
+    "scales:built-in-drills-open",
+    true,
+  );
   const editingBadgeRef = useRef<HTMLDivElement | null>(null);
   const [justLoadedDrillId, setJustLoadedDrillId] = useState<string | null>(
     null,
