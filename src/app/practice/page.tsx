@@ -2514,7 +2514,7 @@ function DrillCard({
         onClick={() => onLaunch(drill)}
         className="group block w-full p-3 text-left"
       >
-        <div className="flex items-center gap-2 pr-20">
+        <div className="flex items-center gap-2 pr-20 group-data-[selecting=true]/dnd:pr-24">
           <Play
             className="h-4 w-4 shrink-0 text-primary"
             aria-hidden="true"

@@ -942,7 +942,7 @@ function ScaleDrillCard({
       <button
         type="button"
         onClick={onLaunch}
-        className="flex flex-1 flex-col items-start text-left"
+        className="flex flex-1 flex-col items-start text-left group-data-[selecting=true]/dnd:pr-8"
       >
         <span className="text-sm font-medium text-foreground">
           {drill.name}

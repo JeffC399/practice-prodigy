@@ -72,7 +72,7 @@ export function SongCard({
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border-2 border-border bg-background/40 transition-all hover:border-primary/60 hover:bg-primary/5 hover:shadow-md">
       <div className="flex flex-col gap-2 p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 group-data-[selecting=true]/dnd:pr-8">
           <Music
             className="h-4 w-4 shrink-0 text-primary"
             aria-hidden="true"

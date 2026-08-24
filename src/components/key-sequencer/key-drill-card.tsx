@@ -69,7 +69,10 @@ export function KeyDrillCard({
         onClick={() => onLaunch(drill)}
         className="flex flex-col gap-1.5 p-3 text-left"
       >
-        <div className="flex items-center gap-2">
+        {/* When the parent SortableItemRow is in selection mode (data-
+            selecting), reserve top-right space so the floating checkbox
+            chip never lands on top of the drill name. */}
+        <div className="flex items-center gap-2 group-data-[selecting=true]/dnd:pr-8">
           <Play className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="flex-1 truncate font-medium text-foreground">
             {drill.name}

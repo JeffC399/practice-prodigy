@@ -709,7 +709,12 @@ function SortableItemRow({
   const isSelected = selection?.selected.has(id) ?? false;
 
   return (
-    <div ref={setNodeRef} style={style} className="group/dnd relative">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group/dnd relative"
+      data-selecting={inSelectionMode ? "true" : undefined}
+    >
       {/* Selection overlay — only when selection mode is active. Sits
           above the card body and intercepts all clicks so the card's
           own onClick (launch drill, open editor, etc.) doesn't fire
@@ -795,7 +800,7 @@ function SelectionShell({
   if (!selection) return <>{children}</>;
   const isSelected = selection.selected.has(id);
   return (
-    <div className="relative">
+    <div className="group/dnd relative" data-selecting="true">
       <button
         type="button"
         onClick={(e) => {
