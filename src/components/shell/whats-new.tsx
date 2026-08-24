@@ -94,7 +94,7 @@ export function WhatsNewTrigger() {
             if (e.target === e.currentTarget) close();
           }}
         >
-          <div className="mt-16 flex w-full max-w-2xl flex-col gap-4 rounded-lg border border-border bg-card p-6 shadow-2xl">
+          <div className="mt-16 flex w-full min-w-0 max-w-2xl flex-col gap-4 overflow-hidden rounded-lg border border-border bg-card p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2
@@ -140,13 +140,15 @@ export function WhatsNewTrigger() {
                     {note.bullets.map((b, i) => (
                       <li
                         key={i}
-                        className="flex items-start gap-2 text-xs text-muted-foreground leading-relaxed"
+                        className="flex min-w-0 items-start gap-2 text-xs text-muted-foreground leading-relaxed"
                       >
                         <span
                           aria-hidden="true"
                           className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-primary/70"
                         />
-                        <span>{b}</span>
+                        <span className="min-w-0 flex-1 break-words">
+                          {b}
+                        </span>
                       </li>
                     ))}
                   </ul>
