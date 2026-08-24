@@ -58,7 +58,7 @@ export function KeyDrillCard({
       }`}
     >
       {isEditing && (
-        <div className="absolute right-2 top-2 z-10 rounded-full bg-primary px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-primary-foreground shadow">
+        <div className="absolute right-3 top-3 z-10 rounded-md bg-primary px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-primary-foreground">
           Editing
         </div>
       )}
@@ -72,7 +72,7 @@ export function KeyDrillCard({
             positioned EDITING chip when it's visible, so long names
             truncate cleanly instead of sliding under the chip. */}
         <div
-          className={`flex items-center gap-2 ${isEditing ? "pr-16" : ""}`}
+          className={`flex items-center gap-2 ${isEditing ? "pr-20" : ""}`}
         >
           <Play className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="flex-1 truncate font-medium text-foreground">

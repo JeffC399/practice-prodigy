@@ -26,6 +26,7 @@ import {
   FolderTree,
   GripVertical,
   Lightbulb,
+  Search,
   X,
 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
@@ -80,6 +81,8 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
   sectionClassName = "",
   enableBulkSelect = false,
   itemLabel = "drill",
+  getItemLabel,
+  searchThreshold = 10,
 }: {
   items: readonly TItem[];
   memberType: CollectionMemberType;
@@ -101,15 +104,33 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
    * "3 drills selected"). Defaults to "drill".
    */
   itemLabel?: string;
+  /**
+   * If provided, enables a name-search bar above the list once the
+   * library has more than `searchThreshold` items. The bar filters
+   * items by case-insensitive substring match on the returned label.
+   * Kept opt-in because not every caller has a natural single-string
+   * name to search on.
+   */
+  getItemLabel?: (item: TItem) => string;
+  searchThreshold?: number;
 }) {
   const collections = useCollections((s) => s.collections);
   const addMember = useCollections((s) => s.addMember);
   const removeMember = useCollections((s) => s.removeMember);
   const setMembers = useCollections((s) => s.setMembers);
 
+  const [search, setSearch] = useState("");
+  const showSearchBar =
+    !!getItemLabel && items.length > searchThreshold;
+  const filteredItems = useMemo(() => {
+    if (!getItemLabel || !search.trim()) return items;
+    const q = search.trim().toLowerCase();
+    return items.filter((it) => getItemLabel(it).toLowerCase().includes(q));
+  }, [items, getItemLabel, search]);
+
   const groups = useMemo(
-    () => groupItemsByCollection(items, collections, memberType),
-    [items, collections, memberType],
+    () => groupItemsByCollection(filteredItems, collections, memberType),
+    [filteredItems, collections, memberType],
   );
 
   // Sensors: pointer (mouse/touch) + keyboard for a11y. 6px activation
@@ -156,7 +177,15 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
   };
 
   const selectAll = () => {
-    setSelected(new Set(items.map((it) => it.id)));
+    setSelected(new Set(filteredItems.map((it) => it.id)));
+  };
+
+  const selectSection = (sectionItemIds: readonly string[]) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of sectionItemIds) next.add(id);
+      return next;
+    });
   };
 
   // Look up which section holds an item id — used to reject drags
@@ -238,10 +267,11 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
     // remove only. Handled.
   };
 
-  // Short-circuit — no collections OR no items → just render items
-  // flat. No DnD when there are no sections to drop between.
+  // Short-circuit — no items at all (before filter) → render caller's
+  // empty state. Applies to fresh libraries; search-produced empty is
+  // handled below with its own message.
   if (items.length === 0 && renderEmpty) return <>{renderEmpty()}</>;
-  if (collections.length === 0 && !enableBulkSelect) {
+  if (collections.length === 0 && !enableBulkSelect && !showSearchBar) {
     return (
       <div className={sectionClassName}>
         {items.map((item) => renderItem(item))}
@@ -250,11 +280,18 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
   }
 
   const selectionApi: SelectionApi | undefined = selectionMode
-    ? { selected, toggle: toggleSelected }
+    ? {
+        selected,
+        toggle: toggleSelected,
+        selectSection,
+        itemLabel,
+      }
     : undefined;
 
   const allSelected =
-    selectionMode && selected.size === items.length && items.length > 0;
+    selectionMode &&
+    filteredItems.length > 0 &&
+    filteredItems.every((it) => selected.has(it.id));
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
@@ -314,6 +351,42 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
         />
       )}
 
+      {showSearchBar && (
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70"
+            aria-hidden="true"
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Search ${items.length} ${
+              items.length === 1 ? itemLabel : `${itemLabel}s`
+            }…`}
+            className="w-full rounded-md border border-border/70 bg-background/60 py-1.5 pl-8 pr-8 text-xs focus:border-primary focus:outline-none"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-background/60 hover:text-foreground"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {showSearchBar &&
+        search.trim() &&
+        filteredItems.length === 0 && (
+          <div className="rounded-md border border-dashed border-border/60 bg-background/20 px-4 py-6 text-center text-xs italic text-muted-foreground">
+            No {itemLabel}s match &ldquo;{search}&rdquo;.
+          </div>
+        )}
+
       {!dragHintDismissed &&
         !selectionMode &&
         collections.length > 0 &&
@@ -342,9 +415,9 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
           </div>
         )}
 
-      {collections.length === 0 ? (
+      {showSearchBar && search.trim() && filteredItems.length === 0 ? null : collections.length === 0 ? (
         <div className={sectionClassName}>
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <SelectionShell
               key={item.id}
               id={item.id}
@@ -392,6 +465,8 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
 type SelectionApi = {
   selected: Set<string>;
   toggle: (id: string) => void;
+  selectSection: (ids: readonly string[]) => void;
+  itemLabel: string;
 };
 
 function CollectionSection<TItem extends { id: string }>({
@@ -424,41 +499,55 @@ function CollectionSection<TItem extends { id: string }>({
           : undefined
       }
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-background/60"
-      >
-        {open ? (
-          <ChevronDown
-            className="h-3.5 w-3.5 text-muted-foreground/70"
-            aria-hidden="true"
-          />
-        ) : (
-          <ChevronRight
-            className="h-3.5 w-3.5 text-muted-foreground/70"
-            aria-hidden="true"
-          />
-        )}
-        {collection.emoji ? (
-          <span className="text-base" aria-hidden="true">
-            {collection.emoji}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex flex-1 items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-background/60"
+        >
+          {open ? (
+            <ChevronDown
+              className="h-3.5 w-3.5 text-muted-foreground/70"
+              aria-hidden="true"
+            />
+          ) : (
+            <ChevronRight
+              className="h-3.5 w-3.5 text-muted-foreground/70"
+              aria-hidden="true"
+            />
+          )}
+          {collection.emoji ? (
+            <span className="text-base" aria-hidden="true">
+              {collection.emoji}
+            </span>
+          ) : (
+            <FolderTree
+              className="h-4 w-4"
+              style={{ color: collection.color ?? "currentColor" }}
+              aria-hidden="true"
+            />
+          )}
+          <span className="text-sm font-medium text-foreground">
+            {collection.name}
           </span>
-        ) : (
-          <FolderTree
-            className="h-4 w-4"
-            style={{ color: collection.color ?? "currentColor" }}
-            aria-hidden="true"
-          />
+          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+            {items.length} {items.length === 1 ? "item" : "items"}
+          </span>
+        </button>
+        {selection && items.length > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              selection.selectSection(items.map((it) => it.id))
+            }
+            title={`Select all ${items.length} in this collection`}
+            className="rounded-md border border-border/70 bg-background/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+          >
+            + Select all
+          </button>
         )}
-        <span className="text-sm font-medium text-foreground">
-          {collection.name}
-        </span>
-        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-          {items.length} {items.length === 1 ? "item" : "items"}
-        </span>
-      </button>
+      </div>
       {open && (
         <SortableContext
           items={items.map((it) => it.id)}
@@ -506,30 +595,44 @@ function UngroupedSection<TItem extends { id: string }>({
           : "border-border/60 bg-background/10"
       }`}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-background/60"
-      >
-        {open ? (
-          <ChevronDown
-            className="h-3.5 w-3.5 text-muted-foreground/70"
-            aria-hidden="true"
-          />
-        ) : (
-          <ChevronRight
-            className="h-3.5 w-3.5 text-muted-foreground/70"
-            aria-hidden="true"
-          />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex flex-1 items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-background/60"
+        >
+          {open ? (
+            <ChevronDown
+              className="h-3.5 w-3.5 text-muted-foreground/70"
+              aria-hidden="true"
+            />
+          ) : (
+            <ChevronRight
+              className="h-3.5 w-3.5 text-muted-foreground/70"
+              aria-hidden="true"
+            />
+          )}
+          <span className="text-sm font-medium text-muted-foreground">
+            {hasCollections ? "Ungrouped" : "All items"}
+          </span>
+          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+            {items.length} {items.length === 1 ? "item" : "items"}
+          </span>
+        </button>
+        {selection && items.length > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              selection.selectSection(items.map((it) => it.id))
+            }
+            title={`Select all ${items.length} ungrouped items`}
+            className="rounded-md border border-border/70 bg-background/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+          >
+            + Select all
+          </button>
         )}
-        <span className="text-sm font-medium text-muted-foreground">
-          {hasCollections ? "Ungrouped" : "All items"}
-        </span>
-        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-          {items.length} {items.length === 1 ? "item" : "items"}
-        </span>
-      </button>
+      </div>
       {open && (
         <SortableContext
           items={items.map((it) => it.id)}

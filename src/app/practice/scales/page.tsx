@@ -254,6 +254,7 @@ export default function ScaleDrillerSetupPage() {
                     memberType="scale-drill"
                     enableBulkSelect
                     itemLabel="drill"
+                    getItemLabel={(d) => d.name}
                     sectionClassName="flex flex-col gap-2"
                     renderItem={(d) => (
                       <ScaleDrillCard

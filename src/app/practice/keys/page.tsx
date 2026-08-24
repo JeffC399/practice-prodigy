@@ -573,6 +573,7 @@ export default function KeySequencerSetupPage() {
                   memberType="key-drill"
                   enableBulkSelect
                   itemLabel="drill"
+                  getItemLabel={(d) => d.name}
                   sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
                   renderItem={(d) => (
                     <KeyDrillCard
