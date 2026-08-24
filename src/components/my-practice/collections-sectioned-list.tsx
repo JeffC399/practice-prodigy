@@ -730,14 +730,14 @@ function SortableItemRow({
           }`}
         >
           <span
-            className={`absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-md border-2 shadow ${
+            className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md border-2 shadow ${
               isSelected
                 ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background/95 text-transparent"
+                : "border-border bg-background text-transparent"
             }`}
             aria-hidden="true"
           >
-            <Check className="h-3 w-3" />
+            <Check className="h-3.5 w-3.5" />
           </span>
         </button>
       )}
