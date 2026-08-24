@@ -730,7 +730,7 @@ function SortableItemRow({
           }`}
         >
           <span
-            className={`absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-md border-2 shadow ${
+            className={`absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-md border-2 shadow ${
               isSelected
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background/95 text-transparent"
