@@ -13,9 +13,9 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, FolderTree, GripVertical } from "lucide-react";
@@ -283,7 +283,7 @@ function CollectionSection<TItem extends { id: string }>({
       {open && (
         <SortableContext
           items={items.map((it) => it.id)}
-          strategy={verticalListSortingStrategy}
+          strategy={rectSortingStrategy}
         >
           <div className={sectionClassName}>
             {items.map((item) => (
@@ -348,7 +348,7 @@ function UngroupedSection<TItem extends { id: string }>({
       {open && (
         <SortableContext
           items={items.map((it) => it.id)}
-          strategy={verticalListSortingStrategy}
+          strategy={rectSortingStrategy}
         >
           <div className={sectionClassName}>
             {items.length === 0 ? (
@@ -390,26 +390,58 @@ function SortableItemRow({
     transform,
     transition,
     isDragging,
+    isOver,
+    activeIndex,
+    overIndex,
   } = useSortable({ id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
+
+  // Slice I hotfix — show an "insertion here" outline on the row
+  // that's the current drop target (but not the row being dragged
+  // itself). Direction (above vs below) mirrors dnd-kit's index
+  // comparison so the ring sits on the edge where the item would
+  // actually land.
+  const showDropRing =
+    isOver && !isDragging && activeIndex !== -1 && overIndex !== -1;
+  const dropSide =
+    showDropRing && activeIndex < overIndex ? "bottom" : "top";
 
   return (
     <div ref={setNodeRef} style={style} className="group/dnd relative">
+      {/* Drag handle — sits on the LEFT edge (vertically centered)
+          so it never conflicts with per-card badges in the top-right
+          (like the "EDITING" chip on KeyDrillCard) or top-left icons
+          (like the Play icon). Half-outside the card body so it feels
+          like a "grab this" affordance rather than obscuring content. */}
       <button
         type="button"
         {...attributes}
         {...listeners}
         aria-label="Drag to another collection or reorder"
         title="Drag to another collection or reorder"
-        className="absolute right-2 top-2 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-md border border-border/60 bg-background/80 text-muted-foreground/70 opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover/dnd:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
+        className="absolute -left-3 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 cursor-grab items-center justify-center rounded-md border border-border bg-background text-muted-foreground/70 opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover/dnd:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
       >
         <GripVertical className="h-3 w-3" aria-hidden="true" />
       </button>
+
+      {/* Insertion indicator: a strong colored line on the top or
+          bottom edge showing where the dragged item would land if
+          dropped here. Only renders while a drag is in progress AND
+          this row is the current over-target. */}
+      {showDropRing && (
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-x-0 h-1 rounded-full bg-primary ${
+            dropSide === "top" ? "-top-1" : "-bottom-1"
+          }`}
+        />
+      )}
+
       {children}
     </div>
   );
