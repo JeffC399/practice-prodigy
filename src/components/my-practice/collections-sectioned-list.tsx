@@ -26,11 +26,17 @@ import {
   FolderTree,
   GripVertical,
   Lightbulb,
+  Rows3,
   Search,
+  StretchHorizontal,
   X,
 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { BulkAddToCollectionMenu } from "./bulk-add-to-collection-menu";
+import {
+  LibraryDensityProvider,
+  type LibraryDensity,
+} from "./library-density-context";
 import {
   useCollections,
   type Collection,
@@ -160,6 +166,14 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
   // one collection — otherwise there's nowhere to drag to yet.
   const [dragHintDismissed, setDragHintDismissed] =
     usePersistedState<boolean>(`drag-hint:${memberType}`, false);
+
+  // Density mode — per-library, persisted. Compact swaps every card
+  // for a single-line "title · summary" row so power users with
+  // dozens of drills can scan through the library at a glance.
+  const [density, setDensity] = usePersistedState<LibraryDensity>(
+    `density:${memberType}`,
+    "comfortable",
+  );
 
   const exitSelectionMode = () => {
     setSelectionMode(false);
@@ -294,18 +308,51 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
     filteredItems.every((it) => selected.has(it.id));
 
   return (
-    <div className={`flex flex-col gap-3 ${className}`}>
-      {enableBulkSelect && items.length > 0 && (
+    <LibraryDensityProvider density={density}>
+      <div className={`flex flex-col gap-3 ${className}`}>
+        {enableBulkSelect && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/30 px-3 py-2">
           {!selectionMode ? (
-            <button
-              type="button"
-              onClick={() => setSelectionMode(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-            >
-              <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
-              Select multiple
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setSelectionMode(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+              >
+                <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                Select multiple
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setDensity(
+                    density === "compact" ? "comfortable" : "compact",
+                  )
+                }
+                title={
+                  density === "compact"
+                    ? "Switch to comfortable view"
+                    : "Switch to compact view (title + summary only)"
+                }
+                aria-pressed={density === "compact"}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+              >
+                {density === "compact" ? (
+                  <>
+                    <StretchHorizontal
+                      className="h-3.5 w-3.5"
+                      aria-hidden="true"
+                    />
+                    Comfortable
+                  </>
+                ) : (
+                  <>
+                    <Rows3 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Compact
+                  </>
+                )}
+              </button>
+            </>
           ) : (
             <>
               <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -458,7 +505,8 @@ export function CollectionsSectionedList<TItem extends { id: string }>({
           </div>
         </DndContext>
       )}
-    </div>
+      </div>
+    </LibraryDensityProvider>
   );
 }
 

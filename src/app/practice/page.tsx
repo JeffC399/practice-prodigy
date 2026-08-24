@@ -60,6 +60,7 @@ import {
 } from "@/lib/state/practice-config";
 import { useDrillsLibrary, type Drill } from "@/lib/state/drills-library";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { useLibraryDensity } from "@/components/my-practice/library-density-context";
 import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
@@ -2489,6 +2490,7 @@ function DrillCard({
 }) {
   const c = drill.config;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const density = useLibraryDensity();
   const flags: string[] = [];
   if (
     c.orderingStrategy &&
@@ -2500,6 +2502,75 @@ function DrillCard({
   const lengthLabel = c.repeatIndefinitely
     ? `${c.drillMeasures} measures / rep`
     : `${c.drillMeasures} × ${c.repetitions} = ${c.drillMeasures * c.repetitions} measures`;
+  const compactSummary = `${c.chordPool.length} chord${
+    c.chordPool.length === 1 ? "" : "s"
+  } · ${getPatternShortName(c.arpeggioPattern)} · ♩=${c.bpm}`;
+
+  if (density === "compact") {
+    return (
+      <div
+        className={`group relative flex items-center gap-3 overflow-hidden rounded-md border bg-background/40 px-3 py-1.5 transition-all ${
+          isEditing
+            ? "border-primary/60 bg-primary/10 ring-1 ring-primary/40"
+            : "border-border hover:border-primary/60 hover:bg-primary/5"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onLaunch(drill)}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left group-data-[selecting=true]/dnd:pr-8"
+        >
+          <Play className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+          <span className="truncate text-sm font-medium text-foreground">
+            {drill.name}
+          </span>
+          <span className="shrink-0 truncate font-mono text-[11px] text-muted-foreground">
+            {compactSummary}
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto md:group-focus-within:opacity-100 md:group-focus-within:pointer-events-auto">
+          {onSetCategory && (
+            <CategoryChipWithPopover
+              value={drill.category}
+              onChange={onSetCategory}
+              align="right"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => onEdit(drill)}
+            aria-label={`Edit drill ${drill.name}`}
+            title="Edit"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          {!isShipped && onDuplicate && (
+            <button
+              type="button"
+              onClick={() => onDuplicate(drill)}
+              aria-label={`Duplicate drill ${drill.name}`}
+              title="Duplicate"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+          {!isShipped && (
+            <button
+              type="button"
+              onClick={() => onDelete(drill.id)}
+              aria-label={`Delete drill ${drill.name}`}
+              title="Delete"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

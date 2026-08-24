@@ -13,6 +13,7 @@ import {
 } from "@/lib/practice/songs-library";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
 import { CollectionsChip } from "./collections-chip";
+import { useLibraryDensity } from "./library-density-context";
 
 /**
  * SongCard — Slice C.2 (Phase 129).
@@ -58,6 +59,8 @@ export function SongCard({
     setSongStatus(song.id, next);
   };
 
+  const density = useLibraryDensity();
+
   const summaryParts: string[] = [];
   if (song.totalPracticeSeconds > 0) {
     summaryParts.push(formatDuration(song.totalPracticeSeconds));
@@ -68,6 +71,69 @@ export function SongCard({
     summaryParts.push("not yet practiced");
   }
   const summary = summaryParts.join(" · ");
+
+  const inlineMeta = [
+    song.artist,
+    song.songKey,
+    song.timeSignature,
+    SONG_STATUS_LABELS[song.status],
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  if (density === "compact") {
+    return (
+      <div className="group relative flex items-center gap-3 overflow-hidden rounded-md border border-border bg-background/40 px-3 py-1.5 transition-all hover:border-primary/60 hover:bg-primary/5">
+        <div className="flex min-w-0 flex-1 items-center gap-2 group-data-[selecting=true]/dnd:pr-8">
+          <Music
+            className="h-3.5 w-3.5 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <span className="truncate text-sm font-medium text-foreground">
+            {song.title}
+          </span>
+          {inlineMeta && (
+            <span className="shrink-0 truncate font-mono text-[11px] text-muted-foreground">
+              {inlineMeta}
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto">
+          {linkedSheet && (
+            <Link
+              href={`/sheets/${linkedSheet.id}`}
+              aria-label={`Open sheet ${linkedSheet.title || "Untitled"}`}
+              title="Open linked sheet"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          )}
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(song.id)}
+              aria-label={`Edit song ${song.title}`}
+              title="Edit"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Music className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => deleteSong(song.id)}
+            aria-label={`Delete song ${song.title}`}
+            title="Delete"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border-2 border-border bg-background/40 transition-all hover:border-primary/60 hover:bg-primary/5 hover:shadow-md">

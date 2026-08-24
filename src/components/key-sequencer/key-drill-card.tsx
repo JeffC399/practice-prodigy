@@ -4,6 +4,7 @@ import { Copy, Pencil, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
+import { useLibraryDensity } from "@/components/my-practice/library-density-context";
 import type { KeyDrill } from "@/lib/key-sequencer/types";
 import type { CategoryId } from "@/lib/practice/categories";
 import { ORDERING_STRATEGY_DISPLAY_NAMES } from "@/lib/state/practice-config";
@@ -38,6 +39,7 @@ export function KeyDrillCard({
   onSetCategory?: (category: CategoryId | undefined) => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const density = useLibraryDensity();
   const c = drill.config;
   const summary = [
     `${c.keyPool.length} ${c.keyPool.length === 1 ? "key" : "keys"}`,
@@ -48,6 +50,75 @@ export function KeyDrillCard({
       ? "loop"
       : `${c.repetitions} pass${c.repetitions === 1 ? "" : "es"}`,
   ].join(" · ");
+
+  // Compact mode — one-line row with title + summary only. Category /
+  // collection management and card actions all move to hover-revealed
+  // buttons on the right so the row height stays minimal. Meant for
+  // scanning through dozens of drills at once.
+  if (density === "compact") {
+    return (
+      <div
+        className={`group relative flex items-center gap-3 overflow-hidden rounded-md border bg-background/40 px-3 py-1.5 transition-all ${
+          isEditing
+            ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+            : "border-border hover:border-primary/60 hover:bg-primary/5"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onLaunch(drill)}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left group-data-[selecting=true]/dnd:pr-8"
+        >
+          <Play
+            className="h-3.5 w-3.5 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <span className="truncate text-sm font-medium text-foreground">
+            {drill.name}
+          </span>
+          <span className="shrink-0 truncate font-mono text-[11px] text-muted-foreground">
+            {summary}
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto md:group-focus-within:opacity-100 md:group-focus-within:pointer-events-auto">
+          {onSetCategory && (
+            <CategoryChipWithPopover
+              value={drill.category}
+              onChange={onSetCategory}
+              align="right"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => onEdit(drill)}
+            aria-label={`Edit drill ${drill.name}`}
+            title="Edit"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDuplicate(drill)}
+            aria-label={`Duplicate drill ${drill.name}`}
+            title="Duplicate"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(drill.id)}
+            aria-label={`Delete drill ${drill.name}`}
+            title="Delete"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

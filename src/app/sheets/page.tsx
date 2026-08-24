@@ -8,6 +8,7 @@ import { CategoryChipWithPopover } from "@/components/practice/category-chip-wit
 import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
+import { useLibraryDensity } from "@/components/my-practice/library-density-context";
 import { SheetThumbnail } from "@/components/sheets/sheet-thumbnail";
 import { decodeSheet } from "@/lib/sheets/share";
 import { useSheetsLibrary } from "@/lib/state/sheets-library";
@@ -286,10 +287,93 @@ export default function SheetsLibraryPage() {
               getItemLabel={(s) => s.title ?? ""}
               sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
               renderItem={(sheet) => (
-              <div
-                key={sheet.id}
-                className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card/40 transition-all hover:border-primary/40 hover:shadow-md"
-              >
+                <SheetCardWrapper
+                  key={sheet.id}
+                  sheet={sheet}
+                  updateSheet={updateSheet}
+                  deleteSheet={deleteSheet}
+                  confirmDeleteId={confirmDeleteId}
+                  setConfirmDeleteId={setConfirmDeleteId}
+                />
+              )}
+            />
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function SheetCardWrapper({
+  sheet,
+  updateSheet,
+  deleteSheet,
+  confirmDeleteId,
+  setConfirmDeleteId,
+}: {
+  sheet: import("@/lib/sheets/types").Sheet;
+  updateSheet: (
+    id: string,
+    patch: Partial<import("@/lib/sheets/types").Sheet>,
+  ) => void;
+  deleteSheet: (id: string) => void;
+  confirmDeleteId: string | null;
+  setConfirmDeleteId: (id: string | null) => void;
+}) {
+  const density = useLibraryDensity();
+
+  if (density === "compact") {
+    return (
+      <div className="group relative flex items-center gap-3 overflow-hidden rounded-md border border-border bg-card/40 px-3 py-1.5 transition-all hover:border-primary/40">
+        <Link
+          href={`/sheets/${sheet.id}`}
+          aria-label={`Open ${sheet.title || "Untitled"}`}
+          className="flex min-w-0 flex-1 items-center gap-2 group-data-[selecting=true]/dnd:pr-8"
+        >
+          <FileMusic
+            className="h-3.5 w-3.5 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <span className="truncate text-sm font-medium text-foreground">
+            {sheet.title || "Untitled"}
+          </span>
+          <span className="shrink-0 truncate font-mono text-[11px] text-muted-foreground">
+            {sheet.keyTonic} {sheet.keyMode} ·{" "}
+            {sheet.timeSignature.beatsPerMeasure}/
+            {sheet.timeSignature.beatUnit} · {sheet.measures.length} bar
+            {sheet.measures.length === 1 ? "" : "s"}
+          </span>
+        </Link>
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto">
+          <CategoryChipWithPopover
+            value={sheet.category}
+            onChange={(cat) => updateSheet(sheet.id, { category: cat })}
+            align="right"
+          />
+          <Link
+            href={`/sheets/${sheet.id}/edit`}
+            aria-label={`Edit ${sheet.title}`}
+            title="Edit"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => deleteSheet(sheet.id)}
+            aria-label={`Delete ${sheet.title}`}
+            title="Delete"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card/40 transition-all hover:border-primary/40 hover:shadow-md">
                 <Link
                   href={`/sheets/${sheet.id}`}
                   className="flex flex-col"
@@ -389,11 +473,5 @@ export default function SheetsLibraryPage() {
                   )}
                 </div>
               </div>
-              )}
-            />
-          </>
-        )}
-      </div>
-    </main>
   );
 }

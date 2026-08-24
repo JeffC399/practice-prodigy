@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CategoryChipWithPopover } from "@/components/practice/category-chip-with-popover";
+import { useLibraryDensity } from "@/components/my-practice/library-density-context";
 import { CollectionsAutoSuggestBanner } from "@/components/my-practice/collections-auto-suggest-banner";
 import { CollectionsChip } from "@/components/my-practice/collections-chip";
 import { CollectionsSectionedList } from "@/components/my-practice/collections-sectioned-list";
@@ -926,6 +927,7 @@ function ScaleDrillCard({
   onSetCategory?: (category: CategoryId | undefined) => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const density = useLibraryDensity();
   const summary = useMemo(() => {
     const pool = drill.config.scalePool.length;
     const bpm = drill.config.bpm;
@@ -935,22 +937,34 @@ function ScaleDrillCard({
 
   return (
     <div
-      className={`group flex items-center justify-between gap-3 rounded-md border border-border bg-card/40 px-4 py-3 transition-colors hover:border-primary/50 ${
-        justLoaded ? "animate-pulse" : ""
-      }`}
+      className={`group flex items-center justify-between gap-3 rounded-md border border-border bg-card/40 transition-colors hover:border-primary/50 ${
+        density === "compact" ? "px-3 py-1.5" : "px-4 py-3"
+      } ${justLoaded ? "animate-pulse" : ""}`}
     >
       <button
         type="button"
         onClick={onLaunch}
-        className="flex flex-1 flex-col items-start text-left group-data-[selecting=true]/dnd:pr-8"
+        className={`flex flex-1 text-left group-data-[selecting=true]/dnd:pr-8 ${
+          density === "compact"
+            ? "min-w-0 flex-row items-center gap-2"
+            : "flex-col items-start"
+        }`}
       >
-        <span className="text-sm font-medium text-foreground">
+        <span
+          className={`font-medium text-foreground ${
+            density === "compact" ? "truncate text-sm" : "text-sm"
+          }`}
+        >
           {drill.name}
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground/70">
+        <span
+          className={`font-mono text-muted-foreground/70 ${
+            density === "compact" ? "shrink-0 truncate text-[11px]" : "text-[11px]"
+          }`}
+        >
           {summary}
         </span>
-        {drill.notes && (
+        {drill.notes && density !== "compact" && (
           <span className="text-[11px] italic text-muted-foreground/70">
             {drill.notes}
           </span>
