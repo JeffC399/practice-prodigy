@@ -94,7 +94,7 @@ export function WhatsNewTrigger() {
             if (e.target === e.currentTarget) close();
           }}
         >
-          <div className="mt-16 flex w-full min-w-0 max-w-2xl flex-col gap-4 overflow-hidden rounded-lg border border-border bg-card p-6 shadow-2xl">
+          <div className="mt-16 flex w-full min-w-0 max-w-2xl flex-col gap-4 rounded-lg border border-border bg-card p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2
@@ -122,21 +122,21 @@ export function WhatsNewTrigger() {
               </button>
             </div>
 
-            <div className="flex flex-col gap-5">
+            <div className="flex min-w-0 flex-col gap-5">
               {RELEASE_NOTES.slice(0, RECAP_COUNT).map((note) => (
                 <article
                   key={note.id}
-                  className="flex flex-col gap-2 rounded-md border border-border/60 bg-background/40 p-4"
+                  className="flex min-w-0 flex-col gap-2 rounded-md border border-border/60 bg-background/40 p-4"
                 >
                   <header className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-foreground">
+                    <h3 className="min-w-0 break-words text-sm font-semibold text-foreground">
                       {note.headline}
                     </h3>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                       {note.date}
                     </span>
                   </header>
-                  <ul className="flex flex-col gap-1.5">
+                  <ul className="flex min-w-0 flex-col gap-1.5">
                     {note.bullets.map((b, i) => (
                       <li
                         key={i}
@@ -146,7 +146,10 @@ export function WhatsNewTrigger() {
                           aria-hidden="true"
                           className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-primary/70"
                         />
-                        <span className="min-w-0 flex-1 break-words">
+                        <span
+                          className="min-w-0 flex-1 whitespace-normal break-words"
+                          style={{ overflowWrap: "anywhere" }}
+                        >
                           {b}
                         </span>
                       </li>
