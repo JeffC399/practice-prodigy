@@ -38,6 +38,7 @@ export function CollectionsMembershipPicker({
   const [newName, setNewName] = useState("");
 
   const ref = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) onDismiss();
@@ -45,6 +46,13 @@ export function CollectionsMembershipPicker({
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [onDismiss]);
+
+  // Auto-focus the "new collection" input when the picker opens with
+  // no collections yet — that's the ONLY productive action from the
+  // empty state, so we put the caret there so typing just works.
+  useEffect(() => {
+    if (collections.length === 0) inputRef.current?.focus();
+  }, [collections.length]);
 
   const sorted = useMemo(
     () =>
@@ -98,9 +106,22 @@ export function CollectionsMembershipPicker({
       </div>
 
       {sorted.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border/60 bg-background/40 px-2 py-3 text-center text-[11px] text-muted-foreground">
-          No collections yet — create one below.
-        </p>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.focus()}
+          className="flex flex-col items-center gap-1 rounded-md border border-dashed border-primary/40 bg-primary/5 px-3 py-3 text-center transition-colors hover:border-primary/60 hover:bg-primary/10"
+        >
+          <FolderTree
+            className="h-4 w-4 text-primary"
+            aria-hidden="true"
+          />
+          <span className="text-[11px] font-medium text-foreground">
+            Create your first collection
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            Type a name below — this drill will be added to it.
+          </span>
+        </button>
       ) : (
         <ul className="flex max-h-52 flex-col gap-0.5 overflow-y-auto">
           {sorted.map((c) => {
@@ -167,6 +188,7 @@ export function CollectionsMembershipPicker({
         className="flex items-center gap-1 border-t border-border/40 pt-2"
       >
         <input
+          ref={inputRef}
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}

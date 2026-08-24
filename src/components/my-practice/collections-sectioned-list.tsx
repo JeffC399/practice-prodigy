@@ -413,18 +413,20 @@ function SortableItemRow({
 
   return (
     <div ref={setNodeRef} style={style} className="group/dnd relative">
-      {/* Drag handle — sits on the LEFT edge (vertically centered)
-          so it never conflicts with per-card badges in the top-right
-          (like the "EDITING" chip on KeyDrillCard) or top-left icons
-          (like the Play icon). Half-outside the card body so it feels
-          like a "grab this" affordance rather than obscuring content. */}
+      {/* Drag handle — sits in the LOWER-LEFT corner of the card, so
+          it never conflicts with per-card badges in the top-right
+          (EDITING chip on KeyDrillCard), top-left icons (Play), or the
+          main click-to-configure body. The vertical-center position we
+          tried previously still overlapped inline "quick action" chips
+          on hover, so anchoring to the bottom edge keeps the grip well
+          clear of everything the card renders. */}
       <button
         type="button"
         {...attributes}
         {...listeners}
         aria-label="Drag to another collection or reorder"
         title="Drag to another collection or reorder"
-        className="absolute -left-3 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 cursor-grab items-center justify-center rounded-md border border-border bg-background text-muted-foreground/70 opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover/dnd:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
+        className="absolute -bottom-2 -left-2 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-md border border-border bg-background text-muted-foreground/70 opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover/dnd:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
       >
         <GripVertical className="h-3 w-3" aria-hidden="true" />
       </button>
