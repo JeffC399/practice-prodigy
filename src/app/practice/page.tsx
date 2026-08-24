@@ -923,6 +923,8 @@ export default function PracticeSetupPage() {
                 <CollectionsSectionedList
                   items={userDrills}
                   memberType="drill"
+                  enableBulkSelect
+                  itemLabel="drill"
                   sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
                   renderItem={(drill) => (
                   <DrillCard

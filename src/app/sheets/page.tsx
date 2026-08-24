@@ -281,6 +281,8 @@ export default function SheetsLibraryPage() {
             <CollectionsSectionedList
               items={filteredSheets}
               memberType="leadsheet"
+              enableBulkSelect
+              itemLabel="sheet"
               sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
               renderItem={(sheet) => (
               <div

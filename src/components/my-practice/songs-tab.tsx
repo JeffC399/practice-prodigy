@@ -131,6 +131,8 @@ export function SongsTab() {
             <CollectionsSectionedList
               items={filtered}
               memberType="song"
+              enableBulkSelect
+              itemLabel="song"
               sectionClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
               renderItem={(song) => (
                 <SongCard

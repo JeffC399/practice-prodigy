@@ -252,6 +252,8 @@ export default function ScaleDrillerSetupPage() {
                   <CollectionsSectionedList
                     items={userDrills}
                     memberType="scale-drill"
+                    enableBulkSelect
+                    itemLabel="drill"
                     sectionClassName="flex flex-col gap-2"
                     renderItem={(d) => (
                       <ScaleDrillCard
